@@ -1,0 +1,140 @@
+{
+  "_comment": "Run 'jotr configure' to set up your paths, or edit this file manually",
+  "paths": {
+    "base_dir": "",
+    "diary_dir": "Diary",
+    "todo_file_path": "todo",
+    "pdp_file_path": null
+  },
+  "_paths_note": "All paths are relative to base_dir. Don't include .md extension - it will be added automatically. Examples: 'todo', 'Work/tasks', 'Career/PDP'",
+  "format": {
+    "task_section": "Tasks",
+    "capture_section": "Captured",
+    "daily_note_sections": ["Notes", "Meetings"],
+    "daily_note_pattern": "{year}-{month}-{day}-{weekday}",
+    "daily_note_dir_pattern": "{year}/{month_num}-{month_abbr}"
+  },
+  "ai": {
+    "enabled": false,
+    "command": "ollama run llama3.2"
+  },
+  "streaks": {
+    "include_weekends": true
+  },
+  "daily_note_template": {
+    "sections": [
+      {"name": "Gratitude", "type": "list"},
+      {"name": "Goals", "type": "tasks"},
+      {"name": "Notes", "type": "freeform"},
+      {"name": "Reflection", "type": "freeform"}
+    ],
+    "prompts": {
+      "morning": [
+        {"section": "Gratitude", "question": "What are you grateful for today?"},
+        {"section": "Goals", "question": "What's your main goal today?"}
+      ],
+      "evening": [
+        {"section": "Reflection", "question": "What went well today?"},
+        {"section": "Reflection", "question": "What could be improved?"},
+        {"section": "Reflection", "question": "What did you learn?"}
+      ]
+    },
+    "weekday_sections": [
+      {"name": "Goals", "type": "tasks"},
+      {"name": "Meetings", "type": "list"},
+      {"name": "Tasks", "type": "tasks"},
+      {"name": "Notes", "type": "freeform"}
+    ],
+    "weekend_sections": [
+      {"name": "Reflection", "type": "freeform"},
+      {"name": "Planning", "type": "freeform"},
+      {"name": "Learning", "type": "freeform"},
+      {"name": "Notes", "type": "freeform"}
+    ]
+  },
+  "git": {
+    "enabled": false,
+    "auto_commit": false,
+    "auto_commit_frequency": "manual"
+  },
+  "summary": {
+    "sources": ["todo", "daily_notes"],
+    "daily_notes_exclude_sections": null,
+    "include_note_types": []
+  },
+  "frontmatter": {
+    "fields": {
+      "status": {
+        "type": "enum",
+        "values": ["in-progress", "done", "blocked", "cancelled"],
+        "required": false,
+        "description": "Note status"
+      },
+      "priority": {
+        "type": "enum",
+        "values": ["P0", "P1", "P2", "P3"],
+        "required": false,
+        "description": "Priority level"
+      },
+      "tags": {
+        "type": "list",
+        "required": false,
+        "description": "Tags for categorization"
+      },
+      "related": {
+        "type": "list",
+        "required": false,
+        "description": "Related notes"
+      },
+      "assignee": {
+        "type": "string",
+        "required": false,
+        "description": "Person assigned"
+      }
+    }
+  },
+  "note_templates": {
+    "note": {
+      "name": "Quick Note",
+      "path": "Notes",
+      "completion_status": false,
+      "patterns": [
+        {
+          "name": "Note",
+          "pattern": "{title}",
+          "template": ["Notes"]
+        }
+      ]
+    },
+    "work_tickets": {
+      "name": "Work Tickets",
+      "path": "Work/Tickets",
+      "completion_status": true,
+      "patterns": [
+        {
+          "name": "Bug Fix",
+          "pattern": "BUG-{ticket}-{priority}",
+          "template": ["Problem", "Solution", "Testing", "Related"]
+        },
+        {
+          "name": "Feature",
+          "pattern": "FEAT-{ticket}-{component}",
+          "template": ["Requirements", "Design", "Implementation", "Testing"]
+        }
+      ]
+    },
+    "investigations": {
+      "name": "Investigations",
+      "path": "Research",
+      "completion_status": false,
+      "patterns": [
+        {
+          "name": "Investigation",
+          "pattern": "Investigation-{topic}",
+          "template": ["Background", "Findings", "Conclusion", "Next Steps"]
+        }
+      ]
+    }
+  }
+}
+
