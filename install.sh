@@ -2,8 +2,8 @@
 
 set -e  # Exit on error
 
-REPO_URL="https://github.com/yourusername/jotr"
-RELEASE_URL="https://github.com/yourusername/jotr/releases/latest/download"
+REPO_URL="https://github.com/AnishShah1803/jotr"
+RELEASE_URL="https://github.com/AnishShah1803/jotr/releases/latest/download"
 BIN_DIR="/usr/local/bin"
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 CONFIG_DIR="$CONFIG_HOME/jotr"

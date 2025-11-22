@@ -252,8 +252,8 @@ Contributions welcome! Please:
 
 ## Support
 
-- 🐛 [Report Issues](https://github.com/yourusername/jotr/issues)
-- 💬 [Discussions](https://github.com/yourusername/jotr/discussions)
+- 🐛 [Report Issues](https://github.com/AnishShah1803/jotr/issues)
+- 💬 [Discussions](https://github.com/AnishShah1803/jotr/discussions)
 - 📖 [Documentation](../jotr.wiki/Home.md)
 
 ---

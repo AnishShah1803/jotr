@@ -6,19 +6,19 @@
 
 ```bash
 # Using Make (recommended)
-git clone https://github.com/yourusername/jotr
+git clone https://github.com/AnishShah1803/jotr
 cd jotr
 make install
 
 # Or using install script
-curl -fsSL https://raw.githubusercontent.com/yourusername/jotr/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/AnishShah1803/jotr/main/install.sh | bash
 ```
 
 ### Windows
 
 ```bash
 # Download binary
-curl -L https://github.com/yourusername/jotr/releases/latest/download/jotr-windows-amd64.exe -o jotr.exe
+curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-windows-amd64.exe -o jotr.exe
 
 # Move to a directory in your PATH
 move jotr.exe C:\Windows\System32\
@@ -32,7 +32,7 @@ move jotr.exe C:\Windows\System32\
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/jotr
+git clone https://github.com/AnishShah1803/jotr
 cd jotr
 
 # Build and install
@@ -60,10 +60,10 @@ make uninstall   # Remove installed binary
 
 ```bash
 # Download and run
-curl -fsSL https://raw.githubusercontent.com/yourusername/jotr/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/AnishShah1803/jotr/main/install.sh | bash
 
 # Or download first, then run
-curl -fsSL https://raw.githubusercontent.com/yourusername/jotr/main/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/AnishShah1803/jotr/main/install.sh -o install.sh
 chmod +x install.sh
 ./install.sh
 ```
@@ -83,10 +83,10 @@ Download the appropriate binary for your platform:
 **macOS:**
 ```bash
 # Intel
-curl -L https://github.com/yourusername/jotr/releases/latest/download/jotr-darwin-amd64 -o jotr
+curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-darwin-amd64 -o jotr
 
 # Apple Silicon
-curl -L https://github.com/yourusername/jotr/releases/latest/download/jotr-darwin-arm64 -o jotr
+curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-darwin-arm64 -o jotr
 
 # Install
 chmod +x jotr
@@ -96,10 +96,10 @@ sudo mv jotr /usr/local/bin/
 **Linux:**
 ```bash
 # x86_64
-curl -L https://github.com/yourusername/jotr/releases/latest/download/jotr-linux-amd64 -o jotr
+curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-linux-amd64 -o jotr
 
 # ARM64
-curl -L https://github.com/yourusername/jotr/releases/latest/download/jotr-linux-arm64 -o jotr
+curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-linux-arm64 -o jotr
 
 # Install
 chmod +x jotr
@@ -109,7 +109,7 @@ sudo mv jotr /usr/local/bin/
 **Windows:**
 ```bash
 # Download
-curl -L https://github.com/yourusername/jotr/releases/latest/download/jotr-windows-amd64.exe -o jotr.exe
+curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-windows-amd64.exe -o jotr.exe
 
 # Move to PATH (example)
 move jotr.exe C:\Windows\System32\
@@ -121,7 +121,7 @@ move jotr.exe C:\Windows\System32\
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/jotr
+git clone https://github.com/AnishShah1803/jotr
 cd jotr
 
 # Build
@@ -139,7 +139,7 @@ sudo mv jotr /usr/local/bin/
 **Prerequisites:** Go 1.21+
 
 ```bash
-go install github.com/yourusername/jotr@latest
+go install github.com/AnishShah1803/jotr@latest
 ```
 
 This installs to `$GOPATH/bin/jotr` (usually `~/go/bin/jotr`).
@@ -237,7 +237,7 @@ The script will detect existing installation and update it.
 
 ```bash
 # Download new binary
-curl -L https://github.com/yourusername/jotr/releases/latest/download/jotr-[platform] -o jotr
+curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-[platform] -o jotr
 chmod +x jotr
 sudo mv jotr /usr/local/bin/
 ```

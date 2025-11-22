@@ -89,7 +89,7 @@ gh release create v1.0.0 \
 
 #### Using GitHub Web UI
 
-1. Go to https://github.com/yourusername/jotr/releases/new
+1. Go to https://github.com/AnishShah1803/jotr/releases/new
 2. Choose tag: `v1.0.0`
 3. Release title: `jotr v1.0.0`
 4. Add release notes

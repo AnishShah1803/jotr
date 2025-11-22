@@ -14,7 +14,7 @@ Thank you for your interest in contributing to jotr!
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/jotr
+git clone https://github.com/AnishShah1803/jotr
 cd jotr
 
 # Build the project
