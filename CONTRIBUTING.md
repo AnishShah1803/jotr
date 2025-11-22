@@ -110,6 +110,8 @@ func init() {
 
 ## Testing
 
+All code changes should include appropriate test coverage.
+
 ```bash
 # Run all tests
 make test
@@ -120,6 +122,8 @@ make test-race
 # Run specific test
 go test ./internal/config -v
 ```
+
+See [TESTING.md](TESTING.md) for detailed testing guidelines and utilities.
 
 ## Documentation
 
