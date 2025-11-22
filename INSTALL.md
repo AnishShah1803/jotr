@@ -152,7 +152,30 @@ export PATH="$PATH:$(go env GOPATH)/bin"
 
 ## Post-Installation
 
-### 1. Verify Installation
+### 1. Install Optional Dependencies
+
+**For Graph Visualization (optional but recommended):**
+
+```bash
+# macOS
+brew install graphviz
+
+# Ubuntu/Debian
+sudo apt-get install graphviz
+
+# CentOS/RHEL/Fedora
+sudo yum install graphviz
+# or
+sudo dnf install graphviz
+
+# Arch Linux
+sudo pacman -S graphviz
+
+# Windows (using chocolatey)
+choco install graphviz
+```
+
+### 2. Verify Installation
 
 ```bash
 jotr version
@@ -163,7 +186,7 @@ You should see:
 jotr version 1.0.0
 ```
 
-### 2. Run Configuration Wizard
+### 3. Run Configuration Wizard
 
 ```bash
 jotr configure
@@ -175,7 +198,7 @@ This will guide you through setting up:
 - Todo file path
 - PDP file path (optional)
 
-### 3. Run Health Check
+### 4. Run Health Check
 
 ```bash
 jotr check
@@ -187,7 +210,7 @@ This verifies:
 - Editor is configured
 - Everything is working
 
-### 4. Create Your First Note
+### 5. Create Your First Note
 
 ```bash
 jotr daily

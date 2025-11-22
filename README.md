@@ -29,21 +29,21 @@ A powerful command-line note-taking and task management system built with Go.
 ✅ **Production Ready** - All core features implemented and tested!
 
 ### Completed ✅
-- [x] 20 commands fully implemented
+- [x] 20+ commands fully implemented
 - [x] Interactive TUI dashboard with 4-panel layout
 - [x] Configuration wizard
-- [x] Task sync and management
+- [x] Task sync and management with unique IDs
 - [x] Search and filtering
 - [x] Template system
 - [x] Statistics and analytics
 - [x] Health checks
+- [x] Graph visualization with DOT syntax support
 
 ### Planned 📋
 - [ ] Full test coverage
 - [ ] CI/CD pipeline
 - [ ] Binary releases for macOS, Linux, Windows
 - [ ] Git integration enhancements
-- [ ] Graph visualization
 - [ ] Plugin system
 
 ## Quick Start
@@ -110,12 +110,88 @@ jotr tags list               # List all tags
 jotr tags find work          # Find notes with tag
 jotr tags stats              # Tag statistics
 
+# Graph visualization
+jotr graph                   # Generate graph of note relationships
+
 # Other
 jotr streak                  # Show daily note streak
 jotr calendar                # Calendar view
 jotr check                   # Health check
 jotr quick                   # Quick actions menu
 ```
+
+## Task Management
+
+jotr includes a sophisticated task management system with automatic task tracking and unique identifiers.
+
+### Task ID System
+
+Every task in jotr is automatically assigned a unique identifier that enables precise tracking across notes:
+
+```markdown
+- [ ] Review project proposal <!-- id: abc123 -->
+- [x] Update documentation <!-- id: def456 -->
+```
+
+**Features:**
+- **Automatic ID generation** - New tasks get unique IDs automatically
+- **Cross-note tracking** - Same task can be referenced across multiple notes
+- **Sync intelligence** - The `sync` command uses IDs to avoid duplicates
+- **Manual ID support** - You can assign custom IDs if needed
+
+**Task ID Commands:**
+```bash
+jotr sync                    # Smart sync using task IDs
+jotr summary                 # Shows task counts with ID tracking
+jotr archive                 # Archives completed tasks by ID
+```
+
+### Daily Note Enhancements
+
+Daily notes now automatically include task sections when created:
+
+```markdown
+## Tasks
+
+### Todo
+- [ ] New task <!-- id: generated-id -->
+
+### In Progress  
+- [ ] Ongoing task <!-- id: another-id -->
+
+### Done
+- [x] Completed task <!-- id: done-id -->
+```
+
+The task sections respect your configuration settings and provide a consistent structure for task management.
+
+## Graph Visualization
+
+jotr includes powerful graph visualization capabilities to show relationships between your notes and tasks:
+
+```bash
+jotr graph                   # Generate DOT graph and open in default viewer
+```
+
+**Features:**
+- **DOT syntax output** - Generates standard Graphviz DOT files
+- **Automatic sanitization** - Handles special characters in note titles safely  
+- **Link detection** - Shows relationships between notes
+- **Visual clustering** - Groups related content visually
+
+**Requirements:**
+- `graphviz` package for rendering (see installation guide)
+
+**Example output:**
+```dot
+digraph G {
+    "Daily 2024-11-22" -> "Project Ideas"
+    "Project Ideas" -> "Technical Specs"
+    "Technical Specs" -> "Implementation"
+}
+```
+
+The graph command automatically handles complex note titles with special characters, quotes, and symbols by properly escaping them for DOT syntax compatibility.
 
 ## Commands
 
@@ -139,6 +215,7 @@ jotr quick                   # Quick actions menu
 | `check` | Health check | |
 | `dashboard` | Interactive TUI dashboard | `dash` |
 | `configure` | Configuration wizard | `config`, `cfg` |
+| `graph` | Generate graph visualization | |
 | `version` | Show version | |
 
 ## Project Structure
@@ -220,9 +297,10 @@ Build Time:    ~2 seconds
 **Build (optional):** Go 1.21+
 
 **Recommended:**
-- nvim (Neovim) or your preferred editor
+- nvim (Neovim) or your preferred editor (defaults to nvim)
 - fzf for fuzzy finding (optional but recommended)
 - git for version control (optional)
+- graphviz (for graph visualization)
 
 ## Configuration
 
