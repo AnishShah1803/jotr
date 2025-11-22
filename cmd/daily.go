@@ -32,22 +32,18 @@ Examples:
 			return err
 		}
 
-		// Determine target date
 		targetDate := time.Now()
 		if yesterday {
 			targetDate = targetDate.AddDate(0, 0, -1)
 		}
 
-		// Build note path
 		notePath := buildDailyNotePath(cfg, targetDate)
 
-		// If path only, just print and exit
 		if pathOnly {
 			fmt.Println(notePath)
 			return nil
 		}
 
-		// Create note if it doesn't exist
 		if _, err := os.Stat(notePath); os.IsNotExist(err) {
 			if err := createDailyNote(notePath, cfg, targetDate); err != nil {
 				return fmt.Errorf("failed to create daily note: %w", err)
@@ -55,7 +51,6 @@ Examples:
 			fmt.Printf("✓ Created: %s\n", notePath)
 		}
 
-		// Open in editor
 		return openInEditor(notePath)
 	},
 }
@@ -81,13 +76,11 @@ func buildDailyNotePath(cfg *config.LoadedConfig, date time.Time) string {
 }
 
 func createDailyNote(notePath string, cfg *config.LoadedConfig, date time.Time) error {
-	// Create directory if it doesn't exist
 	dir := filepath.Dir(notePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 
-	// Create note with template
 	content := fmt.Sprintf("# %s\n\n", date.Format("2006-01-02-Mon"))
 	
 	// Add sections from config

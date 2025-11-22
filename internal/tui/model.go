@@ -78,8 +78,6 @@ func NewModel(cfg *config.LoadedConfig) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	// Note: tea.EnterAltScreen is already handled by tea.WithAltScreen() in program initialization
-	// Calling it here was redundant and may have been clearing the top margin
 	return tickCmd()
 }
 

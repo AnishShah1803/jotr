@@ -76,7 +76,6 @@ func (m Model) View() string {
 		return ""
 	}
 
-	// Show error if any
 	if m.err != nil {
 		return fmt.Sprintf("\n  Error: %v\n\n  Press any key to continue...\n", m.err)
 	}
@@ -243,10 +242,8 @@ func (m Model) renderNotesPanel(width, height int) string {
 		contentWidth = 10
 	}
 
-	// Render title with width constraint to prevent overflow
 	title := tStyle.Width(contentWidth).Render("Recent Notes")
 
-	// Build all content (not limited by height)
 	content := ""
 	for i, notePath := range m.notes {
 		basename := filepath.Base(notePath)
@@ -272,13 +269,10 @@ func (m Model) renderNotesPanel(width, height int) string {
 		content = " No recent notes"
 	}
 
-	// Set viewport content
 	m.notesViewport.SetContent(content)
 
-	// Combine title and viewport
 	panel := title + "\n" + m.notesViewport.View()
 
-	// Render with border and exact width/height
 	return style.Width(width).Height(height).Render(panel)
 }
 

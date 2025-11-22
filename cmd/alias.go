@@ -106,16 +106,13 @@ func saveAliases(cfg *config.LoadedConfig, aliases map[string]string) error {
 }
 
 func addAlias(cfg *config.LoadedConfig, name, target string) error {
-	// Load existing aliases
 	aliases, err := loadAliases(cfg)
 	if err != nil {
 		return err
 	}
 
-	// Add alias
 	aliases[name] = target
 
-	// Save
 	if err := saveAliases(cfg, aliases); err != nil {
 		return err
 	}
@@ -126,21 +123,17 @@ func addAlias(cfg *config.LoadedConfig, name, target string) error {
 }
 
 func removeAlias(cfg *config.LoadedConfig, name string) error {
-	// Load existing aliases
 	aliases, err := loadAliases(cfg)
 	if err != nil {
 		return err
 	}
 
-	// Check if exists
 	if _, exists := aliases[name]; !exists {
 		return fmt.Errorf("alias not found: %s", name)
 	}
 
-	// Remove
 	delete(aliases, name)
 
-	// Save
 	if err := saveAliases(cfg, aliases); err != nil {
 		return err
 	}

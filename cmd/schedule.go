@@ -103,24 +103,20 @@ func saveScheduledNotes(cfg *config.LoadedConfig, scheduled []ScheduledNote) err
 }
 
 func addScheduledNote(cfg *config.LoadedConfig, dateStr, text string) error {
-	// Parse date
 	date, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
 		return fmt.Errorf("invalid date format (use YYYY-MM-DD): %w", err)
 	}
 
-	// Check if date is in the past
 	if date.Before(time.Now().Truncate(24 * time.Hour)) {
 		return fmt.Errorf("cannot schedule notes in the past")
 	}
 
-	// Load existing scheduled notes
 	scheduled, err := loadScheduledNotes(cfg)
 	if err != nil {
 		return err
 	}
 
-	// Create new scheduled note
 	newNote := ScheduledNote{
 		Date: date,
 		Text: text,
@@ -129,7 +125,6 @@ func addScheduledNote(cfg *config.LoadedConfig, dateStr, text string) error {
 
 	scheduled = append(scheduled, newNote)
 
-	// Save
 	if err := saveScheduledNotes(cfg, scheduled); err != nil {
 		return err
 	}

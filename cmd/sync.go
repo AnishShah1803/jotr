@@ -32,7 +32,6 @@ func init() {
 }
 
 func syncTasks(cfg *config.LoadedConfig) error {
-	// Get today's note
 	today := time.Now()
 	notePath := notes.BuildDailyNotePath(cfg.DiaryPath, today)
 
@@ -40,7 +39,6 @@ func syncTasks(cfg *config.LoadedConfig) error {
 		return fmt.Errorf("today's note doesn't exist: %s", notePath)
 	}
 
-	// Read tasks from daily note
 	dailyTasks, err := tasks.ReadTasks(notePath)
 	if err != nil {
 		return fmt.Errorf("failed to read daily note: %w", err)
@@ -67,7 +65,6 @@ func syncTasks(cfg *config.LoadedConfig) error {
 		return nil
 	}
 
-	// Read existing todo file
 	var todoContent string
 	if notes.FileExists(cfg.TodoPath) {
 		content, err := os.ReadFile(cfg.TodoPath)
@@ -76,11 +73,9 @@ func syncTasks(cfg *config.LoadedConfig) error {
 		}
 		todoContent = string(content)
 	} else {
-		// Create new todo file
 		todoContent = "# To-Do List\n\n## Tasks\n\n"
 	}
 
-	// Add tasks to todo file
 	lines := strings.Split(todoContent, "\n")
 	
 	// Find the Tasks section or create it
@@ -130,7 +125,6 @@ func syncTasks(cfg *config.LoadedConfig) error {
 
 	newLines = append(newLines, lines[insertIndex:]...)
 
-	// Write back
 	newContent := strings.Join(newLines, "\n")
 	if err := os.WriteFile(cfg.TodoPath, []byte(newContent), 0644); err != nil {
 		return fmt.Errorf("failed to write todo file: %w", err)

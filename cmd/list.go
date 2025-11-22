@@ -38,7 +38,6 @@ func init() {
 
 func listRecentNotes(cfg *config.LoadedConfig) error {
 	if listAll {
-		// List all notes
 		allNotes, err := notes.FindNotes(cfg.Paths.BaseDir)
 		if err != nil {
 			return fmt.Errorf("failed to find notes: %w", err)
@@ -52,7 +51,6 @@ func listRecentNotes(cfg *config.LoadedConfig) error {
 		return nil
 	}
 
-	// List recent daily notes
 	fmt.Printf("Recent daily notes (last %d days):\n\n", listCount)
 
 	today := time.Now()
