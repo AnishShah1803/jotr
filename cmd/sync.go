@@ -9,13 +9,14 @@ import (
 	"github.com/anish/jotr/internal/config"
 	"github.com/anish/jotr/internal/notes"
 	"github.com/anish/jotr/internal/tasks"
+	"github.com/anish/jotr/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 var syncCmd = &cobra.Command{
-	Use:   "sync",
-	Short: "Sync tasks to to-do list",
-	Long:  `Sync tasks from daily note to the main to-do list.`,
+	Use:     "sync",
+	Short:   "Sync tasks to to-do list",
+	Long:    `Sync tasks from daily note to the main to-do list.`,
 	Aliases: []string{"s"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
@@ -54,7 +55,6 @@ func syncTasks(cfg *config.LoadedConfig) error {
 	var tasksToSync []tasks.Task
 	for _, task := range dailyTasks {
 		if task.Section == taskSection && !task.Completed {
-			// Ensure task has an ID
 			tasks.EnsureTaskID(&task)
 			tasksToSync = append(tasksToSync, task)
 		}
@@ -77,8 +77,7 @@ func syncTasks(cfg *config.LoadedConfig) error {
 	}
 
 	lines := strings.Split(todoContent, "\n")
-	
-	// Find the Tasks section or create it
+
 	tasksSectionIndex := -1
 	for i, line := range lines {
 		if strings.HasPrefix(line, "## Tasks") || strings.HasPrefix(line, "## "+taskSection) {
@@ -88,27 +87,22 @@ func syncTasks(cfg *config.LoadedConfig) error {
 	}
 
 	if tasksSectionIndex == -1 {
-		// Add Tasks section at the end
 		lines = append(lines, "", "## Tasks", "")
 		tasksSectionIndex = len(lines) - 1
 	}
 
-	// Insert tasks after the section header
 	insertIndex := tasksSectionIndex + 1
-	// Skip empty lines
 	for insertIndex < len(lines) && strings.TrimSpace(lines[insertIndex]) == "" {
 		insertIndex++
 	}
 
-	// Add synced tasks
 	newLines := make([]string, 0, len(lines)+len(tasksToSync))
 	newLines = append(newLines, lines[:insertIndex]...)
-	
+
 	syncedCount := 0
 	for _, task := range tasksToSync {
 		taskLine := fmt.Sprintf("- [ ] %s", task.Text)
-		
-		// Check if task already exists
+
 		exists := false
 		for _, line := range lines {
 			if strings.Contains(line, task.Text) {
@@ -126,7 +120,7 @@ func syncTasks(cfg *config.LoadedConfig) error {
 	newLines = append(newLines, lines[insertIndex:]...)
 
 	newContent := strings.Join(newLines, "\n")
-	if err := os.WriteFile(cfg.TodoPath, []byte(newContent), 0644); err != nil {
+	if err := utils.AtomicWriteFile(cfg.TodoPath, []byte(newContent), 0644); err != nil {
 		return fmt.Errorf("failed to write todo file: %w", err)
 	}
 
@@ -134,4 +128,3 @@ func syncTasks(cfg *config.LoadedConfig) error {
 
 	return nil
 }
-

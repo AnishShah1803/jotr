@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/anish/jotr/internal/utils"
 )
 
 // Note represents a note file
@@ -25,6 +27,11 @@ func OpenInEditor(path string) error {
 		editor = "nvim"
 	}
 
+	// Validate editor exists and is executable
+	if err := utils.ValidateEditor(editor); err != nil {
+		return fmt.Errorf("editor validation failed: %w", err)
+	}
+
 	cmd := exec.Command(editor, path)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -40,6 +47,8 @@ func GetEditorCmd(path string) *exec.Cmd {
 		editor = "nvim"
 	}
 
+	// Note: We can't validate here since this is used in TUI context
+	// Validation should be done at startup or in a separate function
 	cmd := exec.Command(editor, path)
 	return cmd
 }
@@ -52,7 +61,7 @@ func FileExists(path string) bool {
 
 // EnsureDir creates a directory if it doesn't exist
 func EnsureDir(path string) error {
-	return os.MkdirAll(path, 0755)
+	return utils.EnsureDir(path)
 }
 
 // ReadNote reads a note file
@@ -77,7 +86,7 @@ func WriteNote(path string, content string) error {
 	if err := EnsureDir(dir); err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(content), 0644)
+	return utils.AtomicWriteFile(path, []byte(content), 0644)
 }
 
 // FindNotes finds all markdown files in a directory recursively
@@ -149,7 +158,7 @@ func CreateDailyNote(notePath string, sections []string, date time.Time) error {
 		content += fmt.Sprintf("## %s\n\n", section)
 	}
 
-	return os.WriteFile(notePath, []byte(content), 0644)
+	return utils.AtomicWriteFile(notePath, []byte(content), 0644)
 }
 
 // GetRecentDailyNotes gets the most recent daily notes

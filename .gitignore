@@ -12,6 +12,10 @@ jotr
 # Output of the go coverage tool
 *.out
 
+# Test coverage reports
+coverage.html
+coverage.xml
+
 # Dependency directories
 vendor/
 

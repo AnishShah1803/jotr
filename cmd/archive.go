@@ -33,7 +33,6 @@ func init() {
 }
 
 func archiveTasks(cfg *config.LoadedConfig) error {
-	// Read tasks from todo file
 	allTasks, err := tasks.ReadTasks(cfg.TodoPath)
 	if err != nil {
 		return fmt.Errorf("failed to read tasks: %w", err)
@@ -56,7 +55,6 @@ func archiveTasks(cfg *config.LoadedConfig) error {
 		return nil
 	}
 
-	// Create archive file path
 	now := time.Now()
 	archiveDir := filepath.Join(cfg.Paths.BaseDir, "Archive")
 	if err := notes.EnsureDir(archiveDir); err != nil {
@@ -65,7 +63,6 @@ func archiveTasks(cfg *config.LoadedConfig) error {
 
 	archiveFile := filepath.Join(archiveDir, fmt.Sprintf("archive-%s.md", now.Format("2006-01")))
 
-	// Read existing archive or create new
 	var archiveContent string
 	if notes.FileExists(archiveFile) {
 		content, err := os.ReadFile(archiveFile)
@@ -77,13 +74,11 @@ func archiveTasks(cfg *config.LoadedConfig) error {
 		archiveContent = fmt.Sprintf("# Archive - %s\n\n", now.Format("January 2006"))
 	}
 
-	// Add completed tasks to archive
 	archiveContent += fmt.Sprintf("\n## Archived on %s\n\n", now.Format("2006-01-02"))
 	for _, task := range completedTasks {
 		archiveContent += fmt.Sprintf("- [x] %s\n", task.Text)
 	}
 
-	// Write archive
 	if err := os.WriteFile(archiveFile, []byte(archiveContent), 0644); err != nil {
 		return fmt.Errorf("failed to write archive: %w", err)
 	}
@@ -97,7 +92,6 @@ func archiveTasks(cfg *config.LoadedConfig) error {
 	lines := strings.Split(string(content), "\n")
 	var newLines []string
 
-	// Keep non-task lines and active tasks
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		
@@ -107,7 +101,6 @@ func archiveTasks(cfg *config.LoadedConfig) error {
 		}
 	}
 
-	// Write back
 	newContent := strings.Join(newLines, "\n")
 	if err := os.WriteFile(cfg.TodoPath, []byte(newContent), 0644); err != nil {
 		return fmt.Errorf("failed to write todo file: %w", err)

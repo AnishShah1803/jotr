@@ -73,7 +73,7 @@ func getScheduleFile(cfg *config.LoadedConfig) string {
 
 func loadScheduledNotes(cfg *config.LoadedConfig) ([]ScheduledNote, error) {
 	scheduleFile := getScheduleFile(cfg)
-	
+
 	if !notes.FileExists(scheduleFile) {
 		return []ScheduledNote{}, nil
 	}
@@ -93,7 +93,7 @@ func loadScheduledNotes(cfg *config.LoadedConfig) ([]ScheduledNote, error) {
 
 func saveScheduledNotes(cfg *config.LoadedConfig, scheduled []ScheduledNote) error {
 	scheduleFile := getScheduleFile(cfg)
-	
+
 	data, err := json.MarshalIndent(scheduled, "", "  ")
 	if err != nil {
 		return err
@@ -173,7 +173,6 @@ func deleteScheduledNote(cfg *config.LoadedConfig, id string) error {
 		return err
 	}
 
-	// Find and remove
 	found := false
 	newScheduled := []ScheduledNote{}
 	for _, note := range scheduled {
@@ -191,4 +190,3 @@ func deleteScheduledNote(cfg *config.LoadedConfig, id string) error {
 
 	return saveScheduledNotes(cfg, newScheduled)
 }
-

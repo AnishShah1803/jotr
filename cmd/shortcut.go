@@ -114,21 +114,17 @@ func isReserved(name string) bool {
 }
 
 func addShortcut(cfg *config.LoadedConfig, name, command string) error {
-	// Check if name is reserved
 	if isReserved(name) {
 		return fmt.Errorf("cannot use reserved command name: %s", name)
 	}
 
-	// Load existing shortcuts
 	shortcuts, err := loadShortcuts(cfg)
 	if err != nil {
 		return err
 	}
 
-	// Add shortcut
 	shortcuts[name] = command
 
-	// Save
 	if err := saveShortcuts(cfg, shortcuts); err != nil {
 		return err
 	}
@@ -139,21 +135,17 @@ func addShortcut(cfg *config.LoadedConfig, name, command string) error {
 }
 
 func removeShortcut(cfg *config.LoadedConfig, name string) error {
-	// Load existing shortcuts
 	shortcuts, err := loadShortcuts(cfg)
 	if err != nil {
 		return err
 	}
 
-	// Check if exists
 	if _, exists := shortcuts[name]; !exists {
 		return fmt.Errorf("shortcut not found: %s", name)
 	}
 
-	// Remove
 	delete(shortcuts, name)
 
-	// Save
 	if err := saveShortcuts(cfg, shortcuts); err != nil {
 		return err
 	}

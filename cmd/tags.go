@@ -124,7 +124,6 @@ func findByTag(cfg *config.LoadedConfig, tag string) error {
 		return err
 	}
 
-	// Remove # if provided
 	tag = strings.TrimPrefix(tag, "#")
 
 	var matches []string

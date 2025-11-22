@@ -28,7 +28,6 @@ func init() {
 }
 
 func showSummary(cfg *config.LoadedConfig) error {
-	// Read tasks from todo file
 	allTasks, err := tasks.ReadTasks(cfg.TodoPath)
 	if err != nil {
 		return fmt.Errorf("failed to read tasks: %w", err)

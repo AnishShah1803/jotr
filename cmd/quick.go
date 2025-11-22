@@ -46,7 +46,6 @@ func showQuickMenu(cfg *config.LoadedConfig) error {
 
 	switch choice {
 	case 1:
-		// Open today's note
 		today := time.Now()
 		notePath := notes.BuildDailyNotePath(cfg.DiaryPath, today)
 		if !notes.FileExists(notePath) {
@@ -57,7 +56,6 @@ func showQuickMenu(cfg *config.LoadedConfig) error {
 		return notes.OpenInEditor(notePath)
 
 	case 2:
-		// Open yesterday's note
 		yesterday := time.Now().AddDate(0, 0, -1)
 		notePath := notes.BuildDailyNotePath(cfg.DiaryPath, yesterday)
 		if !notes.FileExists(notePath) {
@@ -66,18 +64,15 @@ func showQuickMenu(cfg *config.LoadedConfig) error {
 		return notes.OpenInEditor(notePath)
 
 	case 3:
-		// Quick capture
 		fmt.Print("Enter text to capture: ")
 		var text string
 		fmt.Scanln(&text)
 		if text != "" {
-			// Call capture logic
 			fmt.Println("✓ Captured!")
 		}
 		return nil
 
 	case 4:
-		// Search
 		fmt.Print("Search query: ")
 		var query string
 		fmt.Scanln(&query)
@@ -87,11 +82,9 @@ func showQuickMenu(cfg *config.LoadedConfig) error {
 		return nil
 
 	case 5:
-		// Task summary
 		return showSummary(cfg)
 
 	case 6:
-		// Show streak
 		return showStreak(cfg)
 
 	case 0:

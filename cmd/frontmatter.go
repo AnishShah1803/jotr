@@ -46,7 +46,6 @@ func init() {
 }
 
 func showFrontmatter(cfg *config.LoadedConfig, noteName string) error {
-	// Find the note
 	allNotes, err := notes.FindNotes(cfg.Paths.BaseDir)
 	if err != nil {
 		return err
@@ -64,7 +63,6 @@ func showFrontmatter(cfg *config.LoadedConfig, noteName string) error {
 		return fmt.Errorf("note not found: %s", noteName)
 	}
 
-	// Read note content
 	content, err := os.ReadFile(targetNote)
 	if err != nil {
 		return err
@@ -72,13 +70,11 @@ func showFrontmatter(cfg *config.LoadedConfig, noteName string) error {
 
 	lines := strings.Split(string(content), "\n")
 
-	// Check for frontmatter
 	if len(lines) < 3 || lines[0] != "---" {
 		fmt.Printf("No frontmatter in %s\n", filepath.Base(targetNote))
 		return nil
 	}
 
-	// Find end of frontmatter
 	endIdx := -1
 	for i := 1; i < len(lines); i++ {
 		if lines[i] == "---" {
@@ -92,7 +88,6 @@ func showFrontmatter(cfg *config.LoadedConfig, noteName string) error {
 		return nil
 	}
 
-	// Display frontmatter
 	fmt.Printf("Frontmatter in %s:\n\n", filepath.Base(targetNote))
 	for i := 1; i < endIdx; i++ {
 		fmt.Printf("  %s\n", lines[i])
@@ -102,7 +97,6 @@ func showFrontmatter(cfg *config.LoadedConfig, noteName string) error {
 }
 
 func setFrontmatter(cfg *config.LoadedConfig, noteName string, setValue string) error {
-	// Parse key=value
 	parts := strings.SplitN(setValue, "=", 2)
 	if len(parts) != 2 {
 		return fmt.Errorf("invalid format, use: key=value")
@@ -111,7 +105,6 @@ func setFrontmatter(cfg *config.LoadedConfig, noteName string, setValue string) 
 	key := strings.TrimSpace(parts[0])
 	value := strings.TrimSpace(parts[1])
 
-	// Find the note
 	allNotes, err := notes.FindNotes(cfg.Paths.BaseDir)
 	if err != nil {
 		return err
@@ -129,7 +122,6 @@ func setFrontmatter(cfg *config.LoadedConfig, noteName string, setValue string) 
 		return fmt.Errorf("note not found: %s", noteName)
 	}
 
-	// Read note content
 	content, err := os.ReadFile(targetNote)
 	if err != nil {
 		return err
@@ -137,7 +129,6 @@ func setFrontmatter(cfg *config.LoadedConfig, noteName string, setValue string) 
 
 	lines := strings.Split(string(content), "\n")
 
-	// Add or update frontmatter
 	newLines := []string{}
 	if len(lines) > 0 && lines[0] == "---" {
 		// Has frontmatter, update it
@@ -167,7 +158,6 @@ func setFrontmatter(cfg *config.LoadedConfig, noteName string, setValue string) 
 		newLines = append(newLines, lines...)
 	}
 
-	// Write back
 	newContent := strings.Join(newLines, "\n")
 	if err := os.WriteFile(targetNote, []byte(newContent), 0644); err != nil {
 		return err

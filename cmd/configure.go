@@ -35,12 +35,20 @@ func runConfigWizard() error {
 	homeDir, _ := os.UserHomeDir()
 	fmt.Printf("Example: %s/Documents/Notes\n", homeDir)
 	fmt.Print("> ")
-	baseDir, _ := reader.ReadString('\n')
+	baseDir, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read base directory input: %w", err)
+	}
 	baseDir = strings.TrimSpace(baseDir)
 	
 	// Expand ~ to home directory
 	if strings.HasPrefix(baseDir, "~") {
 		baseDir = strings.Replace(baseDir, "~", homeDir, 1)
+	}
+	
+	// Validate the directory path
+	if baseDir == "" {
+		return fmt.Errorf("base directory cannot be empty")
 	}
 	
 	cfg.Paths.BaseDir = baseDir
@@ -51,7 +59,10 @@ func runConfigWizard() error {
 	fmt.Println("Enter the name of your diary folder (relative to base):")
 	fmt.Println("Example: Diary, Journal, Daily")
 	fmt.Print("> ")
-	diaryDir, _ := reader.ReadString('\n')
+	diaryDir, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read diary directory input: %w", err)
+	}
 	diaryDir = strings.TrimSpace(diaryDir)
 	if diaryDir == "" {
 		diaryDir = "Diary"
@@ -64,7 +75,10 @@ func runConfigWizard() error {
 	fmt.Println("Enter the path to your todo file (relative to base, without .md extension):")
 	fmt.Println("Example: todo, Work/tasks, TODO")
 	fmt.Print("> ")
-	todoFilePath, _ := reader.ReadString('\n')
+	todoFilePath, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read todo file path input: %w", err)
+	}
 	todoFilePath = strings.TrimSpace(todoFilePath)
 	if todoFilePath == "" {
 		todoFilePath = "todo"
@@ -82,7 +96,10 @@ func runConfigWizard() error {
 	fmt.Println("Enter the path to your PDP file (relative to base, without .md extension):")
 	fmt.Println("Press Enter to skip")
 	fmt.Print("> ")
-	pdpFilePath, _ := reader.ReadString('\n')
+	pdpFilePath, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read PDP file path input: %w", err)
+	}
 	pdpFilePath = strings.TrimSpace(pdpFilePath)
 	if pdpFilePath != "" {
 		pdpFilePath = strings.TrimSuffix(pdpFilePath, ".md")
@@ -128,7 +145,6 @@ func runConfigWizard() error {
 	
 	cfg.NoteTemplates = make(map[string]interface{})
 
-	// Save configuration
 	fmt.Println("Saving configuration...")
 	if err := config.Save(cfg); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)

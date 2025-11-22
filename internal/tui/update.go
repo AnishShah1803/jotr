@@ -53,6 +53,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleEnter()
 
 		case "r":
+			// Clear any previous errors when refreshing
+			m.err = nil
+			m.errorRetryable = false
+			m.statusMsg = "Refreshing..."
+			return m, m.loadData()
+
+		case "u":
+			m.statusMsg = "🔍 Checking for updates..."
+			return m, checkForUpdatesCmd()
+
+		case "escape":
+			// Clear errors on escape
+			if m.err != nil {
+				m.err = nil
+				m.errorRetryable = false
+				m.statusMsg = ""
+				return m, nil
+			}
+		}
+
+		// If there's a retryable error, allow 'r' to retry
+		if m.err != nil && m.errorRetryable && msg.String() == "r" {
+			m.err = nil
+			m.errorRetryable = false
+			m.statusMsg = "Retrying..."
 			return m, m.loadData()
 		}
 
@@ -66,6 +91,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.totalNotes = msg.totalNotes
 		m.totalTasks = msg.totalTasks
 		m.completedTasks = msg.completedTasks
+		m.statusMsg = "Data loaded successfully"
 
 		// Update stats viewport with new data
 		m.updateStatsViewport()
@@ -85,8 +111,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusMsg = ""
 		if msg.err != nil {
 			m.err = msg.err
+			m.errorRetryable = true
 		}
 		return m, m.loadData()
+
+	case updateCheckMsg:
+		if msg.err != nil {
+			m.statusMsg = fmt.Sprintf("❌ Update check failed: %v", msg.err)
+		} else if msg.hasUpdate {
+			m.updateAvailable = true
+			m.updateVersion = msg.version
+			m.statusMsg = fmt.Sprintf("🆕 Update available: %s (restart jotr and run 'jotr update')", msg.version)
+		} else {
+			m.statusMsg = "✅ You're running the latest version!"
+		}
+		return m, nil
+
+	case errorMsg:
+		m.err = msg.err
+		m.errorRetryable = msg.retryable
+		return m, nil
 	}
 
 	return m, nil
@@ -173,18 +217,28 @@ type previewLoadedMsg []byte
 
 func (m Model) loadData() tea.Cmd {
 	return func() tea.Msg {
-		// Load recent notes
-		recentNotes, _ := notes.GetRecentDailyNotes(m.config.DiaryPath, 10)
+		// Load recent notes with error handling
+		recentNotes, err := notes.GetRecentDailyNotes(m.config.DiaryPath, 10)
+		if err != nil {
+			return newErrorMsg(fmt.Errorf("failed to load recent notes: %w", err), true)
+		}
 
-		// Load tasks
-		allTasks, _ := tasks.ReadTasks(m.config.TodoPath)
+		// Load tasks with error handling
+		allTasks, err := tasks.ReadTasks(m.config.TodoPath)
+		if err != nil {
+			// This is retryable - todo file might not exist yet
+			return newErrorMsg(fmt.Errorf("failed to load tasks: %w", err), true)
+		}
 		total, completed, _ := tasks.CountTasks(allTasks)
 
 		// Calculate streak
 		streak := calculateStreak(m.config)
 
-		// Count total notes
-		allNotes, _ := notes.FindNotes(m.config.Paths.BaseDir)
+		// Count total notes with error handling
+		allNotes, err := notes.FindNotes(m.config.Paths.BaseDir)
+		if err != nil {
+			return newErrorMsg(fmt.Errorf("failed to find notes: %w", err), true)
+		}
 
 		return dataLoadedMsg{
 			notes:          recentNotes,
@@ -201,7 +255,7 @@ func (m Model) loadPreview(notePath string) tea.Cmd {
 	return func() tea.Msg {
 		content, err := os.ReadFile(notePath)
 		if err != nil {
-			return previewLoadedMsg([]byte("Error loading preview"))
+			return previewLoadedMsg([]byte(fmt.Sprintf("Error loading preview: %v", err)))
 		}
 		return previewLoadedMsg(content)
 	}
@@ -254,19 +308,13 @@ func (m *Model) updateViewportSizes() {
 	var headerFooterHeight int
 
 	if m.height >= minHeightForAscii && m.width >= minWidthForAscii {
-		// Large terminal with full ASCII art
-		// 2 (blank lines) + 6 (ASCII) + 1 (spacing) + 2 (footer) + 2 (top/bottom margins) = 13
-		headerFooterHeight = 13
+		headerFooterHeight = 13 // Large terminal with ASCII art
 	} else {
-		// Smaller terminals: no header, just footer
-		// 2 (footer with newline) = 2
-		headerFooterHeight = 2
+		headerFooterHeight = 2 // Small terminal: minimal header
 	}
 
 	// Calculate dimensions - must match View()
-	availableWidth := m.width - 8 // Account for margins and ensure borders fit
-
-	// Split width for all panels (accounting for 2-space gap between them)
+	availableWidth := m.width - 8 // Account for margins
 	leftPanelWidth := (availableWidth - 2) / 2
 	rightPanelWidth := availableWidth - leftPanelWidth - 2
 	panelHeight := (m.height - headerFooterHeight - 4) / 2
@@ -283,11 +331,9 @@ func (m *Model) updateViewportSizes() {
 	}
 
 	// Calculate content dimensions for each panel
-	// Border takes 2 chars, padding takes 2 chars = 4 total for width
-	// Border takes 2 lines, title takes 1 line = 3 total for height
-	leftContentWidth := leftPanelWidth - 4
-	rightContentWidth := rightPanelWidth - 4
-	contentHeight := panelHeight - 3
+	leftContentWidth := leftPanelWidth - 4   // Account for border and padding
+	rightContentWidth := rightPanelWidth - 4 // Account for border and padding
+	contentHeight := panelHeight - 3         // Account for border and title
 
 	if leftContentWidth < 10 {
 		leftContentWidth = 10

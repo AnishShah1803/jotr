@@ -8,6 +8,7 @@ import (
 
 	"github.com/anish/jotr/internal/config"
 	"github.com/anish/jotr/internal/notes"
+	"github.com/anish/jotr/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -44,18 +45,15 @@ func init() {
 }
 
 func captureText(cfg *config.LoadedConfig, text string) error {
-	// Get today's note path
 	today := time.Now()
 	notePath := notes.BuildDailyNotePath(cfg.DiaryPath, today)
 
-	// Create note if it doesn't exist
 	if !notes.FileExists(notePath) {
 		if err := notes.CreateDailyNote(notePath, cfg.Format.DailyNoteSections, today); err != nil {
 			return fmt.Errorf("failed to create daily note: %w", err)
 		}
 	}
 
-	// Read existing content
 	content, err := os.ReadFile(notePath)
 	if err != nil {
 		return fmt.Errorf("failed to read note: %w", err)
@@ -71,7 +69,6 @@ func captureText(cfg *config.LoadedConfig, text string) error {
 	sectionFound := false
 	insertIndex := -1
 
-	// Find the section
 	for i, line := range lines {
 		if strings.HasPrefix(line, "## "+captureSection) {
 			sectionFound = true
@@ -99,15 +96,13 @@ func captureText(cfg *config.LoadedConfig, text string) error {
 		capturedLine = fmt.Sprintf("- %s (%s)", text, timestamp)
 	}
 
-	// Insert the captured text
 	newLines := make([]string, 0, len(lines)+1)
 	newLines = append(newLines, lines[:insertIndex]...)
 	newLines = append(newLines, capturedLine)
 	newLines = append(newLines, lines[insertIndex:]...)
 
-	// Write back
 	newContent := strings.Join(newLines, "\n")
-	if err := os.WriteFile(notePath, []byte(newContent), 0644); err != nil {
+	if err := utils.AtomicWriteFile(notePath, []byte(newContent), 0644); err != nil {
 		return fmt.Errorf("failed to write note: %w", err)
 	}
 

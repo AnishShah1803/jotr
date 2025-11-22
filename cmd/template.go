@@ -91,7 +91,7 @@ func listTemplates(cfg *config.LoadedConfig) error {
 	fmt.Println("Available templates:\n")
 	for _, file := range files {
 		if !file.IsDir() && filepath.Ext(file.Name()) == ".md" {
-			name := file.Name()[:len(file.Name())-3] // Remove .md
+			name := file.Name()[:len(file.Name())-3]
 			fmt.Printf("  %s\n", name)
 		}
 	}

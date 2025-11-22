@@ -73,7 +73,6 @@ func createNote(cfg *config.LoadedConfig, noteType string) error {
 		return fmt.Errorf("note name is required")
 	}
 
-	// Build note path
 	var notePath string
 	if noteType != "" {
 		notePath = filepath.Join(cfg.Paths.BaseDir, noteType, name+".md")
@@ -81,12 +80,10 @@ func createNote(cfg *config.LoadedConfig, noteType string) error {
 		notePath = filepath.Join(cfg.Paths.BaseDir, name+".md")
 	}
 
-	// Check if note already exists
 	if notes.FileExists(notePath) {
 		return fmt.Errorf("note already exists: %s", notePath)
 	}
 
-	// Create note with basic template
 	content := fmt.Sprintf("# %s\n\n", name)
 	if err := notes.WriteNote(notePath, content); err != nil {
 		return fmt.Errorf("failed to create note: %w", err)
@@ -94,12 +91,10 @@ func createNote(cfg *config.LoadedConfig, noteType string) error {
 
 	fmt.Printf("✓ Created: %s\n", notePath)
 
-	// Open in editor
 	return notes.OpenInEditor(notePath)
 }
 
 func openNote(cfg *config.LoadedConfig, query string) error {
-	// Find all notes
 	allNotes, err := notes.FindNotes(cfg.Paths.BaseDir)
 	if err != nil {
 		return fmt.Errorf("failed to find notes: %w", err)
