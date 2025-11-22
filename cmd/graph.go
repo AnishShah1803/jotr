@@ -106,20 +106,26 @@ func generateGraph(cfg *config.LoadedConfig) error {
 	}
 
 	for node := range nodeSet {
-		// Escape quotes and limit length
+		// Sanitize node ID for DOT syntax
+		nodeID := sanitizeNodeID(node)
+		
+		// Escape quotes and limit length for label
 		label := node
 		if len(label) > 30 {
 			label = label[:27] + "..."
 		}
 		label = strings.ReplaceAll(label, "\"", "\\\"")
-		dotContent += fmt.Sprintf("  \"%s\" [label=\"%s\"];\n", node, label)
+		
+		dotContent += fmt.Sprintf("  %s [label=\"%s\"];\n", nodeID, label)
 	}
 
 	dotContent += "\n"
 
 	// Add edges
 	for _, link := range links {
-		dotContent += fmt.Sprintf("  \"%s\" -> \"%s\";\n", link.from, link.to)
+		fromID := sanitizeNodeID(link.from)
+		toID := sanitizeNodeID(link.to)
+		dotContent += fmt.Sprintf("  %s -> %s;\n", fromID, toID)
 	}
 
 	dotContent += "}\n"
@@ -175,5 +181,59 @@ func openGraph(path string) {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// sanitizeNodeID converts a node name to a valid DOT identifier
+func sanitizeNodeID(name string) string {
+	// Replace problematic characters with underscores
+	// DOT doesn't like: | < > { } [ ] " \ and some others
+	replacer := strings.NewReplacer(
+		"|", "_",
+		"<", "_",
+		">", "_",
+		"{", "_",
+		"}", "_",
+		"[", "_",
+		"]", "_",
+		"\"", "_",
+		"\\", "_",
+		" ", "_",
+		"-", "_",
+		".", "_",
+		",", "_",
+		":", "_",
+		";", "_",
+		"(", "_",
+		")", "_",
+		"/", "_",
+		"&", "_",
+		"#", "_",
+		"@", "_",
+		"!", "_",
+		"?", "_",
+		"*", "_",
+		"+", "_",
+		"=", "_",
+		"%", "_",
+	)
+	
+	sanitized := replacer.Replace(name)
+	
+	// Ensure it starts with a letter or underscore
+	if len(sanitized) > 0 && !isLetter(sanitized[0]) && sanitized[0] != '_' {
+		sanitized = "n_" + sanitized
+	}
+	
+	// If empty, use a default
+	if sanitized == "" {
+		sanitized = "node"
+	}
+	
+	return sanitized
+}
+
+// isLetter checks if a byte is a letter
+func isLetter(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 }
 

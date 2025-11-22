@@ -1,6 +1,7 @@
 package tasks
 
 import (
+	"crypto/md5"
 	"fmt"
 	"os"
 	"regexp"
@@ -16,6 +17,7 @@ type Task struct {
 	Tags      []string
 	Line      int
 	Section   string
+	ID        string
 }
 
 // ParseTasks parses tasks from markdown content
@@ -62,6 +64,9 @@ func ParseTasks(content string) []Task {
 					task.Tags = append(task.Tags, match[1])
 				}
 			}
+
+			// Extract task ID
+			task.ID = ExtractTaskID(task.Text)
 
 			tasks = append(tasks, task)
 		}
@@ -175,5 +180,42 @@ func IsOverdue(task Task) bool {
 		}
 	}
 	return false
+}
+
+// GenerateTaskID generates a unique task ID based on content
+func GenerateTaskID(text string) string {
+	// Use first 6 characters of MD5 hash of the task text
+	hash := md5.Sum([]byte(strings.TrimSpace(text)))
+	return fmt.Sprintf("%x", hash)[:6]
+}
+
+// ExtractTaskID extracts task ID from task text
+func ExtractTaskID(text string) string {
+	// Look for <!-- id: abc123 --> pattern
+	idRe := regexp.MustCompile(`<!-- id: ([a-f0-9]{6}) -->`)
+	if match := idRe.FindStringSubmatch(text); len(match) > 1 {
+		return match[1]
+	}
+	return ""
+}
+
+// EnsureTaskID ensures a task has an ID, generating one if needed
+func EnsureTaskID(task *Task) {
+	if task.ID == "" {
+		// Check if ID is embedded in text
+		if id := ExtractTaskID(task.Text); id != "" {
+			task.ID = id
+		} else {
+			// Generate new ID and embed in text
+			task.ID = GenerateTaskID(task.Text)
+			task.Text = task.Text + fmt.Sprintf(" <!-- id: %s -->", task.ID)
+		}
+	}
+}
+
+// StripTaskID removes task ID from task text for display
+func StripTaskID(text string) string {
+	idRe := regexp.MustCompile(`\s*<!-- id: [a-f0-9]{6} -->`)
+	return idRe.ReplaceAllString(text, "")
 }
 

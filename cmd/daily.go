@@ -95,6 +95,26 @@ func createDailyNote(notePath string, cfg *config.LoadedConfig, date time.Time) 
 		content += fmt.Sprintf("## %s\n\n", section)
 	}
 
+	// Always add task section at the end
+	// Use task_section from config, default to "Tasks" if not set
+	taskSection := cfg.Format.TaskSection
+	if taskSection == "" {
+		taskSection = "Tasks"
+	}
+	
+	// Only add if not already in the daily_note_sections
+	hasTaskSection := false
+	for _, section := range cfg.Format.DailyNoteSections {
+		if section == taskSection {
+			hasTaskSection = true
+			break
+		}
+	}
+	
+	if !hasTaskSection {
+		content += fmt.Sprintf("## %s\n\n", taskSection)
+	}
+
 	return os.WriteFile(notePath, []byte(content), 0644)
 }
 
@@ -102,7 +122,7 @@ func openInEditor(path string) error {
 	// Try to get editor from environment
 	editor := os.Getenv("EDITOR")
 	if editor == "" {
-		editor = "vim" // Default to vim
+		editor = "nvim" // Default to nvim
 	}
 
 	cmd := exec.Command(editor, path)

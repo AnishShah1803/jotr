@@ -22,7 +22,7 @@ type Note struct {
 func OpenInEditor(path string) error {
 	editor := os.Getenv("EDITOR")
 	if editor == "" {
-		editor = "vim"
+		editor = "nvim"
 	}
 
 	cmd := exec.Command(editor, path)
@@ -37,7 +37,7 @@ func OpenInEditor(path string) error {
 func GetEditorCmd(path string) *exec.Cmd {
 	editor := os.Getenv("EDITOR")
 	if editor == "" {
-		editor = "vim"
+		editor = "nvim"
 	}
 
 	cmd := exec.Command(editor, path)

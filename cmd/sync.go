@@ -47,14 +47,17 @@ func syncTasks(cfg *config.LoadedConfig) error {
 	}
 
 	// Filter tasks from the task section
+	// Use task_section from config, default to "Tasks" if not set
 	taskSection := cfg.Format.TaskSection
 	if taskSection == "" {
-		taskSection = "Important Things"
+		taskSection = "Tasks"
 	}
 
 	var tasksToSync []tasks.Task
 	for _, task := range dailyTasks {
 		if task.Section == taskSection && !task.Completed {
+			// Ensure task has an ID
+			tasks.EnsureTaskID(&task)
 			tasksToSync = append(tasksToSync, task)
 		}
 	}

@@ -90,7 +90,7 @@ func runHealthCheck() error {
 	if editor == "" {
 		fmt.Println("⚠️  WARNING")
 		fmt.Println("  EDITOR environment variable not set")
-		fmt.Println("  Will default to 'vim'")
+		fmt.Println("  Will default to 'nvim'")
 	} else {
 		fmt.Println("✓ OK")
 		fmt.Printf("  %s\n", editor)
