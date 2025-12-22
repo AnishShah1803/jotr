@@ -1,30 +1,52 @@
 # jotr
 
-**A lightning-fast command-line note-taking and task management system for developers and power users.**
+#### [Install](#installation) · [Configure](#configuration) · [Docs](../jotr.wiki/Home.md)
 
-⚡ **Lightning fast** | 💾 **Lightweight** | 📦 **Single binary** | 🚀 **No dependencies**
+[![Latest Release](https://img.shields.io/github/v/release/AnishShah1803/jotr?style=for-the-badge&logo=starship&color=C9CBFF&logoColor=D9E0EE&labelColor=302D41&include_prerelease&sort=semver)](https://github.com/AnishShah1803/jotr/releases/latest)
+[![Last Commit](https://img.shields.io/github/last-commit/AnishShah1803/jotr?style=for-the-badge&logo=starship&color=8bd5ca&logoColor=D9E0EE&labelColor=302D41)](https://github.com/AnishShah1803/jotr/pulse)
+[![License](https://img.shields.io/github/license/AnishShah1803/jotr?style=for-the-badge&logo=starship&color=ee99a0&logoColor=D9E0EE&labelColor=302D41)](https://github.com/AnishShah1803/jotr/blob/main/LICENSE)
+[![Stars](https://img.shields.io/github/stars/AnishShah1803/jotr?style=for-the-badge&logo=starship&color=c69ff5&logoColor=D9E0EE&labelColor=302D41)](https://github.com/AnishShah1803/jotr/stargazers)
+
+**A lightning-fast command-line note-taking and task management system built for developers and power users.**
+
+Lightning fast | Lightweight | Single binary | Zero dependencies
 
 Stop juggling multiple tools for notes, tasks, and daily planning. jotr unifies your workflow into a single, powerful CLI that starts instantly and gets out of your way.
 
-## Why jotr?
+---
 
-**🚀 Built for Speed** - Sub-5ms startup time, concurrent operations, and instant search across thousands of notes
+## Features
 
-**🎯 Developer-First** - Designed by developers, for developers. Integrates seamlessly with your terminal workflow
+**Built for Speed** - Sub-5ms startup time, concurrent operations, and instant search across thousands of notes
 
-**📱 Beautiful Interface** - Interactive TUI dashboard with fuzzy finding, task management, and calendar views
+**Developer-First** - Designed by developers, for developers. Integrates seamlessly with your terminal workflow
 
-**🔗 Smart Task Tracking** - Unique task IDs enable cross-note task tracking and intelligent sync
+**Beautiful Interface** - Interactive TUI dashboard with fuzzy finding, task management, and calendar views
 
-**📊 Graph Visualization** - Generate visual maps of your notes and their relationships using Graphviz
+**Smart Task Tracking** - Unique task IDs enable cross-note task tracking and intelligent sync
+
+**Graph Visualization** - Generate visual maps of your notes and their relationships using Graphviz
 
 ## Quick Start
 
-```bash
-# Install jotr
-git clone https://github.com/AnishShah1803/jotr && cd jotr
-make install
+**One-line install:**
 
+```bash
+curl -fsSL https://raw.githubusercontent.com/AnishShah1803/jotr/main/install.sh | bash
+```
+
+**Or clone and build:**
+
+```bash
+# Clone and install
+git clone https://github.com/AnishShah1803/jotr
+cd jotr  
+make install
+```
+
+**Set up and start using:**
+
+```bash
 # Set up your workspace
 jotr configure
 
@@ -36,21 +58,44 @@ jotr dashboard               # Launch interactive TUI
 
 **That's it!** You're ready to streamline your note-taking workflow.
 
+## Installation
+
+### Quick Install
+
+```bash
+# Clone and build
+git clone https://github.com/AnishShah1803/jotr
+cd jotr  
+make install
+```
+
+### Other Installation Methods
+
+- **Pre-built binaries**: Download from [releases](https://github.com/AnishShah1803/jotr/releases)
+- **Go install**: `go install github.com/AnishShah1803/jotr@latest`
+- **Build from source**: See [INSTALL.md](INSTALL.md) for detailed instructions
+
+### Requirements
+
+- **Runtime**: None! Single binary with no dependencies
+- **Build**: Go 1.21+ (optional)
+- **Recommended**: nvim, fzf, git, graphviz
+
 ## Core Features
 
-### 📝 **Smart Daily Notes**
+### Smart Daily Notes
 Automatic daily note creation with customizable templates, task sections, and streak tracking. Never lose track of your daily planning again.
 
-### 🔍 **Instant Search**  
+### Instant Search  
 Lightning-fast full-text search across all your notes. Find anything in milliseconds, no matter how large your note collection grows.
 
-### 📋 **Intelligent Task Management**
+### Intelligent Task Management
 Every task gets a unique ID for precise tracking across notes. Smart sync prevents duplicates while maintaining task relationships.
 
-### 🎨 **Interactive Dashboard**
+### Interactive Dashboard
 Beautiful terminal interface with fuzzy finding, calendar views, and real-time task statistics. All the power of a GUI in your terminal.
 
-### 📊 **Visual Knowledge Mapping**
+### Visual Knowledge Mapping
 Generate graph visualizations of your notes to discover hidden connections and patterns in your thinking.
 
 ## Usage Examples
@@ -142,29 +187,6 @@ Automatic daily note structure with customizable sections:
 
 Task sections respect your configuration and provide consistent organization.
 
-## Installation
-
-### Quick Install
-```bash
-# Clone and install
-git clone https://github.com/AnishShah1803/jotr
-cd jotr  
-make install
-
-# Set up configuration
-jotr configure
-```
-
-### Other Installation Methods
-- **Pre-built binaries**: Download from [releases](https://github.com/AnishShah1803/jotr/releases)
-- **Go install**: `go install github.com/AnishShah1803/jotr@latest`
-- **Build from source**: See [INSTALL.md](INSTALL.md) for detailed instructions
-
-### Requirements
-- **Runtime**: None! Single binary with no dependencies
-- **Build**: Go 1.21+ (optional)
-- **Recommended**: nvim, fzf, git, graphviz
-
 ## Configuration
 
 jotr uses a JSON config at `~/.config/jotr/config.json`. Run `jotr configure` for interactive setup, or see [config.template.json](config.template.json) for all options.
@@ -248,16 +270,16 @@ make clean        # Clean artifacts
 
 ## Documentation
 
-- 📖 [Installation Guide](INSTALL.md)
-- 📖 [Release Guide](RELEASE.md)  
-- 📚 [Wiki](../jotr.wiki/Home.md)
-- ❓ [FAQ](../jotr.wiki/FAQ.md)
+- [Installation Guide](INSTALL.md)
+- [Release Guide](RELEASE.md)  
+- [Wiki](../jotr.wiki/Home.md)
+- [FAQ](../jotr.wiki/FAQ.md)
 
 ## Support
 
-- 🐛 [Report Issues](https://github.com/AnishShah1803/jotr/issues)
-- 💬 [Discussions](https://github.com/AnishShah1803/jotr/discussions)
-- 📖 [Documentation](../jotr.wiki/Home.md)
+- [Report Issues](https://github.com/AnishShah1803/jotr/issues)
+- [Discussions](https://github.com/AnishShah1803/jotr/discussions)
+- [Documentation](../jotr.wiki/Home.md)
 
 ## License
 
@@ -265,4 +287,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**Made with ❤️ for developers and power users**
+**Made for developers and power users**
