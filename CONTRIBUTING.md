@@ -14,7 +14,7 @@ Thank you for your interest in contributing to jotr!
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/jotr
+git clone https://github.com/AnishShah1803/jotr
 cd jotr
 
 # Build the project
@@ -110,6 +110,8 @@ func init() {
 
 ## Testing
 
+All code changes should include appropriate test coverage.
+
 ```bash
 # Run all tests
 make test
@@ -120,6 +122,8 @@ make test-race
 # Run specific test
 go test ./internal/config -v
 ```
+
+See [TESTING.md](TESTING.md) for detailed testing guidelines and utilities.
 
 ## Documentation
 
@@ -140,7 +144,7 @@ To update after a release:
 3. Update URLs and checksums in `jotr.rb`
 4. Test: `brew install --build-from-source ./jotr.rb`
 
-See [ABOUT_JOTR_RB.md](../ABOUT_JOTR_RB.md) for details.
+The jotr.rb file is written in Ruby (Homebrew's DSL), but jotr itself is Go.
 
 ## Release Process
 
@@ -150,7 +154,7 @@ See [RELEASE.md](RELEASE.md) for the complete release process.
 
 - Open an issue for bugs or feature requests
 - Start a discussion for questions
-- Check the [FAQ](../jotr.wiki/FAQ.md)
+- Check the [Wiki](https://github.com/AnishShah1803/jotr/wiki)
 
 ## Code of Conduct
 
@@ -158,5 +162,5 @@ Be respectful, inclusive, and constructive in all interactions.
 
 ---
 
-Thank you for contributing! 🎉
+Thank you for contributing!
 

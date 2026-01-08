@@ -93,6 +93,9 @@
       }
     }
   },
+  "editor": {
+    "default": "vim"
+  },
   "note_templates": {
     "note": {
       "name": "Quick Note",

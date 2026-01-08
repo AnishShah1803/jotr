@@ -1,0 +1,59 @@
+# Pre-commit hooks for jotr Go project
+#
+# Installation:
+#   1. Install pre-commit: https://pre-commit.com/#install
+#      - pip: pip install pre-commit
+#      - brew: brew install pre-commit
+#   2. Run: pre-commit install
+#
+# Usage:
+#   - Hooks run automatically on `git commit`
+#   - Run manually: pre-commit run --all-files
+#   - Skip hooks: git commit --no-verify
+
+repos:
+  # Go formatting - runs gofmt to ensure consistent style
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.61.0
+    hooks:
+      - id: golangci-lint
+        args:
+          - run
+          - --issues-exit-code=1
+          - --timeout=5m
+        description: "Run golangci-lint for comprehensive Go linting"
+        # Pass files to avoid running on entire repo every time
+        files: \.go$
+        # Exclude generated files and test files from strict checks
+        exclude: _test\.go$
+
+  # Go imports - organizes imports according to goimports standards
+  - repo: https://github.com/golangci/goimports-lint
+    rev: v0.1.5
+    hooks:
+      - id: goimports-lint
+        args:
+          - -l
+          - .
+        description: "Run goimports to organize imports"
+        files: \.go$
+        exclude: _test\.go$
+
+  # Detect hardcoded credentials and secrets
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: detect-private-key
+        description: "Ensure no private keys are committed"
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+        types: [markdown]
+        description: "Remove trailing whitespace in markdown files"
+
+  # Shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+        args: [--severity=error]
+        description: "Lint shell scripts for common issues"

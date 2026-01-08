@@ -1,133 +1,242 @@
 # jotr
 
-⚡ **Lightning fast** | 💾 **Lightweight** | 📦 **Single binary** | 🚀 **No dependencies**
+#### [Install](#installation) · [Configure](#configuration) · [Wiki](https://github.com/AnishShah1803/jotr/wiki)
 
-A powerful command-line note-taking and task management system built with Go.
+[![Latest Release](https://img.shields.io/github/v/release/AnishShah1803/jotr?style=for-the-badge&logo=starship&color=C9CBFF&logoColor=D9E0EE&labelColor=302D41&include_prerelease&sort=semver)](https://github.com/AnishShah1803/jotr/releases/latest)
+[![Last Commit](https://img.shields.io/github/last-commit/AnishShah1803/jotr?style=for-the-badge&logo=starship&color=8bd5ca&logoColor=D9E0EE&labelColor=302D41)](https://github.com/AnishShah1803/jotr/pulse)
+[![License](https://img.shields.io/github/license/AnishShah1803/jotr?style=for-the-badge&logo=starship&color=ee99a0&logoColor=D9E0EE&labelColor=302D41)](https://github.com/AnishShah1803/jotr/blob/main/LICENSE)
+[![Stars](https://img.shields.io/github/stars/AnishShah1803/jotr?style=for-the-badge&logo=starship&color=c69ff5&logoColor=D9E0EE&labelColor=302D41)](https://github.com/AnishShah1803/jotr/stargazers)
+
+**A lightning-fast command-line note-taking and task management system built for developers and power users.**
+
+Lightning fast | Lightweight | Single binary | Zero dependencies
+
+Stop juggling multiple tools for notes, tasks, and daily planning. jotr unifies your workflow into a single, powerful CLI that starts instantly and gets out of your way.
+
+---
 
 ## Features
 
-✅ **20 Commands Implemented:**
-- 📝 Daily notes with templates
-- 📓 Note management (create, open, list)
-- 🔍 Full-text search across all notes
-- ⚡ Quick capture to daily note
-- 🏷️ Tag management and statistics
-- 📋 Task management and sync
-- 📊 Task statistics and summaries
-- 🗄️ Archive completed tasks
-- 🔥 Daily note streak tracking
-- 📅 Calendar view
-- 🎨 Template management
-- 🔧 Health checks and validation
-- 📦 Bulk operations
-- 🎯 Quick actions menu
-- 📱 Beautiful TUI dashboard (Bubbletea)
-- And more!
+**Built for Speed** - Sub-5ms startup time, concurrent operations, and instant search across thousands of notes
 
-## Status
+**Developer-First** - Designed by developers, for developers. Integrates seamlessly with your terminal workflow
 
-✅ **Production Ready** - All core features implemented and tested!
+**Beautiful Interface** - Interactive TUI dashboard with fuzzy finding, task management, and calendar views
 
-### Completed ✅
-- [x] 20 commands fully implemented
-- [x] Interactive TUI dashboard with 4-panel layout
-- [x] Configuration wizard
-- [x] Task sync and management
-- [x] Search and filtering
-- [x] Template system
-- [x] Statistics and analytics
-- [x] Health checks
+**Smart Task Tracking** - Unique task IDs enable cross-note task tracking and intelligent sync
 
-### Planned 📋
-- [ ] Full test coverage
-- [ ] CI/CD pipeline
-- [ ] Binary releases for macOS, Linux, Windows
-- [ ] Git integration enhancements
-- [ ] Graph visualization
-- [ ] Plugin system
+**Graph Visualization** - Generate visual maps of your notes and their relationships using Graphviz
 
 ## Quick Start
 
-### Installation
+**One-line install:**
 
-See [INSTALL.md](INSTALL.md) for detailed installation instructions.
-
-**Quick install:**
 ```bash
-# Using Makefile
-make install
-
-# Or build manually
-go build -o jotr
-sudo mv jotr /usr/local/bin/
+curl -fsSL https://raw.githubusercontent.com/AnishShah1803/jotr/main/install.sh | bash
 ```
 
-### First Run
+**Or clone and build:**
 
 ```bash
-# Run configuration wizard
+# Clone and install
+git clone https://github.com/AnishShah1803/jotr
+cd jotr  
+make install
+```
+
+**Set up and start using:**
+
+```bash
+# Set up your workspace
 jotr configure
 
-# Create/open today's daily note
-jotr daily
-
-# Launch interactive dashboard
-jotr dashboard
-
-# Show help
-jotr --help
+# Start taking notes
+jotr daily                    # Open today's daily note
+jotr capture "Important idea" # Quick capture to daily note  
+jotr dashboard               # Launch interactive TUI
 ```
+
+**That's it!** You're ready to streamline your note-taking workflow.
+
+## Installation
+
+### Quick Install
+
+```bash
+# Clone and build
+git clone https://github.com/AnishShah1803/jotr
+cd jotr  
+make install
+```
+
+⚠️ **Note**: This will overwrite any existing jotr installation at `/usr/local/bin/jotr`
+
+### For Developers
+
+```bash
+# Development build (includes dev mode)
+git clone https://github.com/AnishShah1803/jotr
+cd jotr
+make dev
+
+# Production build (user release)
+make build  # ⚠️  Will overwrite existing binary
+```
+
+### Other Installation Methods
+
+- **Pre-built binaries**: Download from [releases](https://github.com/AnishShah1803/jotr/releases) (recommended for users)
+- **Go install**: `go install github.com/AnishShah1803/jotr@latest`
+- **Build from source**: See [INSTALL.md](INSTALL.md) for detailed instructions
+
+**⚠️ Build Options**:
+- **For users**: Use pre-built binaries or `make install`
+- **For developers**: Use `make dev` for development builds
+- **Production build**: `make build` (local binary, no system changes)
+
+### Requirements
+
+- **Runtime**: None! Single binary with no dependencies
+- **Build**: Go 1.21+ (optional)
+- **Recommended**: nvim, fzf, git, graphviz
+- **Installation Path**: `/usr/local/bin/jotr` (may overwrite existing)
+
+## Core Features
+
+### Smart Daily Notes
+Automatic daily note creation with customizable templates, task sections, and streak tracking. Never lose track of your daily planning again.
+
+### Instant Search  
+Lightning-fast full-text search across all your notes. Find anything in milliseconds, no matter how large your note collection grows.
+
+### Intelligent Task Management
+Every task gets a unique ID for precise tracking across notes. Smart sync prevents duplicates while maintaining task relationships.
+
+### Interactive Dashboard
+Beautiful terminal interface with fuzzy finding, calendar views, and real-time task statistics. All the power of a GUI in your terminal.
+
+### Visual Knowledge Mapping
+Generate graph visualizations of your notes to discover hidden connections and patterns in your thinking.
 
 ## Usage Examples
 
+### Daily Workflow
 ```bash
-# Daily notes
+# Start your day
 jotr daily                    # Open today's note
-jotr daily --yesterday        # Open yesterday's note
-jotr daily --path            # Show path only
+jotr summary                  # Review pending tasks
 
-# Note management
-jotr note create "Project Ideas"
-jotr note open               # Fuzzy find and open
-jotr note list               # List recent notes
+# Capture ideas throughout the day  
+jotr capture "API design thoughts"
+jotr capture "Meeting notes - discuss Q4 planning"
 
-# Quick capture
-jotr capture "Meeting at 2pm"
-jotr cap "Buy groceries"     # Using alias
-
-# Search
-jotr search "project"
-jotr find "TODO"             # Using alias
-
-# Tasks
-jotr summary                 # Show task summary
-jotr stats                   # Show statistics
-jotr sync                    # Sync tasks to todo list
-jotr archive                 # Archive completed tasks
-
-# Tags
-jotr tags list               # List all tags
-jotr tags find work          # Find notes with tag
-jotr tags stats              # Tag statistics
-
-# Other
-jotr streak                  # Show daily note streak
-jotr calendar                # Calendar view
-jotr check                   # Health check
-jotr quick                   # Quick actions menu
+# End of day review
+jotr stats                    # Check productivity metrics
+jotr archive                  # Archive completed tasks
 ```
 
-## Commands
+### Note Management
+```bash
+# Create and organize notes
+jotr note create "Project Architecture"
+jotr note open               # Fuzzy search and open any note
+jotr search "authentication" # Find notes mentioning auth
+
+# Work with tags and links
+jotr tags find work          # Find all work-related notes
+jotr graph                   # Visualize note relationships
+```
+
+### Task Tracking
+```bash
+# Smart task management
+jotr sync                    # Sync tasks to your todo list
+jotr summary                 # View task overview
+jotr streak                  # Check daily note consistency
+```
+
+## Advanced Features
+
+### Task ID System
+
+Every task gets a unique identifier for precise cross-note tracking:
+
+```markdown
+- [ ] Review project proposal <!-- id: abc123 -->
+- [x] Update documentation <!-- id: def456 -->
+```
+
+**Benefits:**
+- **Automatic ID generation** - New tasks get unique IDs automatically
+- **Cross-note tracking** - Reference the same task across multiple notes  
+- **Smart sync** - The `sync` command uses IDs to avoid duplicates
+- **Manual ID support** - Assign custom IDs when needed
+
+### Graph Visualization
+
+Generate visual maps of your knowledge base:
+
+```bash
+jotr graph                   # Generate DOT graph and open in default viewer
+```
+
+**Features:**
+- **DOT syntax output** - Standard Graphviz format
+- **Auto-sanitization** - Handles special characters safely  
+- **Link detection** - Shows note relationships
+- **Visual clustering** - Groups related content
+
+**Requirements:** Install `graphviz` package (see [Installation Guide](INSTALL.md))
+
+### Daily Note Templates
+
+Automatic daily note structure with customizable sections:
+
+```markdown
+## Tasks
+
+### Todo
+- [ ] New task <!-- id: generated-id -->
+
+### In Progress  
+- [ ] Ongoing task <!-- id: another-id -->
+
+### Done
+- [x] Completed task <!-- id: done-id -->
+```
+
+Task sections respect your configuration and provide consistent organization.
+
+## Configuration
+
+jotr uses a JSON config at `~/.config/jotr/config.json`. Run `jotr configure` for interactive setup, or see [config.template.json](config.template.json) for all options.
+
+Example configuration:
+```json
+{
+  "paths": {
+    "base_dir": "/Users/you/Documents/Notes",
+    "diary_dir": "Diary",
+    "todo_file_path": "todo"
+  },
+  "format": {
+    "task_section": "Tasks",
+    "daily_note_sections": ["Notes", "Meetings"]
+  }
+}
+```
+
+## Command Reference
 
 | Command | Description | Aliases |
 |---------|-------------|---------|
 | `daily` | Create/open daily note | `d` |
-| `note` | Create, open, list notes | `n` |
+| `note` | Create, open, list notes | `n` |  
 | `search` | Search across all notes | `find`, `grep` |
 | `capture` | Quick capture to daily note | `cap` |
 | `tags` | Manage tags | `tag` |
 | `summary` | Show task summary | `sum` |
-| `stats` | Show task statistics | `st` |
+| `stats` | Show task statistics | `st` |  
 | `sync` | Sync tasks to todo list | `s` |
 | `archive` | Archive completed tasks | `arc` |
 | `streak` | Show daily note streak | |
@@ -139,123 +248,62 @@ jotr quick                   # Quick actions menu
 | `check` | Health check | |
 | `dashboard` | Interactive TUI dashboard | `dash` |
 | `configure` | Configuration wizard | `config`, `cfg` |
+| `graph` | Generate graph visualization | |
 | `version` | Show version | |
 
-## Project Structure
+## Performance & Architecture
 
-```
-jotr/
-├── main.go                 # Entry point
-├── cmd/                    # Commands (Cobra)
-│   ├── root.go            # Root command
-│   ├── daily.go           # Daily note command
-│   ├── dashboard.go       # TUI dashboard
-│   ├── configure.go       # Configuration wizard
-│   └── ...                # 20 total commands
-├── internal/              # Internal packages
-│   ├── config/           # Configuration management
-│   ├── notes/            # Note operations
-│   ├── tasks/            # Task operations
-│   └── tui/              # Bubbletea TUI components
-├── go.mod                # Go module definition
-├── go.sum                # Dependency checksums
-├── Makefile              # Build automation
-├── install.sh            # Installation script
-└── config.template.json  # Configuration template
-```
+**Performance:**
+- Startup time: ~5ms (instant)  
+- Memory usage: ~15MB (lightweight)
+- Binary size: ~15MB (self-contained)
+- Build time: ~2 seconds
 
-## Building & Development
+**Architecture:**
+- Built with Go for speed and reliability
+- Concurrent operations (search, sync, etc.)
+- Single binary deployment
+- Cross-platform (macOS, Linux, Windows)
 
-```bash
-# Build
-make build
-
-# Build for all platforms
-make build-all
-
-# Install locally
-make install
-
-# Run tests
-make test
-
-# Format code
-make fmt
-
-# Clean build artifacts
-make clean
-```
-
-## Dependencies
-
-- **cobra** - CLI framework
-- **viper** - Configuration management
-- **bubbletea** - TUI framework
-- **lipgloss** - Terminal styling
-- **bubbles** - TUI components (viewport, list, etc.)
-
-## Why jotr?
-
-1. **⚡ Performance** - Lightning fast startup (~5ms)
-2. **📦 Single Binary** - No runtime dependencies, easy distribution
-3. **🎨 Beautiful TUI** - Interactive dashboard with Bubbletea
-4. **🌍 Cross-Platform** - Works on macOS, Linux, Windows
-5. **🔒 Type Safety** - Built with Go for reliability
-6. **⚙️ Concurrent** - Fast parallel operations (search, sync, etc.)
-7. **🎯 Developer-Friendly** - Designed for power users and developers
-
-## Performance
-
-```
-Startup Time:  ~5ms (instant)
-Memory Usage:  ~15MB (lightweight)
-Binary Size:   ~15MB (self-contained)
-Build Time:    ~2 seconds
-```
-
-## Requirements
-
-**Runtime:** None! Single binary with no dependencies.
-
-**Build (optional):** Go 1.21+
-
-**Recommended:**
-- nvim (Neovim) or your preferred editor
-- fzf for fuzzy finding (optional but recommended)
-- git for version control (optional)
-
-## Configuration
-
-jotr uses a JSON configuration file located at `~/.config/jotr/config.json`.
-
-Run `jotr configure` to set up your configuration interactively, or see [config.template.json](config.template.json) for all available options.
-
-## Documentation
-
-- 📖 [Installation Guide](INSTALL.md)
-- 📖 [Release Guide](RELEASE.md)
-- 📚 [Wiki](../jotr.wiki/Home.md)
-- ❓ [FAQ](../jotr.wiki/FAQ.md)
-
-## License
-
-MIT License - see [LICENSE](LICENSE) for details
+**Dependencies:**
+- cobra (CLI framework)
+- viper (configuration)  
+- bubbletea (TUI framework)
+- lipgloss (terminal styling)
 
 ## Contributing
 
 Contributions welcome! Please:
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch  
 3. Make your changes
 4. Add tests if applicable
 5. Submit a pull request
 
+For development:
+```bash
+make build        # Build binary
+make test         # Run tests  
+make fmt          # Format code
+make clean        # Clean artifacts
+```
+
+## Documentation
+
+- [Installation Guide](INSTALL.md)
+- [Release Guide](RELEASE.md)  
+- [Wiki](https://github.com/AnishShah1803/jotr/wiki)
+
 ## Support
 
-- 🐛 [Report Issues](https://github.com/yourusername/jotr/issues)
-- 💬 [Discussions](https://github.com/yourusername/jotr/discussions)
-- 📖 [Documentation](../jotr.wiki/Home.md)
+- [Report Issues](https://github.com/AnishShah1803/jotr/issues)
+- [Discussions](https://github.com/AnishShah1803/jotr/discussions)
+- [Wiki](https://github.com/AnishShah1803/jotr/wiki)
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-Made with ❤️ for developers and power users
+**Made for developers and power users**

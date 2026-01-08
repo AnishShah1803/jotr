@@ -12,6 +12,10 @@ jotr
 # Output of the go coverage tool
 *.out
 
+# Test coverage reports
+coverage.html
+coverage.xml
+
 # Dependency directories
 vendor/
 
@@ -38,4 +42,7 @@ config.json
 # Temporary files
 *.tmp
 *.log
+
+# Ralph files
+.ralph-*
 

@@ -1,19 +1,28 @@
-# Release Process
+# Enterprise Release Process
 
-This document describes how to create a release of jotr.
+This document describes the release process for jotr with automated workflows, safety checks, and comprehensive validation.
 
 ## Prerequisites
 
 - Go 1.21+
 - Git
-- GitHub CLI (optional but recommended)
+- GitHub CLI (recommended)
+- GitHub token with repo access (for automation)
+- Docker (optional, for containerized builds)
 
 ## Building Release Binaries
+
+### Build Types
+
+**⚠️ Important: Release builds are always PRODUCTION builds**
+- `make build-all` → Production binaries only (no dev features)
+- `make dev` → Development builds (includes dev mode)
+- Build tags enforce separation at compile time
 
 ### Using Make
 
 ```bash
-# Build for all platforms
+# Build for all platforms (production)
 make build-all
 
 # This creates binaries in dist/:
@@ -48,21 +57,55 @@ GOOS=windows GOARCH=amd64 go build -o dist/jotr-windows-amd64.exe
 
 ## Creating a Release
 
-### 1. Update Version
+### 🚀 Automated Release (Recommended)
 
-Update version in:
-- `main.go` (if hardcoded)
-- `README.md`
-- `jotr.rb` (Homebrew formula)
-
-### 2. Create Git Tag
+Use the safe, interactive release script:
 
 ```bash
-# Tag the release
-git tag -a v1.0.0 -m "Release v1.0.0"
+# Patch release (1.2.0 -> 1.2.1)
+./scripts/release.sh --type patch
 
-# Push tag
-git push origin v1.0.0
+# Minor release (1.2.0 -> 1.3.0) 
+./scripts/release.sh --type minor
+
+# Major release (1.2.0 -> 2.1.0)
+./scripts/release.sh --type major
+
+# Dry run to test
+./scripts/release.sh --type patch --dry-run
+```
+
+**Safety Features:**
+- ✅ Automatic backup and rollback
+- ✅ Working directory validation
+- ✅ Interactive confirmation prompts
+- ✅ Change detection and changelog generation
+- ✅ Git state preservation
+
+### Manual Release (Advanced)
+
+#### 1. Update Version
+
+The release script automatically handles version updates using CalVer format:
+- `v1.2.0` → `v1.2.1` (patch)
+- `v1.2.0` → `v1.3.0` (minor)  
+- `v1.2.0` → `v2.1.0` (major)
+
+#### 2. Safety Checks
+
+The release script performs these validations:
+- Clean working directory
+- Valid git commit
+- No uncommitted changes
+- Proper version format
+
+#### 3. Automated Tag and Push
+
+```bash
+# The script automatically:
+git commit -m "🏷️ Release v1.2.0"
+git tag -a v1.2.0 -m "Release v1.2.0"  
+git push origin v1.2.0
 ```
 
 ### 3. Build Binaries
@@ -89,7 +132,7 @@ gh release create v1.0.0 \
 
 #### Using GitHub Web UI
 
-1. Go to https://github.com/yourusername/jotr/releases/new
+1. Go to https://github.com/AnishShah1803/jotr/releases/new
 2. Choose tag: `v1.0.0`
 3. Release title: `jotr v1.0.0`
 4. Add release notes
