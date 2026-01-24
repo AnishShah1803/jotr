@@ -1,0 +1,71 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: all
+  disable:
+    - gochecknoglobals
+    - gochecknoinits
+    - wsl
+    - gomoddirectives
+    - gomodguard
+    - testpackage
+    - paralleltest
+    - tparallel
+    - thelper
+    - nosprintfhostport
+    - goheader
+
+linters-settings:
+  govet:
+    enable-all: true
+  gocyclo:
+    min-complexity: 15
+  misspell:
+    locale: US
+  ineffassign:
+    check-exported: true
+  staticcheck:
+    checks: ["SA2000"]
+  goimports:
+    local-prefixes: github.com/AnishShah1803/jotr
+  errcheck:
+    all: true
+  gosec:
+    severity: medium
+  funlen:
+    all: true
+  gocritic:
+    all: true
+  godot:
+    all: true
+  mnd:
+    all: true
+  goprintffuncname:
+    all: true
+  nolintlint:
+    all: true
+  prealloc:
+    all: true
+  revive:
+    all: true
+  rowserrcheck:
+    all: true
+  unconvert:
+    all: true
+  unparam:
+    all: true
+  whitespace:
+    all: true
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  sort-results: true

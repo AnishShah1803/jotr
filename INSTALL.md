@@ -6,19 +6,19 @@
 
 ```bash
 # Using Make (recommended)
-git clone https://github.com/yourusername/jotr
+git clone https://github.com/AnishShah1803/jotr
 cd jotr
 make install
 
 # Or using install script
-curl -fsSL https://raw.githubusercontent.com/yourusername/jotr/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/AnishShah1803/jotr/main/install.sh | bash
 ```
 
 ### Windows
 
 ```bash
 # Download binary
-curl -L https://github.com/yourusername/jotr/releases/latest/download/jotr-windows-amd64.exe -o jotr.exe
+curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-windows-amd64.exe -o jotr.exe
 
 # Move to a directory in your PATH
 move jotr.exe C:\Windows\System32\
@@ -26,13 +26,33 @@ move jotr.exe C:\Windows\System32\
 
 ## Detailed Installation Methods
 
-### Method 1: Using Make (Recommended for Developers)
+### Method 1: Using Make
+
+**🚀 For Users (Recommended):**
+```bash
+git clone https://github.com/AnishShah1803/jotr
+cd jotr
+make install    # Production build with automatic installation
+```
+⚠️ **This will overwrite any existing jotr installation at `/usr/local/bin/jotr`**
+
+**🛠️ For Developers:**
+```bash
+git clone https://github.com/AnishShah1803/jotr
+cd jotr
+make dev        # Development build with dev mode
+```
+
+**⚠️ Production Build (Advanced):**
+```bash
+make build       # Production only, requires confirmation
+```
 
 **Prerequisites:** Go 1.21+
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/jotr
+git clone https://github.com/AnishShah1803/jotr
 cd jotr
 
 # Build and install
@@ -44,15 +64,23 @@ make install
 # 3. Make it executable
 ```
 
-**Other Make commands:**
+**Build Commands:**
 
 ```bash
-make build       # Just build (creates ./jotr)
+make build       # Production build (requires confirmation)
+make dev         # Development build (includes dev mode)
 make build-all   # Build for all platforms
 make clean       # Clean build artifacts
 make test        # Run tests
+make install     # Build and install production version
 make uninstall   # Remove installed binary
 ```
+
+**⚠️ Important:**
+- Use `make dev` for development work
+- `make install` overwrites system binary (with confirmation)
+- `make build` creates local binary (no system changes)
+- Production builds exclude development features
 
 ### Method 2: Using Install Script
 
@@ -60,10 +88,10 @@ make uninstall   # Remove installed binary
 
 ```bash
 # Download and run
-curl -fsSL https://raw.githubusercontent.com/yourusername/jotr/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/AnishShah1803/jotr/main/install.sh | bash
 
 # Or download first, then run
-curl -fsSL https://raw.githubusercontent.com/yourusername/jotr/main/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/AnishShah1803/jotr/main/install.sh -o install.sh
 chmod +x install.sh
 ./install.sh
 ```
@@ -83,10 +111,10 @@ Download the appropriate binary for your platform:
 **macOS:**
 ```bash
 # Intel
-curl -L https://github.com/yourusername/jotr/releases/latest/download/jotr-darwin-amd64 -o jotr
+curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-darwin-amd64 -o jotr
 
 # Apple Silicon
-curl -L https://github.com/yourusername/jotr/releases/latest/download/jotr-darwin-arm64 -o jotr
+curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-darwin-arm64 -o jotr
 
 # Install
 chmod +x jotr
@@ -96,10 +124,10 @@ sudo mv jotr /usr/local/bin/
 **Linux:**
 ```bash
 # x86_64
-curl -L https://github.com/yourusername/jotr/releases/latest/download/jotr-linux-amd64 -o jotr
+curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-linux-amd64 -o jotr
 
 # ARM64
-curl -L https://github.com/yourusername/jotr/releases/latest/download/jotr-linux-arm64 -o jotr
+curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-linux-arm64 -o jotr
 
 # Install
 chmod +x jotr
@@ -109,7 +137,7 @@ sudo mv jotr /usr/local/bin/
 **Windows:**
 ```bash
 # Download
-curl -L https://github.com/yourusername/jotr/releases/latest/download/jotr-windows-amd64.exe -o jotr.exe
+curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-windows-amd64.exe -o jotr.exe
 
 # Move to PATH (example)
 move jotr.exe C:\Windows\System32\
@@ -121,7 +149,7 @@ move jotr.exe C:\Windows\System32\
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/jotr
+git clone https://github.com/AnishShah1803/jotr
 cd jotr
 
 # Build
@@ -139,7 +167,7 @@ sudo mv jotr /usr/local/bin/
 **Prerequisites:** Go 1.21+
 
 ```bash
-go install github.com/yourusername/jotr@latest
+go install github.com/AnishShah1803/jotr@latest
 ```
 
 This installs to `$GOPATH/bin/jotr` (usually `~/go/bin/jotr`).
@@ -152,7 +180,30 @@ export PATH="$PATH:$(go env GOPATH)/bin"
 
 ## Post-Installation
 
-### 1. Verify Installation
+### 1. Install Optional Dependencies
+
+**For Graph Visualization (optional but recommended):**
+
+```bash
+# macOS
+brew install graphviz
+
+# Ubuntu/Debian
+sudo apt-get install graphviz
+
+# CentOS/RHEL/Fedora
+sudo yum install graphviz
+# or
+sudo dnf install graphviz
+
+# Arch Linux
+sudo pacman -S graphviz
+
+# Windows (using chocolatey)
+choco install graphviz
+```
+
+### 2. Verify Installation
 
 ```bash
 jotr version
@@ -163,7 +214,7 @@ You should see:
 jotr version 1.0.0
 ```
 
-### 2. Run Configuration Wizard
+### 3. Run Configuration Wizard
 
 ```bash
 jotr configure
@@ -175,7 +226,30 @@ This will guide you through setting up:
 - Todo file path
 - PDP file path (optional)
 
-### 3. Run Health Check
+### 4. Configure Your Editor
+
+jotr requires an editor to be configured before opening files:
+
+**Option 1: Set EDITOR environment variable (Recommended)**
+```bash
+# Add to your shell profile (~/.bashrc, ~/.zshrc, etc.)
+export EDITOR="nvim"
+```
+
+**Option 2: Configure in jotr config**
+```bash
+jotr configure
+# Or edit ~/.config/jotr/config.json and add:
+{
+  "editor": {
+    "default": "nvim"
+  }
+}
+```
+
+**Supported editors:** vim, nvim, code, emacs, nano, or any editor in your PATH.
+
+### 5. Run Health Check
 
 ```bash
 jotr check
@@ -187,7 +261,19 @@ This verifies:
 - Editor is configured
 - Everything is working
 
-### 4. Create Your First Note
+### 5. Run Health Check
+
+```bash
+jotr check
+```
+
+This verifies:
+- Config file exists
+- Directories are accessible
+- Editor is configured
+- Everything is working
+
+### 6. Create Your First Note
 
 ```bash
 jotr daily
@@ -237,7 +323,7 @@ The script will detect existing installation and update it.
 
 ```bash
 # Download new binary
-curl -L https://github.com/yourusername/jotr/releases/latest/download/jotr-[platform] -o jotr
+curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-[platform] -o jotr
 chmod +x jotr
 sudo mv jotr /usr/local/bin/
 ```
@@ -262,5 +348,50 @@ rm -rf ~/.config/jotr/
 
 ## Troubleshooting
 
-See [Getting Started](jotr.wiki/Getting-Started-Go.md) for troubleshooting tips.
+### "no editor configured" Error
+
+If you see this error when running commands:
+
+```
+Error: no editor configured - set EDITOR environment variable or configure editor.default
+```
+
+**Solution:** Configure an editor as shown in step 4 above.
+
+### Editor Not Found
+
+If you see:
+
+```
+Error: editor 'nvim' not found in PATH
+```
+
+**Solution:** Install your preferred editor:
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install vim neovim
+
+# macOS
+brew install vim neovim
+
+# Or use VS Code
+code
+```
+
+Then verify it's in your PATH:
+
+```bash
+which nvim  # Should show /usr/bin/nvim or similar
+```
+
+### Health Check Failures
+
+Running `jotr check` will identify common issues:
+- Missing config file → Run `jotr configure`
+- Inaccessible directories → Check permissions and paths
+- Editor not configured → See step 4 above
+- Editor not found → Install editor and verify PATH
+
+For more troubleshooting tips, see the [Wiki](https://github.com/AnishShah1803/jotr/wiki).
 

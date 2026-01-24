@@ -12,6 +12,10 @@ jotr
 # Output of the go coverage tool
 *.out
 
+# Test coverage reports
+coverage.html
+coverage.xml
+
 # Dependency directories
 vendor/
 
@@ -21,6 +25,7 @@ go.work
 # Build artifacts
 dist/
 build/
+jotr-dev
 
 # IDE specific files
 .vscode/
@@ -33,9 +38,17 @@ build/
 .DS_Store
 
 # Config files (user-specific)
-config.json
+*config.json
 
 # Temporary files
 *.tmp
 *.log
 
+# Ralph files
+.ralph-*
+
+# Development data directories
+dev-data/
+
+#Agent files
+PLAN.md

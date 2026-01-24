@@ -1,17 +1,62 @@
 #!/bin/bash
 
-set -e  # Exit on error
+set -e
 
-REPO_URL="https://github.com/yourusername/jotr"
-RELEASE_URL="https://github.com/yourusername/jotr/releases/latest/download"
+REPO_URL="https://github.com/AnishShah1803/jotr"
+API_URL="https://api.github.com/repos/AnishShah1803/jotr/releases/latest"
 BIN_DIR="/usr/local/bin"
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 CONFIG_DIR="$CONFIG_HOME/jotr"
+TEMP_DIR="/tmp/jotr-install-$(date +%s)"
 
-echo "🔧 Installing jotr..."
+echo "Installing jotr..."
 echo ""
 
-# Detect OS
+cleanup() {
+    rm -rf "$TEMP_DIR"
+}
+trap cleanup EXIT
+
+get_latest_version() {
+    if command -v curl >/dev/null 2>&1; then
+        curl -s "$API_URL" | grep -o '"tag_name":"[^"]*' | cut -d'"' -f2
+    elif command -v wget >/dev/null 2>&1; then
+        wget -qO- "$API_URL" | grep -o '"tag_name":"[^"]*' | cut -d'"' -f2
+    else
+        echo "latest"
+    fi
+}
+
+verify_checksum() {
+    local file="$1"
+    local expected="$2"
+    
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual=$(sha256sum "$file" | cut -d' ' -f1)
+    elif command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 "$file" | cut -d' ' -f1)
+    else
+        echo "Cannot verify checksum: no checksum tool available"
+        return 0
+    fi
+    
+    if [ "$actual" = "$expected" ]; then
+        echo "Checksum verified"
+        return 0
+    else
+        echo "❌ Checksum verification failed"
+        echo "  Expected: $expected"
+        echo "  Actual:   $actual"
+        return 1
+    fi
+}
+
+mkdir -p "$TEMP_DIR"
+
+LATEST_VERSION=$(get_latest_version)
+echo "Latest version: $LATEST_VERSION"
+echo ""
+
 OS="$(uname -s)"
 ARCH="$(uname -m)"
 
@@ -27,6 +72,7 @@ case "$OS" in
         ;;
     *)
         echo "❌ Unsupported OS: $OS"
+        echo "Supported: Linux, macOS, Windows (WSL)"
         exit 1
         ;;
 esac
@@ -40,72 +86,159 @@ case "$ARCH" in
         ;;
     *)
         echo "❌ Unsupported architecture: $ARCH"
+        echo "Supported: amd64, arm64"
         exit 1
         ;;
 esac
 
-echo "Detected: $OS_TYPE-$ARCH_TYPE"
+echo "Detected platform: $OS_TYPE-$ARCH_TYPE"
 echo ""
 
-# Download pre-built binary
-echo "Downloading pre-built binary..."
 BINARY_NAME="jotr-${OS_TYPE}-${ARCH_TYPE}"
-DOWNLOAD_URL="${RELEASE_URL}/${BINARY_NAME}"
+if [ "$OS_TYPE" = "windows" ]; then
+    BINARY_NAME="${BINARY_NAME}.exe"
+    ARCHIVE_EXTENSION="zip"
+else
+    ARCHIVE_EXTENSION="tar.gz"
+fi
 
-echo "Downloading from: $DOWNLOAD_URL"
+ARCHIVE_NAME="jotr-${LATEST_VERSION}-${OS_TYPE}-${ARCH_TYPE}.${ARCHIVE_EXTENSION}"
+DOWNLOAD_URL="https://github.com/AnishShah1803/jotr/releases/download/${LATEST_VERSION}/${ARCHIVE_NAME}"
+
+echo "Downloading: $ARCHIVE_NAME"
+echo "URL: $DOWNLOAD_URL"
 echo ""
 
-# Try to download
-if curl -fsSL "$DOWNLOAD_URL" -o /tmp/jotr 2>/dev/null; then
-    echo "✓ Downloaded successfully"
+if command -v curl >/dev/null 2>&1; then
+    if ! curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_DIR/$ARCHIVE_NAME"; then
+        echo "❌ Download failed"
+        exit 1
+    fi
+elif command -v wget >/dev/null 2>&1; then
+    if ! wget -q "$DOWNLOAD_URL" -O "$TEMP_DIR/$ARCHIVE_NAME"; then
+        echo "❌ Download failed"
+        exit 1
+    fi
 else
-    echo "❌ Failed to download pre-built binary"
-    echo ""
-    echo "Please try one of these alternatives:"
-    echo "  1. Build from source: git clone $REPO_URL && cd jotr && make install"
-    echo "  2. Download manually from: ${REPO_URL}/releases"
-    echo "  3. Check if your platform is supported"
+    echo "❌ Neither curl nor wget available"
     exit 1
 fi
 
-# Install binary
-echo "Installing to $BIN_DIR/jotr..."
+echo "Download successful"
 
-# Check if we need sudo
-if [ -w "$BIN_DIR" ]; then
-    mv /tmp/jotr "$BIN_DIR/jotr"
-    chmod +x "$BIN_DIR/jotr"
+CHECKSUMS_FILE="checksums.txt"
+CHECKSUMS_URL="https://github.com/AnishShah1803/jotr/releases/download/${LATEST_VERSION}/${CHECKSUMS_FILE}"
+
+if curl -fsSL "$CHECKSUMS_URL" -o "$TEMP_DIR/$CHECKSUMS_FILE" 2>/dev/null; then
+    EXPECTED_CHECKSUM=$(grep "$ARCHIVE_NAME" "$TEMP_DIR/$CHECKSUMS_FILE" | cut -d' ' -f1)
+    if verify_checksum "$TEMP_DIR/$ARCHIVE_NAME" "$EXPECTED_CHECKSUM"; then
+        echo "Security verification passed"
+    else
+        echo "❌ Security verification failed"
+        exit 1
+    fi
 else
-    echo "(This may require your password)"
-    sudo mv /tmp/jotr "$BIN_DIR/jotr"
-    sudo chmod +x "$BIN_DIR/jotr"
+    echo "Could not download checksums for verification"
 fi
 
-# Create config directory
+echo "Extracting archive..."
+cd "$TEMP_DIR"
+if [ "$ARCHIVE_EXTENSION" = "zip" ]; then
+    if command -v unzip >/dev/null 2>&1; then
+        unzip -q "$ARCHIVE_NAME"
+    else
+        echo "❌ unzip not available for Windows extraction"
+        exit 1
+    fi
+else
+    tar -xzf "$ARCHIVE_NAME"
+fi
+
+if [ ! -f "$BINARY_NAME" ]; then
+    echo "❌ Binary not found in archive"
+    ls -la "$TEMP_DIR"
+    exit 1
+fi
+
+echo "Installing binary to $BIN_DIR..."
+
+if [ -f "$BIN_DIR/jotr" ]; then
+    echo "Existing jotr found, backing up..."
+    cp "$BIN_DIR/jotr" "$BIN_DIR/jotr.backup.$(date +%s)"
+fi
+
+if [ -w "$BIN_DIR" ]; then
+    mv "$BINARY_NAME" "$BIN_DIR/jotr"
+    chmod +x "$BIN_DIR/jotr"
+    INSTALL_METHOD="user"
+else
+    echo "Administrator privileges required"
+    if command -v sudo >/dev/null 2>&1; then
+        sudo mv "$BINARY_NAME" "$BIN_DIR/jotr"
+        sudo chmod +x "$BIN_DIR/jotr"
+        INSTALL_METHOD="sudo"
+    else
+        echo "❌ Cannot write to $BIN_DIR and sudo not available"
+        echo "Alternative: Install to ~/.local/bin instead"
+        mkdir -p "$HOME/.local/bin"
+        mv "$BINARY_NAME" "$HOME/.local/bin/jotr"
+        chmod +x "$HOME/.local/bin/jotr"
+        BIN_DIR="$HOME/.local/bin"
+        INSTALL_METHOD="local"
+        
+        if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
+            echo "Add ~/.local/bin to your PATH:"
+            echo "  echo 'export PATH=\"\$PATH:\$HOME/.local/bin\"' >> ~/.bashrc"
+            echo "  source ~/.bashrc"
+        fi
+    fi
+fi
+
+echo "Binary installed to $BIN_DIR/jotr"
+
+if ! "$BIN_DIR/jotr" version >/dev/null 2>&1; then
+    echo "❌ Installation verification failed"
+    exit 1
+fi
+
 mkdir -p "$CONFIG_DIR"
 
-# Copy template if config doesn't exist
 if [ ! -f "$CONFIG_DIR/config.json" ]; then
-    echo "✓ Config directory created at: $CONFIG_DIR"
-    echo "  Run 'jotr configure' to set up your configuration"
+echo "Config directory created: $CONFIG_DIR"
+echo "Run 'jotr configure' to set up your configuration"
+else
+    echo "Config directory exists: $CONFIG_DIR"
 fi
 
 echo ""
-echo "✅ Installation complete!"
+echo "Installation complete!"
 echo ""
-echo "Config location: $CONFIG_DIR/config.json"
-echo "Binary location: $BIN_DIR/jotr"
+echo "Installation Summary:"
+echo "  Version: $LATEST_VERSION"
+echo "  Binary: $BIN_DIR/jotr"
+echo "  Config: $CONFIG_DIR/config.json"
+echo "  Method: $INSTALL_METHOD"
 echo ""
-echo "Next steps:"
-echo "  1. Run 'jotr configure' to set up your paths"
-echo "  2. Start using: jotr daily, jotr sync, etc."
+
+INSTALLED_VERSION=$("$BIN_DIR/jotr" version 2>/dev/null || echo "unknown")
+echo "Verification: $INSTALLED_VERSION"
+
 echo ""
-echo "Quick start:"
-echo "  jotr configure          # Run configuration wizard"
-echo "  jotr daily              # Create/open daily note"
-echo "  jotr note create        # Create a note"
-echo "  jotr --help             # Show help"
+echo "Quick Start:"
+echo "  jotr configure          # Configuration wizard"
+echo "  jotr daily              # Create daily note"
+echo "  jotr capture \"idea\"     # Quick capture"
+echo "  jotr --help             # Show all commands"
 echo ""
-echo "Version:"
-jotr version
+
+echo "Documentation:"
+echo "  Wiki: $REPO_URL/wiki"
+echo "  Issues: $REPO_URL/issues"
+echo "  Releases: $REPO_URL/releases"
+echo ""
+
+if [ "$INSTALL_METHOD" = "local" ]; then
+    echo "Remember to start a new terminal or run:"
+    echo "  export PATH=\"\$PATH:\$HOME/.local/bin\""
+fi
 

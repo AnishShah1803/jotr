@@ -1,0 +1,113 @@
+name: Build and Test
+
+on:
+  pull_request:
+    branches:
+      - main
+  pull_request_target:
+    types: [labeled]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'pull_request_target' && contains(github.event.label.name, 'trigger-ci'))
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.25
+        
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/go-build
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Run tests
+      run: |
+        go test -race ./...
+        
+    - name: Check code formatting
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "❌ Code is not formatted properly"
+          gofmt -s -l .
+          exit 1
+        else
+          echo "✅ Code is properly formatted"
+        fi
+        
+    - name: Run go vet
+      run: |
+        if go vet ./...; then
+          echo "✅ go vet passed"
+        else
+          echo "❌ go vet found issues"
+          go vet ./...
+          exit 1
+        fi
+        
+    - name: Build test
+      run: |
+        go build -o /tmp/jotr-test .
+        if [ $? -eq 0 ]; then
+          echo "✅ Build successful"
+          /tmp/jotr-test version
+          rm /tmp/jotr-test
+        else
+          echo "❌ Build failed"
+          exit 1
+        fi
+        
+    - name: Check for breaking changes
+      run: |
+        if [[ "${{ github.base_ref }}" != "" ]]; then
+          MAIN_VERSION=$(git show origin/main:main.go | grep -o 'const Version = "[^"]*' | cut -d'"' -f2)
+          PR_VERSION=$(git show ${{ github.sha }}:main.go | grep -o 'const Version = "[^"]*' | cut -d'"' -f2)
+          
+          if [[ "${PR_VERSION%.*}" > "${MAIN_VERSION%.*}" ]]; then
+            echo "⚠️  Major version bump detected - ensure breaking changes are documented"
+          fi
+        fi
+        
+    - name: Security scan
+      run: |
+        echo "🔍 Running basic security checks..."
+        
+        if grep -rE "(password|secret|key|token)\s*=\s*" . --include="*.go" --exclude-dir=.git; then
+          echo "⚠️  Potential hardcoded secrets found"
+        else
+          echo "✅ No obvious hardcoded secrets detected"
+        fi
+        
+        if grep -r "exec\|system\|shell\|eval" . --include="*.go" --exclude-dir=.git | grep -v "_test.go"; then
+          echo "⚠️  Potentially unsafe functions detected"
+        else
+          echo "✅ No obviously unsafe functions detected"
+        fi
+        
+    - name: Run integration tests
+      run: |
+        go test -v ./cmd/... -tags=integration
+        
+    - name: Test CLI functionality
+      run: |
+        go build -o /tmp/jotr .
+        
+        /tmp/jotr version
+        /tmp/jotr --help
+        
+        echo "✅ Basic CLI functionality verified"

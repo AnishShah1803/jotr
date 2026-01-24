@@ -6,17 +6,23 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/AnishShah1803/jotr/internal/version"
 )
 
 var (
-	// Colors
+	// Colors.
 	primaryColor   = lipgloss.Color("86")
 	secondaryColor = lipgloss.Color("240")
 	accentColor    = lipgloss.Color("205")
 	successColor   = lipgloss.Color("42")
 	warningColor   = lipgloss.Color("214")
+	errorColor     = lipgloss.Color("203")
 
-	// Styles
+	iconStreak = "🔥"
+	iconEmpty  = "○"
+
+	// Styles.
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(primaryColor)
@@ -50,15 +56,7 @@ var (
 	helpStyle = lipgloss.NewStyle().
 			Foreground(secondaryColor)
 
-	// Nerd Font Icons
-	iconNote     = "" // nf-fa-file_text_o
-	iconPreview  = "" // nf-fa-eye
-	iconTask     = "" // nf-fa-check_square_o
-	iconStats    = "" // nf-fa-bar_chart
-	iconStreak   = "" // nf-fa-fire
-	iconEmpty    = "" // nf-fa-circle_o
-
-	// ASCII Art - Only used for large terminals (40+ lines, 50+ width)
+	// ASCII Art - Only used for large terminals (40+ lines, 50+ width).
 	asciiArtLarge = `     ██╗ ██████╗ ████████╗██████╗
      ██║██╔═══██╗╚══██╔══╝██╔══██╗
      ██║██║   ██║   ██║   ██████╔╝
@@ -76,42 +74,49 @@ func (m Model) View() string {
 		return ""
 	}
 
-	// Show error if any
 	if m.err != nil {
-		return fmt.Sprintf("\n  Error: %v\n\n  Press any key to continue...\n", m.err)
+		var helpText string
+		if m.errorRetryable {
+			helpText = "Press 'n' to create the file, 'r' to retry, or 'q' to quit"
+		} else {
+			helpText = "Press 'q' to quit"
+		}
+
+		errorTitle := "❌ Error"
+		errorContent := fmt.Sprintf("%v\n\n%s", m.err, helpText)
+
+		// Create a bordered error display
+		errorStyle := lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("196")).
+			Padding(1, 2).
+			Width(m.width - 8).
+			Foreground(lipgloss.Color("196"))
+
+		return "\n" + errorStyle.Render(errorTitle+"\n\n"+errorContent) + "\n"
 	}
 
 	// Calculate panel dimensions
 	// Note: lipgloss .Width() and .Height() include borders in the dimension
 	// So if we set Width(50) with a border, the content area is 50 - 2 = 48
 
-	// Header height calculation - dynamic based on terminal size
-	// Only show ASCII art for large terminals (40+ lines, 50+ width)
-	// Otherwise no header, just footer
+	// Calculate panel dimensions
+	// Only show ASCII art for large terminals
 	minWidthForAscii := 50
 	minHeightForAscii := 40
+
 	var headerFooterHeight int
 
 	if m.height >= minHeightForAscii && m.width >= minWidthForAscii {
-		// Large terminal with full ASCII art
-		// 1 (blank line above) + 6 (ASCII) + 1 (blank line below) + 2 (footer) + 2 (top/bottom margins) + 2 (extra) = 14
-		headerFooterHeight = 14
+		headerFooterHeight = 14 // Large terminal with ASCII art and footer
 	} else {
-		// Smaller terminals: 1 blank line at top + footer
-		// 1 (blank line at top) + 2 (footer with newline) = 3
-		headerFooterHeight = 3
+		headerFooterHeight = 3 // Small terminal: minimal header + footer
 	}
 
-	// Calculate dimensions
-	// Account for margins: left=2, right=2 = 4 total
-	// Account for gap between panels: 2 spaces
-	// Account for borders on each panel: 2 per panel = 4 total for 2 panels
-	// Account for padding inside borders: 2 per panel = 4 total for 2 panels
-	// Total overhead: 4 (margins) + 2 (gap) + 4 (borders) + 4 (padding) = 14
+	// Calculate available width: account for margins, gaps, borders, and padding
 	availableWidth := m.width - 14
 
 	// Split width evenly between left and right panels
-	// This is the CONTENT width (excluding borders and padding)
 	leftPanelWidth := availableWidth / 2
 	rightPanelWidth := availableWidth / 2
 	panelHeight := (m.height - headerFooterHeight - 4) / 2
@@ -120,9 +125,11 @@ func (m Model) View() string {
 	if leftPanelWidth < 30 {
 		leftPanelWidth = 30
 	}
+
 	if rightPanelWidth < 30 {
 		rightPanelWidth = 30
 	}
+
 	if panelHeight < 8 {
 		panelHeight = 8
 	}
@@ -169,35 +176,49 @@ func (m Model) View() string {
 }
 
 func (m Model) renderHeader() string {
-	// Only show ASCII art for large terminals (40+ lines)
 	minWidthForAscii := 50
 	minHeightForAscii := 40
 
 	var header string
 
-	// Only show ASCII art if terminal is large enough
 	if m.height >= minHeightForAscii && m.width >= minWidthForAscii {
-		// Large terminal: full ASCII art (6 lines)
 		centeredArt := lipgloss.NewStyle().
 			Width(m.width).
 			Align(lipgloss.Center).
 			Foreground(primaryColor).
 			Render(asciiArtLarge)
 
-		// Add blank lines above and below for spacing
 		header = "\n\n" + centeredArt + "\n"
 	} else {
-		// For smaller terminals, add a single blank line at top
 		header = "\n"
 	}
 
 	if m.statusMsg != "" {
+		var statusColor lipgloss.Color
+		switch m.statusLevel {
+		case "error":
+			statusColor = errorColor
+		case "success":
+			statusColor = successColor
+		case "warning":
+			statusColor = warningColor
+		default:
+			statusColor = warningColor
+		}
 		status := lipgloss.NewStyle().
 			Width(m.width).
 			Align(lipgloss.Center).
-			Foreground(warningColor).
+			Foreground(statusColor).
 			Render(m.statusMsg)
 		header += status + "\n"
+	} else if !m.updateAvailable {
+		versionInfo := version.GetVersion()
+		version := lipgloss.NewStyle().
+			Width(m.width).
+			Align(lipgloss.Center).
+			Foreground(secondaryColor).
+			Render(versionInfo)
+		header += version + "\n"
 	}
 
 	return header
@@ -208,23 +229,25 @@ func (m Model) renderFooter() string {
 
 	switch m.focusedPanel {
 	case panelNotes:
-		helpText = "q: quit | tab: switch panel | ↑↓/jk: navigate | enter: open note | r: refresh"
+		helpText = "q: quit | tab: switch panel | ↑↓/jk: navigate | enter: open note | r: refresh | u: update"
 	case panelPreview:
-		helpText = "q: quit | tab: switch panel | ↑↓/jk: scroll | r: refresh"
+		helpText = "q: quit | tab: switch panel | ↑↓/jk: scroll | r: refresh | u: update"
 	case panelTasks:
-		helpText = "q: quit | tab: switch panel | ↑↓/jk: scroll | enter: open todo list | r: refresh"
+		helpText = "q: quit | tab: switch panel | ↑↓/jk: scroll | enter: open todo list | r: refresh | u: update"
 	case panelStats:
-		helpText = "q: quit | tab: switch panel | ↑↓/jk: scroll | r: refresh"
+		helpText = "q: quit | tab: switch panel | ↑↓/jk: scroll | r: refresh | u: update"
 	default:
-		helpText = "q: quit | tab: switch panel | r: refresh"
+		helpText = "q: quit | tab: switch panel | r: refresh | u: update"
 	}
 
 	help := helpStyle.Render(helpText)
+
 	return "\n" + help
 }
 
 func (m Model) renderNotesPanel(width, height int) string {
 	var tStyle lipgloss.Style
+
 	var style lipgloss.Style
 
 	if m.focusedPanel == panelNotes {
@@ -236,27 +259,24 @@ func (m Model) renderNotesPanel(width, height int) string {
 	}
 
 	// Calculate content dimensions
-	// Border takes 2 chars (1 on each side), padding takes 2 chars (1 on each side)
-	// Total overhead: 4 chars for width
-	contentWidth := width - 4
+	contentWidth := width - 4 // Account for border and padding
 	if contentWidth < 10 {
 		contentWidth = 10
 	}
 
-	// Render title with width constraint to prevent overflow
 	title := tStyle.Width(contentWidth).Render("Recent Notes")
 
-	// Build all content (not limited by height)
 	content := ""
+
 	for i, notePath := range m.notes {
 		basename := filepath.Base(notePath)
 		basename = strings.TrimSuffix(basename, ".md")
 
-		// Width for content: account for selection indicator (▶ = 2 chars) and small margin
 		maxLen := contentWidth - 3
 		if maxLen < 10 {
 			maxLen = 10
 		}
+
 		if len(basename) > maxLen {
 			basename = basename[:maxLen-3] + "..."
 		}
@@ -272,18 +292,16 @@ func (m Model) renderNotesPanel(width, height int) string {
 		content = " No recent notes"
 	}
 
-	// Set viewport content
 	m.notesViewport.SetContent(content)
 
-	// Combine title and viewport
 	panel := title + "\n" + m.notesViewport.View()
 
-	// Render with border and exact width/height
 	return style.Width(width).Height(height).Render(panel)
 }
 
 func (m Model) renderPreviewPanel(width, height int) string {
 	var tStyle lipgloss.Style
+
 	var style lipgloss.Style
 
 	if m.focusedPanel == panelPreview {
@@ -312,6 +330,7 @@ func (m Model) renderPreviewPanel(width, height int) string {
 
 func (m Model) renderTasksPanel(width, height int) string {
 	var tStyle lipgloss.Style
+
 	var style lipgloss.Style
 
 	if m.focusedPanel == panelTasks {
@@ -323,8 +342,7 @@ func (m Model) renderTasksPanel(width, height int) string {
 	}
 
 	// Calculate content dimensions
-	// Border takes 2 chars, padding takes 2 chars = 4 total
-	contentWidth := width - 4
+	contentWidth := width - 4 // Account for border and padding
 	if contentWidth < 10 {
 		contentWidth = 10
 	}
@@ -351,6 +369,7 @@ func (m Model) renderTasksPanel(width, height int) string {
 		} else {
 			content += fmt.Sprintf(" %s\n", taskText)
 		}
+
 		count++
 	}
 
@@ -370,6 +389,7 @@ func (m Model) renderTasksPanel(width, height int) string {
 
 func (m Model) renderStatsPanel(width, height int) string {
 	var tStyle lipgloss.Style
+
 	var style lipgloss.Style
 
 	if m.focusedPanel == panelStats {
@@ -395,4 +415,3 @@ func (m Model) renderStatsPanel(width, height int) string {
 	// Render with border and exact width/height
 	return style.Width(width).Height(height).Render(panel)
 }
-

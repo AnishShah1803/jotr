@@ -1,6 +1,8 @@
 package tasks
 
 import (
+	"context"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"regexp"
@@ -8,19 +10,27 @@ import (
 	"time"
 )
 
-// Task represents a task item
+// Task represents a task item.
 type Task struct {
 	Text      string
-	Completed bool
 	Priority  string
+	Section   string
+	ID        string
 	Tags      []string
 	Line      int
-	Section   string
+	Completed bool
 }
 
-// ParseTasks parses tasks from markdown content
+// taskFormatRegex matches common markdown task list formats:
+// - [ ] and - [x] (dash)
+// * [ ] and * [x] (asterisk)
+// + [ ] and + [x] (plus)
+var taskFormatRegex = regexp.MustCompile(`^(\*|-|\+)\s*\[([ xX])\]\s*(.*)$`)
+
+// ParseTasks parses tasks from markdown content.
 func ParseTasks(content string) []Task {
 	var tasks []Task
+
 	lines := strings.Split(content, "\n")
 	currentSection := ""
 
@@ -31,47 +41,61 @@ func ParseTasks(content string) []Task {
 			continue
 		}
 
-		// Parse task lines
-		if strings.HasPrefix(strings.TrimSpace(line), "- [") {
-			task := Task{
-				Line:    i + 1,
-				Section: currentSection,
-			}
+		// Parse task lines - supports all common markdown formats:
+		// - [ ] / - [x] (dash), * [ ] / * [x] (asterisk), + [ ] / + [x] (plus)
+		trimmedLine := strings.TrimSpace(line)
 
-			// Check if completed
-			if strings.Contains(line, "- [x]") || strings.Contains(line, "- [X]") {
-				task.Completed = true
-				task.Text = strings.TrimSpace(strings.TrimPrefix(line, "- [x]"))
-				task.Text = strings.TrimSpace(strings.TrimPrefix(task.Text, "- [X]"))
-			} else {
-				task.Completed = false
-				task.Text = strings.TrimSpace(strings.TrimPrefix(line, "- [ ]"))
-			}
-
-			// Extract priority
-			priorityRe := regexp.MustCompile(`\[P([0-3])\]`)
-			if match := priorityRe.FindStringSubmatch(task.Text); len(match) > 1 {
-				task.Priority = "P" + match[1]
-			}
-
-			// Extract tags
-			tagRe := regexp.MustCompile(`#([a-zA-Z0-9_-]+)`)
-			matches := tagRe.FindAllStringSubmatch(task.Text, -1)
-			for _, match := range matches {
-				if len(match) > 1 {
-					task.Tags = append(task.Tags, match[1])
-				}
-			}
-
-			tasks = append(tasks, task)
+		// Must match valid task format: bullet + space + [space/x/X] + optional text
+		match := taskFormatRegex.FindStringSubmatch(trimmedLine)
+		if len(match) == 0 {
+			continue
 		}
+
+		task := Task{
+			Line:    i + 1,
+			Section: currentSection,
+		}
+
+		// Parse completed status and text from regex match
+		checkbox := match[2]
+		task.Completed = checkbox == "x" || checkbox == "X"
+		task.Text = strings.TrimSpace(match[3])
+
+		// Extract priority
+		priorityRe := regexp.MustCompile(`\[P([0-3])\]`)
+		if match := priorityRe.FindStringSubmatch(task.Text); len(match) > 1 {
+			task.Priority = "P" + match[1]
+		}
+
+		// Extract tags
+		tagRe := regexp.MustCompile(`#([a-zA-Z0-9_-]+)`)
+
+		matches := tagRe.FindAllStringSubmatch(task.Text, -1)
+		for _, match := range matches {
+			if len(match) > 1 {
+				task.Tags = append(task.Tags, match[1])
+			}
+		}
+
+		// Extract task ID
+		task.ID = ExtractTaskID(task.Text)
+		// Strip ID from text for clean display
+		task.Text = StripTaskID(task.Text)
+
+		tasks = append(tasks, task)
 	}
 
 	return tasks
 }
 
-// ReadTasks reads tasks from a file
-func ReadTasks(path string) ([]Task, error) {
+// ReadTasks reads tasks from a file with context support.
+func ReadTasks(ctx context.Context, path string) ([]Task, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -80,7 +104,7 @@ func ReadTasks(path string) ([]Task, error) {
 	return ParseTasks(string(content)), nil
 }
 
-// FilterTasks filters tasks by various criteria
+// FilterTasks filters tasks by various criteria.
 func FilterTasks(tasks []Task, completed *bool, priority string, section string) []Task {
 	var filtered []Task
 
@@ -106,9 +130,10 @@ func FilterTasks(tasks []Task, completed *bool, priority string, section string)
 	return filtered
 }
 
-// CountTasks counts tasks by status
+// CountTasks counts tasks by status.
 func CountTasks(tasks []Task) (total, completed, pending int) {
 	total = len(tasks)
+
 	for _, task := range tasks {
 		if task.Completed {
 			completed++
@@ -116,10 +141,11 @@ func CountTasks(tasks []Task) (total, completed, pending int) {
 			pending++
 		}
 	}
+
 	return
 }
 
-// GroupByPriority groups tasks by priority
+// GroupByPriority groups tasks by priority.
 func GroupByPriority(tasks []Task) map[string][]Task {
 	groups := make(map[string][]Task)
 
@@ -128,13 +154,14 @@ func GroupByPriority(tasks []Task) map[string][]Task {
 		if priority == "" {
 			priority = "None"
 		}
+
 		groups[priority] = append(groups[priority], task)
 	}
 
 	return groups
 }
 
-// GroupBySection groups tasks by section
+// GroupBySection groups tasks by section.
 func GroupBySection(tasks []Task) map[string][]Task {
 	groups := make(map[string][]Task)
 
@@ -143,13 +170,14 @@ func GroupBySection(tasks []Task) map[string][]Task {
 		if section == "" {
 			section = "Uncategorized"
 		}
+
 		groups[section] = append(groups[section], task)
 	}
 
 	return groups
 }
 
-// FormatTask formats a task for display
+// FormatTask formats a task for display.
 func FormatTask(task Task) string {
 	checkbox := "○"
 	if task.Completed {
@@ -158,13 +186,13 @@ func FormatTask(task Task) string {
 
 	priority := ""
 	if task.Priority != "" {
-		priority = fmt.Sprintf("[%s] ", task.Priority)
+		priority = fmt.Sprintf("%s ", task.Priority)
 	}
 
-	return fmt.Sprintf("%s %s%s", checkbox, priority, task.Text)
+	return fmt.Sprintf("%s  %s%s", checkbox, priority, task.Text)
 }
 
-// IsOverdue checks if a task is overdue based on due date in text
+// IsOverdue checks if a task is overdue based on due date in text.
 func IsOverdue(task Task) bool {
 	// Simple check for "due:" pattern
 	dueRe := regexp.MustCompile(`due:\s*(\d{4}-\d{2}-\d{2})`)
@@ -174,6 +202,43 @@ func IsOverdue(task Task) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
+// GenerateTaskID generates a unique task ID based on content.
+func GenerateTaskID(text string) string {
+	hash := sha256.Sum256([]byte(strings.TrimSpace(text)))
+	return fmt.Sprintf("%x", hash)[:8]
+}
+
+// ExtractTaskID extracts task ID from task text.
+func ExtractTaskID(text string) string {
+	// Look for <!-- id: abc12345 --> pattern
+	idRe := regexp.MustCompile(`<!-- id: ([a-f0-9]{8}) -->`)
+	if match := idRe.FindStringSubmatch(text); len(match) > 1 {
+		return match[1]
+	}
+
+	return ""
+}
+
+// EnsureTaskID ensures a task has an ID, generating one if needed.
+func EnsureTaskID(task *Task) {
+	if task.ID == "" {
+		// Check if ID is embedded in text
+		if id := ExtractTaskID(task.Text); id != "" {
+			task.ID = id
+		} else {
+			// Generate new ID and embed in text
+			task.ID = GenerateTaskID(task.Text)
+			task.Text = task.Text + fmt.Sprintf(" <!-- id: %s -->", task.ID)
+		}
+	}
+}
+
+// StripTaskID removes task ID from task text for display.
+func StripTaskID(text string) string {
+	idRe := regexp.MustCompile(`\s*<!-- id: [a-f0-9]{8} -->`)
+	return idRe.ReplaceAllString(text, "")
+}

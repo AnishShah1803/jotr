@@ -1,0 +1,187 @@
+# GitHub Actions workflow for building and releasing jotr
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.2.0)'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [linux, darwin, windows]
+        arch: [amd64, arm64]
+        
+    steps:
+    - uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.25
+        
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/go-build
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+        
+    - name: Get version from tag
+      run: |
+        echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+        echo "Building version: $VERSION"
+        
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.os }}
+        GOARCH: ${{ matrix.arch }}
+        CGO_ENABLED: 0
+        VERSION: ${{ env.VERSION }}
+      run: |
+        go build -ldflags="-s -w -X github.com/AnishShah1803/jotr/internal/version.Version=${{ env.VERSION }} -X github.com/AnishShah1803/jotr/internal/version.BuildTime=$(date -u +'%Y-%m-%d_%H:%M:%S')" -o jotr-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.exe' || '' }} .
+        
+    - name: Create archive
+      run: |
+        mkdir -p release
+        
+        if [ "${{ matrix.os }}" = "windows" ]; then
+          cp jotr-${{ matrix.os }}-${{ matrix.arch }}.exe release/
+          cd release
+          zip -r ../jotr-${{ env.VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.zip jotr-${{ matrix.os }}-${{ matrix.arch }}.exe
+          cd ..
+        else
+          cp jotr-${{ matrix.os }}-${{ matrix.arch }} release/
+          tar -czf release/jotr-${{ env.VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz jotr-${{ matrix.os }}-${{ matrix.arch }}
+        fi
+        
+    - name: Generate checksums
+      run: |
+        cd release
+        sha256sum * > checksums.txt
+        cat checksums.txt
+        
+    - name: Test binary
+      if: matrix.os == 'linux' && matrix.arch == 'amd64'
+      run: |
+        ./jotr-linux-amd64 version
+        ./jotr-linux-amd64 --help
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: jotr-${{ matrix.os }}-${{ matrix.arch }}
+        path: release/
+        retention-days: 30
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.25
+        
+    - name: Run tests
+      run: |
+        go test ./...
+        
+    - name: Check code formatting
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "Code is not formatted properly"
+          gofmt -s -l .
+          exit 1
+        fi
+        
+    - name: Run go vet
+      run: go vet ./...
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Get version from tag
+      run: |
+        echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+        
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/
+        
+    - name: Prepare release assets
+      run: |
+        mkdir -p release-assets
+        find artifacts/ -type f -exec cp {} release-assets/ \;
+        
+    - name: Generate release notes
+      run: |
+        echo "# ${{ env.VERSION }}" > release_notes.md
+        echo "" >> release_notes.md
+        
+        # Get changes since last tag
+        LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        if [ -n "$LAST_TAG" ]; then
+          echo "## Changes since $LAST_TAG" >> release_notes.md
+          echo "" >> release_notes.md
+          git log --pretty=format:"- %s (%h)" $LAST_TAG..HEAD | head -20 >> release_notes.md
+        else
+          echo "## Initial Release" >> release_notes.md
+          echo "" >> release_notes.md
+          git log --pretty=format:"- %s (%h)" | head -20 >> release_notes.md
+        fi
+        
+        echo "" >> release_notes.md
+        echo "### 📦 Assets" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "- **Linux AMD64**: \`jotr-${{ env.VERSION }}-linux-amd64.tar.gz\`" >> release_notes.md
+        echo "- **Linux ARM64**: \`jotr-${{ env.VERSION }}-linux-arm64.tar.gz\`" >> release_notes.md
+        echo "- **macOS AMD64**: \`jotr-${{ env.VERSION }}-darwin-amd64.tar.gz\`" >> release_notes.md
+        echo "- **macOS ARM64**: \`jotr-${{ env.VERSION }}-darwin-arm64.tar.gz\`" >> release_notes.md
+        echo "- **Windows AMD64**: \`jotr-${{ env.VERSION }}-windows-amd64.zip\`" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### 🚀 Installation" >> release_notes.md
+        echo "" >> release_notes.md
+        echo '```bash' >> release_notes.md
+        echo "# Linux/macOS" >> release_notes.md
+        echo 'curl -fsSL https://raw.githubusercontent.com/AnishShah1803/jotr/main/install.sh | bash' >> release_notes.md
+        echo "" >> release_notes.md
+        echo "# Or download directly" >> release_notes.md
+        echo "wget https://github.com/AnishShah1803/jotr/releases/download/${{ env.VERSION }}/jotr-${{ env.VERSION }}-\$(uname -s | tr '[:upper:]' '[:lower:]')-\$(uname -m).tar.gz" >> release_notes.md
+        echo "tar -xzf jotr-${{ env.VERSION }}-\$(uname -s | tr '[:upper:]' '[:lower:]')-\$(uname -m).tar.gz" >> release_notes.md
+        echo "sudo mv jotr-\$(uname -s | tr '[:upper:]' '[:lower:]')-\$(uname -m) /usr/local/bin/jotr" >> release_notes.md
+        echo '```' >> release_notes.md
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release-assets/*
+        body_path: release_notes.md
+        draft: false
+        prerelease: ${{ contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') || contains(github.ref_name, '-alpha') }}
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Update Homebrew formula (if not prerelease)
+      if: ${{ !contains(github.ref_name, '-beta') && !contains(github.ref_name, '-rc') && !contains(github.ref_name, '-alpha') }}
+      run: |
+        echo "🍺 Homebrew formula update would be triggered here"
+        echo "Version: ${{ env.VERSION }}"
+        # This would typically update homebrew formula repository

@@ -1,16 +1,20 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/anish/jotr/internal/config"
-	"github.com/anish/jotr/internal/notes"
-	"github.com/anish/jotr/internal/tasks"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/notes"
+	"github.com/AnishShah1803/jotr/internal/tasks"
+	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -53,10 +57,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleEnter()
 
 		case "r":
+			m.err = nil
+			m.errorRetryable = false
+			m = setStatus(m, "Refreshing...", "info")
+
+			return m, m.loadData()
+
+		case "u":
+			m = setStatus(m, "🔍 Checking for updates...", "info")
+			return m, checkForUpdatesCmd()
+
+		case "n":
+			if m.err != nil && m.errorRetryable {
+				err := createTodoFile(m.config.TodoPath)
+				if err != nil {
+					m = setStatus(m, "Failed to create file: "+err.Error(), "error")
+				} else {
+					m = setStatus(m, "Todo file created successfully", "success")
+					m.err = nil
+					m.errorRetryable = false
+					return m, m.loadData()
+				}
+				return m, nil
+			}
+		}
+
+		// If there's a retryable error, allow 'r' to retry
+		if m.err != nil && m.errorRetryable && msg.String() == "r" {
+			m.err = nil
+			m.errorRetryable = false
+			m = setStatus(m, "Retrying...", "info")
 			return m, m.loadData()
 		}
 
 	case tickMsg:
+		if m.statusMsg != "" && time.Since(m.statusMsgTime) > m.statusDuration {
+			m = clearStatus(m)
+		}
 		return m, tickCmd()
 
 	case dataLoadedMsg:
@@ -66,6 +103,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.totalNotes = msg.totalNotes
 		m.totalTasks = msg.totalTasks
 		m.completedTasks = msg.completedTasks
+		m.editorConfigured = msg.editorConfigured
+		m.editorFallback = msg.editorFallback
+		m = setStatus(m, "Data loaded successfully", "success")
 
 		// Update stats viewport with new data
 		m.updateStatsViewport()
@@ -73,20 +113,56 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.notes) > 0 {
 			return m, m.loadPreview(m.notes[m.selectedNote])
 		}
+
 		return m, nil
 
 	case previewLoadedMsg:
 		m.previewContent = string(msg)
 		m.updatePreviewViewport()
+
 		return m, nil
 
 	case editorFinishedMsg:
-		// Editor closed, refresh data
-		m.statusMsg = ""
+		m = clearStatus(m)
 		if msg.err != nil {
 			m.err = msg.err
+			m.errorRetryable = true
 		}
+
 		return m, m.loadData()
+
+	case editorOpenAttemptMsg:
+		m = clearStatus(m)
+		if msg.useShellFallback {
+			return m.handleFileOpen()
+		}
+		return m, nil
+
+	case editorFallbackMsg:
+		m = clearStatus(m)
+		if !m.editorConfigured {
+			m = setStatus(m, "❌ No editor available - configure editor.default or set EDITOR env var", "error")
+		}
+		return m, nil
+
+	case updateCheckMsg:
+		if msg.err != nil {
+			m = setStatus(m, fmt.Sprintf("❌ Update check failed: %v", msg.err), "error")
+		} else if msg.hasUpdate {
+			m.updateAvailable = true
+			m.updateVersion = msg.version
+			m = setStatus(m, fmt.Sprintf("🆕 Update available: %s (restart jotr and run 'jotr update')", msg.version), "info")
+		} else {
+			m = setStatus(m, "✅ You're running the latest version!", "success")
+		}
+
+		return m, nil
+
+	case errorMsg:
+		m.err = msg.err
+		m.errorRetryable = msg.retryable
+
+		return m, nil
 	}
 
 	return m, nil
@@ -110,6 +186,7 @@ func (m Model) handleUp() (Model, tea.Cmd) {
 	case panelStats:
 		m.statsViewport.LineUp(1)
 	}
+
 	return m, nil
 }
 
@@ -131,68 +208,145 @@ func (m Model) handleDown() (Model, tea.Cmd) {
 	case panelStats:
 		m.statsViewport.LineDown(1)
 	}
+
 	return m, nil
 }
 
 func (m Model) handleEnter() (Model, tea.Cmd) {
+	if !m.editorConfigured {
+		m = setStatus(m, "❌ No editor available - configure editor.default or set EDITOR env var", "error")
+		return m, nil
+	}
+
+	if m.editorFallback {
+		m = setStatus(m, "⚠️  editor not configured in config - using shell EDITOR", "warning")
+		return m, tea.Tick(time.Second, func(t time.Time) tea.Msg {
+			return editorOpenAttemptMsg{useShellFallback: true}
+		})
+	}
+
+	return m.handleFileOpen()
+}
+
+func (m Model) handleFileOpen() (Model, tea.Cmd) {
+	var filePath string
+	var statusMsg string
+
 	switch m.focusedPanel {
 	case panelNotes:
 		if len(m.notes) > 0 && m.selectedNote < len(m.notes) {
-			// Open note in editor
-			notePath := m.notes[m.selectedNote]
-			m.statusMsg = "Opening editor..."
-			c := notes.GetEditorCmd(notePath)
-			return m, tea.ExecProcess(c, func(err error) tea.Msg {
-				return editorFinishedMsg{err}
-			})
+			filePath = m.notes[m.selectedNote]
+			statusMsg = "Opening editor..."
 		}
 	case panelTasks:
-		// Open todo list in editor
-		todoPath := m.config.TodoPath
-		m.statusMsg = "Opening todo list..."
-		c := notes.GetEditorCmd(todoPath)
-		return m, tea.ExecProcess(c, func(err error) tea.Msg {
-			return editorFinishedMsg{err}
-		})
+		filePath = m.config.TodoPath
+		statusMsg = "Opening todo list..."
+	default:
+		return m, nil
 	}
-	return m, nil
+
+	if filePath == "" {
+		return m, nil
+	}
+
+	m = setStatus(m, statusMsg, "info")
+
+	var c *exec.Cmd
+	var err error
+
+	if m.editorFallback {
+		c, err = notes.GetEditorCmdWithShellFallback(m.ctx, filePath)
+	} else {
+		c, err = notes.GetEditorCmdWithContext(m.ctx, filePath)
+	}
+
+	if err != nil {
+		m = setStatus(m, "Error: "+err.Error(), "error")
+		return m, nil
+	}
+
+	return m, tea.ExecProcess(c, func(err error) tea.Msg {
+		return editorFinishedMsg{err}
+	})
 }
 
 type editorFinishedMsg struct{ err error }
 
 type dataLoadedMsg struct {
-	notes          []string
-	tasks          []tasks.Task
-	streak         int
-	totalNotes     int
-	totalTasks     int
-	completedTasks int
+	notes            []string
+	tasks            []tasks.Task
+	streak           int
+	totalNotes       int
+	totalTasks       int
+	completedTasks   int
+	editorConfigured bool
+	editorFallback   bool
 }
 
 type previewLoadedMsg []byte
 
 func (m Model) loadData() tea.Cmd {
 	return func() tea.Msg {
-		// Load recent notes
-		recentNotes, _ := notes.GetRecentDailyNotes(m.config.DiaryPath, 10)
+		ctx := m.ctx
+		if ctx == nil {
+			ctx = context.Background()
+		}
 
-		// Load tasks
-		allTasks, _ := tasks.ReadTasks(m.config.TodoPath)
+		select {
+		case <-ctx.Done():
+			return newErrorMsg(ctx.Err(), true)
+		default:
+		}
+
+		recentNotes, err := notes.GetRecentDailyNotes(ctx, m.config.DiaryPath, 10)
+		if err != nil {
+			return newErrorMsg(fmt.Errorf("failed to load recent notes: %w", err), true)
+		}
+
+		select {
+		case <-ctx.Done():
+			return newErrorMsg(ctx.Err(), true)
+		default:
+		}
+		allTasks, err := tasks.ReadTasks(ctx, m.config.TodoPath)
+		if err != nil {
+			// This is retryable - todo file might not exist yet
+			return newErrorMsg(fmt.Errorf("failed to load tasks: %w", err), true)
+		}
+
+		// Check context cancellation
+		select {
+		case <-ctx.Done():
+			return newErrorMsg(ctx.Err(), true)
+		default:
+		}
+
 		total, completed, _ := tasks.CountTasks(allTasks)
 
-		// Calculate streak
 		streak := calculateStreak(m.config)
 
-		// Count total notes
-		allNotes, _ := notes.FindNotes(m.config.Paths.BaseDir)
+		select {
+		case <-ctx.Done():
+			return newErrorMsg(ctx.Err(), true)
+		default:
+		}
+		allNotes, err := notes.FindNotes(ctx, m.config.Paths.BaseDir)
+		if err != nil {
+			return newErrorMsg(fmt.Errorf("failed to find notes: %w", err), true)
+		}
+
+		editorConfigured := isAnyEditorAvailable(ctx, m.config)
+		editorFallback := !isConfigEditorAvailable(ctx, m.config) && isShellEditorAvailable(ctx)
 
 		return dataLoadedMsg{
-			notes:          recentNotes,
-			tasks:          allTasks,
-			streak:         streak,
-			totalNotes:     len(allNotes),
-			totalTasks:     total,
-			completedTasks: completed,
+			notes:            recentNotes,
+			tasks:            allTasks,
+			streak:           streak,
+			totalNotes:       len(allNotes),
+			totalTasks:       total,
+			completedTasks:   completed,
+			editorConfigured: editorConfigured,
+			editorFallback:   editorFallback,
 		}
 	}
 }
@@ -201,13 +355,12 @@ func (m Model) loadPreview(notePath string) tea.Cmd {
 	return func() tea.Msg {
 		content, err := os.ReadFile(notePath)
 		if err != nil {
-			return previewLoadedMsg([]byte("Error loading preview"))
+			return previewLoadedMsg([]byte(fmt.Sprintf("Error loading preview: %v", err)))
 		}
+
 		return previewLoadedMsg(content)
 	}
 }
-
-
 
 func calculateStreak(cfg *config.LoadedConfig) int {
 	today := time.Now()
@@ -227,14 +380,12 @@ func calculateStreak(cfg *config.LoadedConfig) int {
 
 		notePath := notes.BuildDailyNotePath(cfg.DiaryPath, date)
 
-		if notes.FileExists(notePath) {
+		if utils.FileExists(notePath) {
 			streak++
 		} else {
-			// If this is the first valid day we're checking and there's no note, streak is 0
 			if firstValidDay {
 				break
 			}
-			// If we already have a streak and hit a gap, stop counting
 			if streak > 0 {
 				break
 			}
@@ -246,55 +397,50 @@ func calculateStreak(cfg *config.LoadedConfig) int {
 	return streak
 }
 
-// updateViewportSizes updates all viewport dimensions based on current window size
+// updateViewportSizes updates all viewport dimensions based on current window size.
 func (m *Model) updateViewportSizes() {
-	// Must match the calculation in View() exactly
 	minWidthForAscii := 50
 	minHeightForAscii := 40
+
 	var headerFooterHeight int
 
 	if m.height >= minHeightForAscii && m.width >= minWidthForAscii {
-		// Large terminal with full ASCII art
-		// 2 (blank lines) + 6 (ASCII) + 1 (spacing) + 2 (footer) + 2 (top/bottom margins) = 13
-		headerFooterHeight = 13
+		headerFooterHeight = 13 // Large terminal with ASCII art
 	} else {
-		// Smaller terminals: no header, just footer
-		// 2 (footer with newline) = 2
-		headerFooterHeight = 2
+		headerFooterHeight = 2 // Small terminal: minimal header
 	}
 
 	// Calculate dimensions - must match View()
-	availableWidth := m.width - 8 // Account for margins and ensure borders fit
-
-	// Split width for all panels (accounting for 2-space gap between them)
+	availableWidth := m.width - 8 // Account for margins
 	leftPanelWidth := (availableWidth - 2) / 2
 	rightPanelWidth := availableWidth - leftPanelWidth - 2
 	panelHeight := (m.height - headerFooterHeight - 4) / 2
 
-	// Ensure minimum size
 	if leftPanelWidth < 30 {
 		leftPanelWidth = 30
 	}
+
 	if rightPanelWidth < 30 {
 		rightPanelWidth = 30
 	}
+
 	if panelHeight < 8 {
 		panelHeight = 8
 	}
 
 	// Calculate content dimensions for each panel
-	// Border takes 2 chars, padding takes 2 chars = 4 total for width
-	// Border takes 2 lines, title takes 1 line = 3 total for height
-	leftContentWidth := leftPanelWidth - 4
-	rightContentWidth := rightPanelWidth - 4
-	contentHeight := panelHeight - 3
+	leftContentWidth := leftPanelWidth - 4   // Account for border and padding
+	rightContentWidth := rightPanelWidth - 4 // Account for border and padding
+	contentHeight := panelHeight - 3         // Account for border and title
 
 	if leftContentWidth < 10 {
 		leftContentWidth = 10
 	}
+
 	if rightContentWidth < 10 {
 		rightContentWidth = 10
 	}
+
 	if contentHeight < 3 {
 		contentHeight = 3
 	}
@@ -328,10 +474,12 @@ func (m *Model) updatePreviewViewport() {
 
 	// Process lines: truncate if needed and add margin
 	lines := strings.Split(content, "\n")
+
 	maxWidth := contentWidth - 1
 	if maxWidth < 10 {
 		maxWidth = 10
 	}
+
 	for i, line := range lines {
 		if len(line) > maxWidth {
 			lines[i] = line[:maxWidth-3] + "..."
@@ -353,6 +501,7 @@ func (m *Model) updateStatsViewport() {
 	// Streak with visual indicator
 	streakIcon := iconStreak
 	streakColor := successColor
+
 	if m.streak == 0 {
 		streakIcon = iconEmpty
 		streakColor = secondaryColor
@@ -384,9 +533,11 @@ func (m *Model) updateStatsViewport() {
 		if barWidth > 20 {
 			barWidth = 20
 		}
+
 		if barWidth < 5 {
 			barWidth = 5
 		}
+
 		filled := int(float64(barWidth) * completion / 100)
 		bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
 
@@ -406,3 +557,66 @@ func (m *Model) updateStatsViewport() {
 	m.statsViewport.SetContent(content)
 }
 
+func createTodoFile(path string) error {
+	return os.WriteFile(path, []byte("# Todo\n\n## Tasks\n\n\n\n"), 0644)
+}
+
+func isEditorAvailable(ctx context.Context) bool {
+	editor := config.GetEditorWithContext(ctx)
+	if editor == "" {
+		return false
+	}
+
+	if err := utils.ValidateEditor(editor); err != nil {
+		return false
+	}
+
+	return true
+}
+
+func isAnyEditorAvailable(ctx context.Context, cfg *config.LoadedConfig) bool {
+	configEditor := cfg.GetDefaultEditor()
+
+	if configEditor != "" {
+		if err := utils.ValidateEditor(configEditor); err == nil {
+			return true
+		}
+	}
+
+	shellEditor := os.Getenv("EDITOR")
+	if shellEditor != "" {
+		if err := utils.ValidateEditor(shellEditor); err == nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isConfigEditorAvailable(ctx context.Context, cfg *config.LoadedConfig) bool {
+	configEditor := cfg.GetDefaultEditor()
+
+	if configEditor == "" {
+		return false
+	}
+
+	if err := utils.ValidateEditor(configEditor); err != nil {
+		return false
+	}
+
+	return true
+}
+
+func isShellEditorAvailable(ctx context.Context) bool {
+	shellEditor := os.Getenv("EDITOR")
+
+	if shellEditor == "" {
+		return false
+	}
+
+	if err := utils.ValidateEditor(shellEditor); err != nil {
+		return false
+	}
+
+	return true
+}
