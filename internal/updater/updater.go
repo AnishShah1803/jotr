@@ -301,40 +301,42 @@ func downloadBinary(url string) (string, error) {
 }
 
 func replaceBinary(newBinaryPath string) error {
-	// Get current executable path
 	currentExe, err := os.Executable()
 	if err != nil {
 		return err
 	}
 
-	// Resolve any symlinks
 	currentExe, err = filepath.EvalSymlinks(currentExe)
 	if err != nil {
 		return err
 	}
 
-	// Create backup
 	backupPath := currentExe + ".backup"
 	if err := copyFile(currentExe, backupPath); err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}
 
-	// Replace binary
-	if err := copyFile(newBinaryPath, currentExe); err != nil {
-		// Restore backup on failure
-		if restoreErr := copyFile(backupPath, currentExe); restoreErr != nil {
-			return fmt.Errorf("failed to replace binary: %w, backup restore failed: %w", err, restoreErr)
-		}
-
+	err = copyFile(newBinaryPath, currentExe)
+	if err == nil {
 		_ = os.Remove(backupPath)
-
-		return fmt.Errorf("failed to replace binary: %w", err)
+		return nil
 	}
 
-	// Remove backup
-	if err := os.Remove(backupPath); err != nil {
-		return fmt.Errorf("failed to remove backup: %w", err)
+	renamePath := currentExe + ".old"
+	if err := os.Rename(currentExe, renamePath); err != nil {
+		_ = os.Remove(backupPath)
+		return fmt.Errorf("failed to rename in-use binary: %w", err)
 	}
+
+	if err := copyFile(newBinaryPath, currentExe); err != nil {
+		_ = os.Remove(currentExe)
+		_ = os.Rename(renamePath, currentExe)
+		_ = os.Remove(backupPath)
+		return fmt.Errorf("failed to copy new binary after rename: %w", err)
+	}
+
+	_ = os.Remove(renamePath)
+	_ = os.Remove(backupPath)
 
 	return nil
 }
