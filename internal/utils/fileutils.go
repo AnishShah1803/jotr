@@ -8,8 +8,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
+
+	"github.com/AnishShah1803/jotr/internal/utils/platform"
 )
 
 // LockFile acquires an exclusive lock on a file for concurrent access protection.
@@ -30,7 +31,7 @@ func LockFile(path string, timeout time.Duration) (*os.File, error) {
 
 	// Try to acquire exclusive lock with timeout
 	for {
-		err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX)
+		err := platform.Flock(int(lockFile.Fd()), platform.LOCK_EX)
 		if err == nil {
 			// Lock acquired successfully
 			return lockFile, nil
@@ -53,7 +54,7 @@ func UnlockFile(lockFile *os.File) error {
 	}
 
 	// Release the lock
-	err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+	err := platform.Flock(int(lockFile.Fd()), platform.LOCK_UN)
 	if err != nil {
 		// Still try to close the file even if unlock fails
 		closeErr := lockFile.Close()
@@ -75,12 +76,16 @@ func TryLockFile(path string) (*os.File, error) {
 		return nil, fmt.Errorf("failed to open lock file: %w", err)
 	}
 
-	err = syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	err = platform.Flock(int(lockFile.Fd()), platform.LOCK_EX|platform.LOCK_NB)
 	if err != nil {
 		lockFile.Close()
 
-		if err == syscall.EWOULDBLOCK {
+		if platform.IsLockBusy(err) {
 			return nil, nil // Lock is held by another process
+		}
+		if err == platform.ErrNotSupported {
+			// On platforms that don't support locking, assume success
+			return lockFile, nil
 		}
 
 		return nil, fmt.Errorf("failed to acquire file lock: %w", err)
@@ -126,8 +131,6 @@ func CheckWritePermission(path string) error {
 
 // CheckDiskSpace checks if there's enough disk space for a write operation.
 func CheckDiskSpace(path string, requiredBytes int64) error {
-	var stat syscall.Statfs_t
-
 	// Get directory path if path is a file
 	dir := path
 	if info, err := os.Stat(path); err == nil && !info.IsDir() {
@@ -136,7 +139,7 @@ func CheckDiskSpace(path string, requiredBytes int64) error {
 		dir = filepath.Dir(path)
 	}
 
-	err := syscall.Statfs(dir, &stat)
+	stat, err := platform.Statfs(dir)
 	if err != nil {
 		// If we can't get disk space, don't fail the operation
 		// Just log a warning and continue
@@ -144,7 +147,7 @@ func CheckDiskSpace(path string, requiredBytes int64) error {
 	}
 
 	// Calculate available space
-	availableBytes := int64(stat.Bavail) * int64(stat.Bsize)
+	availableBytes := int64(stat.BavailField()) * int64(stat.BsizeField())
 
 	if availableBytes < requiredBytes {
 		return fmt.Errorf("insufficient disk space: need %d bytes, have %d bytes available", requiredBytes, availableBytes)
