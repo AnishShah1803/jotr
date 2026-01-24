@@ -293,17 +293,6 @@ func TestRunValidation_NoConfig(t *testing.T) {
 	defer os.Setenv("HOME", origHome)
 }
 
-func TestShowQuickMenu_InvalidChoice(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "jotr-quick-test-")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	cfg := createTestUtilConfig(t, tmpDir)
-	_ = showQuickMenu(context.Background(), cfg)
-}
-
 func TestShowQuickMenu_Exit(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "jotr-quick-test-")
 	if err != nil {

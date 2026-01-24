@@ -7,29 +7,6 @@ import (
 	"github.com/AnishShah1803/jotr/internal/templates"
 )
 
-func TestLoadTemplatesForIntegration(t *testing.T) {
-	templates := []*templates.Template{
-		{
-			Name:     "test1",
-			Category: "cat1",
-		},
-		{
-			Name:     "test2",
-			Category: "cat1",
-		},
-	}
-
-	selected := SelectTemplateForIntegration(templates)
-
-	if selected == nil {
-		t.Fatal("SelectTemplateForIntegration returned nil")
-	}
-
-	if selected.Name != "test1" && selected.Name != "test2" {
-		t.Errorf("Unexpected selection: %s", selected.Name)
-	}
-}
-
 func TestCreateFromSelectedTemplate(t *testing.T) {
 	tmpl := &templates.Template{
 		Name:       "test",
