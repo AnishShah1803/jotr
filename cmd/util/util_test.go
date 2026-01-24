@@ -336,6 +336,10 @@ func TestShowQuickMenu_OpenTodayNote_Existing(t *testing.T) {
 		t.Fatalf("Failed to create diary dir: %v", err)
 	}
 
+	origEditor := os.Getenv("EDITOR")
+	os.Setenv("EDITOR", "true")
+	defer os.Setenv("EDITOR", origEditor)
+
 	oldStdin := os.Stdin
 	defer func() { os.Stdin = oldStdin }()
 
