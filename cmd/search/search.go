@@ -69,6 +69,11 @@ Examples:
 // SearchNotes performs a full-text search across all notes in the configured base directory.
 // It displays matching files with highlighted context lines unless --count or --files flags are used.
 func SearchNotes(ctx context.Context, cfg *config.LoadedConfig, query string) error {
+	// Skip empty queries
+	if query == "" {
+		return nil
+	}
+
 	matches, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, query)
 	if err != nil {
 		return fmt.Errorf("search failed: %w", err)
