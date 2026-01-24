@@ -157,7 +157,8 @@ $CHANGELOG
 
 Automated release script via ./scripts/release.sh --type $TYPE"
 
-echo "Creating and pushing tag..."
+echo "Pushing commit and tag..."
+git push origin HEAD
 git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
 git push origin "$NEW_VERSION"
 
