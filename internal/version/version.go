@@ -57,7 +57,7 @@ func getLatestReleaseVersion() (string, error) {
 		return "", err
 	}
 
-	return "v" + result.TagName, nil
+	return result.TagName, nil
 }
 
 func isNewerVersion(current, latest string) bool {
