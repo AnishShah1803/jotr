@@ -33,7 +33,7 @@ Examples:
 func runUpdate() error {
 	fmt.Println("🔍 Checking for updates...")
 
-	currentVersion := "v" + version.Version
+	currentVersion := version.GetVersion()
 
 	hasUpdate, latestVersion, release, err := updater.CheckForUpdates(currentVersion)
 	if err != nil {
@@ -90,7 +90,7 @@ func runUpdate() error {
 
 // CheckForUpdates is exported for use by TUI.
 func CheckForUpdates() (bool, string, error) {
-	currentVersion := "v" + version.Version
+	currentVersion := version.GetVersion()
 	hasUpdate, latestVersion, _, err := updater.CheckForUpdates(currentVersion)
 
 	return hasUpdate, latestVersion, err

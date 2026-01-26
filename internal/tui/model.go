@@ -133,7 +133,7 @@ func checkForUpdatesCmd() tea.Cmd {
 
 func checkForUpdatesFromTUI() (bool, string, error) {
 	var checker updateChecker = &defaultUpdateChecker{}
-	currentVersion := "v" + version.Version
+	currentVersion := version.GetVersion()
 
 	return checker.CheckForUpdate(currentVersion)
 }
