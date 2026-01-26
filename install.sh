@@ -27,6 +27,18 @@ get_latest_version() {
     fi
 }
 
+get_checksum_from_api() {
+    local version="$1"
+    local binary_name="$2"
+    local api_url="https://api.github.com/repos/AnishShah1803/jotr/releases/tags/${version}"
+    
+    if command -v curl >/dev/null 2>&1; then
+        curl -s "$api_url" | grep -A 5 "\"name\": \"${binary_name}\"" | grep '"digest"' | cut -d'"' -f4 | cut -d':' -f2
+    elif command -v wget >/dev/null 2>&1; then
+        wget -qO- "$api_url" | grep -A 5 "\"name\": \"${binary_name}\"" | grep '"digest"' | cut -d'"' -f4 | cut -d':' -f2
+    fi
+}
+
 verify_checksum() {
     local file="$1"
     local expected="$2"
@@ -130,28 +142,32 @@ echo "Download successful"
 CHECKSUMS_FILE="checksums.txt"
 CHECKSUMS_URL="https://github.com/AnishShah1803/jotr/releases/download/${LATEST_VERSION}/${CHECKSUMS_FILE}"
 
+# Try to get checksum from checksums.txt file first
+EXPECTED_CHECKSUM=""
 if curl -fsSL "$CHECKSUMS_URL" -o "$TEMP_DIR/$CHECKSUMS_FILE" 2>/dev/null; then
-    # Check if checksums file is not empty
     if [ -s "$TEMP_DIR/$CHECKSUMS_FILE" ]; then
         EXPECTED_CHECKSUM=$(grep "$BINARY_NAME" "$TEMP_DIR/$CHECKSUMS_FILE" | cut -d' ' -f1)
-        if [ -n "$EXPECTED_CHECKSUM" ]; then
-            if verify_checksum "$TEMP_DIR/$BINARY_NAME" "$EXPECTED_CHECKSUM"; then
-                echo "Security verification passed"
-            else
-                echo "❌ Security verification failed"
-                exit 1
-            fi
-        else
-            echo "⚠️  Checksum for $BINARY_NAME not found in checksums file"
-            echo "Proceeding without checksum verification (not recommended)"
-        fi
+    fi
+fi
+
+# If checksums.txt didn't work, try to get it from the GitHub API
+if [ -z "$EXPECTED_CHECKSUM" ]; then
+    echo "Checksum not found in checksums.txt, trying GitHub API..."
+    EXPECTED_CHECKSUM=$(get_checksum_from_api "$LATEST_VERSION" "$BINARY_NAME")
+fi
+
+if [ -n "$EXPECTED_CHECKSUM" ]; then
+    if verify_checksum "$TEMP_DIR/$BINARY_NAME" "$EXPECTED_CHECKSUM"; then
+        echo "Security verification passed"
     else
-        echo "⚠️  Checksums file is empty"
-        echo "Proceeding without checksum verification (not recommended)"
+        echo "❌ Security verification failed"
+        echo "  Expected: $EXPECTED_CHECKSUM"
+        exit 1
     fi
 else
-    echo "Could not download checksums for verification"
-    echo "Proceeding without checksum verification (not recommended)"
+    echo "⚠️  Could not retrieve checksum for verification"
+    echo "  This may be a temporary issue with the checksums file"
+    echo "  Proceeding without checksum verification (not recommended)"
 fi
 
 # Verify the binary was downloaded
