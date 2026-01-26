@@ -19,9 +19,9 @@ trap cleanup EXIT
 
 get_latest_version() {
     if command -v curl >/dev/null 2>&1; then
-        curl -s "$API_URL" | grep -o '"tag_name":"[^"]*' | cut -d'"' -f2
+        curl -s "$API_URL" | grep '"tag_name"' | cut -d'"' -f4
     elif command -v wget >/dev/null 2>&1; then
-        wget -qO- "$API_URL" | grep -o '"tag_name":"[^"]*' | cut -d'"' -f2
+        wget -qO- "$API_URL" | grep '"tag_name"' | cut -d'"' -f4
     else
         echo "latest"
     fi
@@ -102,20 +102,21 @@ else
     ARCHIVE_EXTENSION="tar.gz"
 fi
 
-ARCHIVE_NAME="jotr-${LATEST_VERSION}-${OS_TYPE}-${ARCH_TYPE}.${ARCHIVE_EXTENSION}"
-DOWNLOAD_URL="https://github.com/AnishShah1803/jotr/releases/download/${LATEST_VERSION}/${ARCHIVE_NAME}"
+# Use raw binary directly instead of archive when available
+ARCHIVE_NAME="${BINARY_NAME}"
+DOWNLOAD_URL="https://github.com/AnishShah1803/jotr/releases/download/${LATEST_VERSION}/${BINARY_NAME}"
 
-echo "Downloading: $ARCHIVE_NAME"
+echo "Downloading: $BINARY_NAME"
 echo "URL: $DOWNLOAD_URL"
 echo ""
 
 if command -v curl >/dev/null 2>&1; then
-    if ! curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_DIR/$ARCHIVE_NAME"; then
+    if ! curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_DIR/$BINARY_NAME"; then
         echo "❌ Download failed"
         exit 1
     fi
 elif command -v wget >/dev/null 2>&1; then
-    if ! wget -q "$DOWNLOAD_URL" -O "$TEMP_DIR/$ARCHIVE_NAME"; then
+    if ! wget -q "$DOWNLOAD_URL" -O "$TEMP_DIR/$BINARY_NAME"; then
         echo "❌ Download failed"
         exit 1
     fi
@@ -130,8 +131,8 @@ CHECKSUMS_FILE="checksums.txt"
 CHECKSUMS_URL="https://github.com/AnishShah1803/jotr/releases/download/${LATEST_VERSION}/${CHECKSUMS_FILE}"
 
 if curl -fsSL "$CHECKSUMS_URL" -o "$TEMP_DIR/$CHECKSUMS_FILE" 2>/dev/null; then
-    EXPECTED_CHECKSUM=$(grep "$ARCHIVE_NAME" "$TEMP_DIR/$CHECKSUMS_FILE" | cut -d' ' -f1)
-    if verify_checksum "$TEMP_DIR/$ARCHIVE_NAME" "$EXPECTED_CHECKSUM"; then
+    EXPECTED_CHECKSUM=$(grep "$BINARY_NAME" "$TEMP_DIR/$CHECKSUMS_FILE" | cut -d' ' -f1)
+    if verify_checksum "$TEMP_DIR/$BINARY_NAME" "$EXPECTED_CHECKSUM"; then
         echo "Security verification passed"
     else
         echo "❌ Security verification failed"
@@ -141,21 +142,11 @@ else
     echo "Could not download checksums for verification"
 fi
 
-echo "Extracting archive..."
-cd "$TEMP_DIR"
-if [ "$ARCHIVE_EXTENSION" = "zip" ]; then
-    if command -v unzip >/dev/null 2>&1; then
-        unzip -q "$ARCHIVE_NAME"
-    else
-        echo "❌ unzip not available for Windows extraction"
-        exit 1
-    fi
-else
-    tar -xzf "$ARCHIVE_NAME"
-fi
-
-if [ ! -f "$BINARY_NAME" ]; then
-    echo "❌ Binary not found in archive"
+# Verify the binary was downloaded
+FOUND_BINARY="$BINARY_NAME"
+if [ ! -f "$TEMP_DIR/$FOUND_BINARY" ]; then
+    echo "❌ Binary not found after download"
+    echo "Expected: $TEMP_DIR/$FOUND_BINARY"
     ls -la "$TEMP_DIR"
     exit 1
 fi
@@ -168,20 +159,20 @@ if [ -f "$BIN_DIR/jotr" ]; then
 fi
 
 if [ -w "$BIN_DIR" ]; then
-    mv "$BINARY_NAME" "$BIN_DIR/jotr"
+    mv "$TEMP_DIR/$FOUND_BINARY" "$BIN_DIR/jotr"
     chmod +x "$BIN_DIR/jotr"
     INSTALL_METHOD="user"
 else
     echo "Administrator privileges required"
     if command -v sudo >/dev/null 2>&1; then
-        sudo mv "$BINARY_NAME" "$BIN_DIR/jotr"
+        sudo mv "$TEMP_DIR/$FOUND_BINARY" "$BIN_DIR/jotr"
         sudo chmod +x "$BIN_DIR/jotr"
         INSTALL_METHOD="sudo"
     else
         echo "❌ Cannot write to $BIN_DIR and sudo not available"
         echo "Alternative: Install to ~/.local/bin instead"
         mkdir -p "$HOME/.local/bin"
-        mv "$BINARY_NAME" "$HOME/.local/bin/jotr"
+        mv "$TEMP_DIR/$FOUND_BINARY" "$HOME/.local/bin/jotr"
         chmod +x "$HOME/.local/bin/jotr"
         BIN_DIR="$HOME/.local/bin"
         INSTALL_METHOD="local"
