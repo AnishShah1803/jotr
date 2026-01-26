@@ -224,6 +224,19 @@ func TestGitCmd_GitCommit(t *testing.T) {
 		t.Skip("Git not available, skipping test")
 	}
 
+	// Configure git user identity for the test repository
+	gitCmd := func(args ...string) error {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = tmpDir
+		return cmd.Run()
+	}
+	if err := gitCmd("config", "user.email", "test@test.com"); err != nil {
+		t.Skip("Cannot configure git user, skipping test")
+	}
+	if err := gitCmd("config", "user.name", "Test"); err != nil {
+		t.Skip("Cannot configure git user, skipping test")
+	}
+
 	filePath := filepath.Join(tmpDir, "test.txt")
 	if err := os.WriteFile(filePath, []byte("test"), 0600); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)

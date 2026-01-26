@@ -376,6 +376,11 @@ func TestMonthlySummary(t *testing.T) {
 
 	cfg := createTestConfig(t, tmpDir)
 
+	// Set EDITOR environment variable for test
+	origEditor := os.Getenv("EDITOR")
+	os.Setenv("EDITOR", "true")
+	defer os.Setenv("EDITOR", origEditor)
+
 	// Set global monthly variables for testing
 	now := time.Now()
 	monthlyYear = now.Year()

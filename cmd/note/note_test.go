@@ -493,6 +493,11 @@ func TestCreateNoteWithReader_Success(t *testing.T) {
 
 	cfg := createTestConfig(t, tmpDir)
 
+	// Set EDITOR environment variable for the test
+	origEditor := os.Getenv("EDITOR")
+	os.Setenv("EDITOR", "true")
+	defer os.Setenv("EDITOR", origEditor)
+
 	// Mock input for note name
 	reader := newMockReader("TestNote\n")
 
@@ -528,6 +533,11 @@ func TestCreateNoteWithReader_WithType(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	cfg := createTestConfig(t, tmpDir)
+
+	// Set EDITOR environment variable for test
+	origEditor := os.Getenv("EDITOR")
+	os.Setenv("EDITOR", "true")
+	defer os.Setenv("EDITOR", origEditor)
 
 	// Mock input for note name
 	reader := newMockReader("WorkNote\n")
