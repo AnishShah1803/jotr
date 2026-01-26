@@ -2,7 +2,7 @@
 
 # Variables
 BINARY_NAME=jotr
-INSTALL_PATH=/usr/local/bin
+INSTALL_PATH=$(HOME)/.local/bin
 YEAR_IN_DEV=$(shell expr $(shell date +%Y) - 2025)
 MONTH=$(shell date +%-m)
 VERSION=$(YEAR_IN_DEV).$(MONTH).0
@@ -22,17 +22,12 @@ build-all:
 	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-windows-amd64.exe
 	@echo "✓ Built for all platforms in dist/"
 
-# Install locally
+# Install
 install: build
-	@echo "⚠️  WARNING: This will overwrite your system jotr installation"
-	@echo "   → Current binary at $(INSTALL_PATH)/$(BINARY_NAME) will be replaced"
-	@echo "   → For local testing: use './$(BINARY_NAME)' instead"
-	@echo "   → Continue with system install? [y/N]"
-	@read -r confirm && [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ] || exit 1
-	@echo ""
-	@echo "Installing $(BINARY_NAME) to $(INSTALL_PATH)..."
-	sudo cp $(BINARY_NAME) $(INSTALL_PATH)/$(BINARY_NAME)
-	sudo chmod +x $(INSTALL_PATH)/$(BINARY_NAME)
+	@echo "Installing $(BINARY_NAME) to $(INSTALL_PATH)/..."
+	@mkdir -p $(INSTALL_PATH)
+	@cp $(BINARY_NAME) $(INSTALL_PATH)/$(BINARY_NAME)
+	@chmod +x $(INSTALL_PATH)/$(BINARY_NAME)
 	@echo "✓ Installed to $(INSTALL_PATH)/$(BINARY_NAME)"
 	@echo ""
 	@echo "Run 'jotr configure' to set up your configuration"
@@ -40,7 +35,7 @@ install: build
 # Uninstall
 uninstall:
 	@echo "Uninstalling $(BINARY_NAME)..."
-	sudo rm -f $(INSTALL_PATH)/$(BINARY_NAME)
+	@rm -f $(INSTALL_PATH)/$(BINARY_NAME)
 	@echo "✓ Uninstalled"
 
 # Clean build artifacts
@@ -115,11 +110,13 @@ run:
 help:
 	@echo "jotr Makefile"
 	@echo ""
-	@echo "Usage:"
-	@echo "  make build       - Build production binary (user release)"
-	@echo "  make dev         - Build development binary (includes dev mode)"
+	@echo "Installation:"
 	@echo "  make install     - Build and install to $(INSTALL_PATH)"
 	@echo "  make uninstall   - Remove installed binary"
+	@echo ""
+	@echo "Development:"
+	@echo "  make build       - Build production binary"
+	@echo "  make dev         - Build development binary (includes dev mode)"
 	@echo "  make clean       - Remove build artifacts"
 	@echo "  make test        - Run tests"
 	@echo "  make test-race  - Run tests with race detector"
