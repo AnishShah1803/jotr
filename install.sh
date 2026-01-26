@@ -131,15 +131,27 @@ CHECKSUMS_FILE="checksums.txt"
 CHECKSUMS_URL="https://github.com/AnishShah1803/jotr/releases/download/${LATEST_VERSION}/${CHECKSUMS_FILE}"
 
 if curl -fsSL "$CHECKSUMS_URL" -o "$TEMP_DIR/$CHECKSUMS_FILE" 2>/dev/null; then
-    EXPECTED_CHECKSUM=$(grep "$BINARY_NAME" "$TEMP_DIR/$CHECKSUMS_FILE" | cut -d' ' -f1)
-    if verify_checksum "$TEMP_DIR/$BINARY_NAME" "$EXPECTED_CHECKSUM"; then
-        echo "Security verification passed"
+    # Check if checksums file is not empty
+    if [ -s "$TEMP_DIR/$CHECKSUMS_FILE" ]; then
+        EXPECTED_CHECKSUM=$(grep "$BINARY_NAME" "$TEMP_DIR/$CHECKSUMS_FILE" | cut -d' ' -f1)
+        if [ -n "$EXPECTED_CHECKSUM" ]; then
+            if verify_checksum "$TEMP_DIR/$BINARY_NAME" "$EXPECTED_CHECKSUM"; then
+                echo "Security verification passed"
+            else
+                echo "❌ Security verification failed"
+                exit 1
+            fi
+        else
+            echo "⚠️  Checksum for $BINARY_NAME not found in checksums file"
+            echo "Proceeding without checksum verification (not recommended)"
+        fi
     else
-        echo "❌ Security verification failed"
-        exit 1
+        echo "⚠️  Checksums file is empty"
+        echo "Proceeding without checksum verification (not recommended)"
     fi
 else
     echo "Could not download checksums for verification"
+    echo "Proceeding without checksum verification (not recommended)"
 fi
 
 # Verify the binary was downloaded
