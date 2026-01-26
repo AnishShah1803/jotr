@@ -4,7 +4,7 @@ set -e
 
 REPO_URL="https://github.com/AnishShah1803/jotr"
 API_URL="https://api.github.com/repos/AnishShah1803/jotr/releases/latest"
-BIN_DIR="/usr/local/bin"
+BIN_DIR="${HOME}/.local/bin"
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 CONFIG_DIR="$CONFIG_HOME/jotr"
 TEMP_DIR="/tmp/jotr-install-$(date +%s)"
@@ -186,31 +186,18 @@ if [ -f "$BIN_DIR/jotr" ]; then
     cp "$BIN_DIR/jotr" "$BIN_DIR/jotr.backup.$(date +%s)"
 fi
 
-if [ -w "$BIN_DIR" ]; then
-    mv "$TEMP_DIR/$FOUND_BINARY" "$BIN_DIR/jotr"
-    chmod +x "$BIN_DIR/jotr"
-    INSTALL_METHOD="user"
-else
-    echo "Administrator privileges required"
-    if command -v sudo >/dev/null 2>&1; then
-        sudo mv "$TEMP_DIR/$FOUND_BINARY" "$BIN_DIR/jotr"
-        sudo chmod +x "$BIN_DIR/jotr"
-        INSTALL_METHOD="sudo"
-    else
-        echo "❌ Cannot write to $BIN_DIR and sudo not available"
-        echo "Alternative: Install to ~/.local/bin instead"
-        mkdir -p "$HOME/.local/bin"
-        mv "$TEMP_DIR/$FOUND_BINARY" "$HOME/.local/bin/jotr"
-        chmod +x "$HOME/.local/bin/jotr"
-        BIN_DIR="$HOME/.local/bin"
-        INSTALL_METHOD="local"
-        
-        if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
-            echo "Add ~/.local/bin to your PATH:"
-            echo "  echo 'export PATH=\"\$PATH:\$HOME/.local/bin\"' >> ~/.bashrc"
-            echo "  source ~/.bashrc"
-        fi
-    fi
+mkdir -p "$BIN_DIR"
+
+mv "$TEMP_DIR/$FOUND_BINARY" "$BIN_DIR/jotr"
+chmod +x "$BIN_DIR/jotr"
+INSTALL_METHOD="user"
+
+if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
+    echo ""
+    echo "⚠️  ~/.local/bin is not in your PATH"
+    echo "Add it with:"
+    echo "  echo 'export PATH=\"\$PATH:\$HOME/.local/bin\"' >> ~/.bashrc"
+    echo "  source ~/.bashrc"
 fi
 
 echo "Binary installed to $BIN_DIR/jotr"
