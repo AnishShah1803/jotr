@@ -119,6 +119,7 @@ func TestTaskService_SyncTasks_NoTasksToSync(t *testing.T) {
 	result, err := service.SyncTasks(ctx, SyncOptions{
 		DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
 		TodoPath:    todoPath,
+		StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 		TaskSection: "Tasks",
 	})
 	if err != nil {
@@ -291,6 +292,7 @@ func TestTaskService_SyncTasks_Deduplication_SubstringFalsePositive(t *testing.T
 	result, err := service.SyncTasks(ctx, SyncOptions{
 		DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
 		TodoPath:    todoPath,
+		StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 		TaskSection: "Tasks",
 	})
 	if err != nil {
@@ -343,6 +345,7 @@ func TestTaskService_SyncTasks_Deduplication_ExactMatch(t *testing.T) {
 	result, err := service.SyncTasks(ctx, SyncOptions{
 		DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
 		TodoPath:    todoPath,
+		StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 		TaskSection: "Tasks",
 	})
 	if err != nil {
@@ -395,6 +398,7 @@ func TestTaskService_SyncTasks_Deduplication_IDBased(t *testing.T) {
 	result, err := service.SyncTasks(ctx, SyncOptions{
 		DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
 		TodoPath:    todoPath,
+		StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 		TaskSection: "Tasks",
 	})
 	if err != nil {
@@ -448,6 +452,7 @@ func TestTaskService_SyncTasks_Deduplication_MultipleSimilar(t *testing.T) {
 	result, err := service.SyncTasks(ctx, SyncOptions{
 		DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
 		TodoPath:    todoPath,
+		StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 		TaskSection: "Tasks",
 	})
 	if err != nil {

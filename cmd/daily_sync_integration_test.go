@@ -136,6 +136,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -170,6 +171,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -200,6 +202,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -225,6 +228,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -255,6 +259,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -285,6 +290,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -310,6 +316,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -345,6 +352,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -370,6 +378,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 

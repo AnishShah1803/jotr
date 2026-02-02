@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/AnishShah1803/jotr/internal/notes"
+	"github.com/AnishShah1803/jotr/internal/state"
 	"github.com/AnishShah1803/jotr/internal/tasks"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
@@ -25,6 +27,7 @@ func NewTaskService() *TaskService {
 type SyncOptions struct {
 	DiaryPath   string
 	TodoPath    string
+	StatePath   string
 	TaskSection string
 }
 
@@ -35,7 +38,7 @@ type SyncResult struct {
 	TasksSynced int
 }
 
-// SyncTasks reads tasks from the daily note and syncs new ones to the todo file.
+// SyncTasks reads tasks from the daily note and syncs new ones to the todo file using state as source of truth.
 func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncResult, error) {
 	result := &SyncResult{}
 
@@ -53,14 +56,12 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 
 	result.TasksRead = len(dailyTasks)
 
-	// Filter tasks from the task section
 	taskSection := opts.TaskSection
 	if taskSection == "" {
 		taskSection = "Tasks"
 	}
 
 	var tasksToSync []tasks.Task
-
 	for _, task := range dailyTasks {
 		if task.Section == taskSection && !task.Completed {
 			tasks.EnsureTaskID(&task)
@@ -71,69 +72,46 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 	if len(tasksToSync) == 0 {
 		result.TasksSynced = 0
 		result.TodoPath = opts.TodoPath
-
 		return result, nil
 	}
 
-	var todoContent string
+	todoState, err := state.Read(opts.StatePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read state file: %w", err)
+	}
 
-	if utils.FileExists(opts.TodoPath) {
-		content, err := os.ReadFile(opts.TodoPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read todo file: %w", err)
+	if todoState.NeedsMigration() && utils.FileExists(opts.TodoPath) {
+		existingTasks, _ := tasks.ReadTasks(ctx, opts.TodoPath)
+		if len(existingTasks) > 0 {
+			todoState.MigrateFromMarkdown(existingTasks, "migration")
 		}
-
-		todoContent = string(content)
-	} else {
-		todoContent = "# To-Do List\n\n## Tasks\n\n"
 	}
 
-	lines := strings.Split(todoContent, "\n")
-
-	insertIndex := utils.FindSectionIndex(lines, "Tasks")
-	if insertIndex == -1 {
-		lines = append(lines, "", "## Tasks", "")
-		insertIndex = len(lines) - 1
+	existingTasks := make(map[string]bool)
+	if utils.FileExists(opts.TodoPath) {
+		existingMarkdownTasks, _ := tasks.ReadTasks(ctx, opts.TodoPath)
+		for _, t := range existingMarkdownTasks {
+			existingTasks[t.ID] = true
+			existingTasks[t.Text] = true
+		}
 	}
 
-	newLines := make([]string, 0, len(lines)+len(tasksToSync))
-	newLines = append(newLines, lines[:insertIndex]...)
-
+	sectionName := today.Format("2006-01-02")
 	syncedCount := 0
 
 	for _, task := range tasksToSync {
-		taskLine := fmt.Sprintf("- [ ] %s", task.Text)
-
-		exists := false
-
-		for _, line := range lines {
-			trimmedLine := strings.TrimSpace(line)
-
-			// Check for exact task line match first (most reliable for deduplication)
-			// Strip ID from both sides to handle cases where EnsureTaskID added an ID
-			baseTaskLine := tasks.StripTaskID(task.Text)
-			expectedLine := fmt.Sprintf("- [ ] %s", strings.TrimSpace(baseTaskLine))
-			if trimmedLine == expectedLine {
-				exists = true
-				break
-			}
-			// Fall back to ID-based matching if available (prevents false positives)
-			if task.ID != "" && strings.Contains(trimmedLine, task.ID) {
-				exists = true
-				break
-			}
-		}
-
-		if !exists {
-			newLines = append(newLines, taskLine)
+		if !todoState.HasTask(task.ID) && !existingTasks[task.ID] && !existingTasks[task.Text] {
+			task.Section = sectionName
+			todoState.AddTask(task, notePath)
 			syncedCount++
 		}
 	}
 
-	newLines = append(newLines, lines[insertIndex:]...)
+	if err := todoState.Write(opts.StatePath); err != nil {
+		return nil, fmt.Errorf("failed to write state file: %w", err)
+	}
 
-	newContent := strings.Join(newLines, "\n")
-	if err := utils.AtomicWriteFile(opts.TodoPath, []byte(newContent), 0644); err != nil {
+	if err := s.writeTodoFileFromState(opts.TodoPath, todoState); err != nil {
 		return nil, fmt.Errorf("failed to write todo file: %w", err)
 	}
 
@@ -143,10 +121,64 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 	return result, nil
 }
 
+// writeTodoFileFromState generates and writes the todo markdown file from state.
+func (s *TaskService) writeTodoFileFromState(todoPath string, todoState *state.TodoState) error {
+	var content strings.Builder
+	content.WriteString("# To-Do List\n\n")
+
+	activeTasks := todoState.GetActiveTasks()
+
+	sections := make(map[string][]state.TaskState)
+	for _, task := range activeTasks {
+		section := task.Section
+		if section == "" {
+			section = "Tasks"
+		}
+		sections[section] = append(sections[section], task)
+	}
+
+	var sectionNames []string
+	for name := range sections {
+		sectionNames = append(sectionNames, name)
+	}
+
+	dateRegex := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
+	for i := 0; i < len(sectionNames)-1; i++ {
+		for j := i + 1; j < len(sectionNames); j++ {
+			dateI := dateRegex.MatchString(sectionNames[i])
+			dateJ := dateRegex.MatchString(sectionNames[j])
+
+			if dateI && dateJ {
+				if sectionNames[i] < sectionNames[j] {
+					sectionNames[i], sectionNames[j] = sectionNames[j], sectionNames[i]
+				}
+			} else if !dateI && dateJ {
+				sectionNames[i], sectionNames[j] = sectionNames[j], sectionNames[i]
+			}
+		}
+	}
+
+	for _, sectionName := range sectionNames {
+		content.WriteString(fmt.Sprintf("## %s\n\n", sectionName))
+		for _, task := range sections[sectionName] {
+			content.WriteString(fmt.Sprintf("- [ ] %s\n", task.Text))
+		}
+		content.WriteString("\n")
+	}
+
+	if err := utils.AtomicWriteFile(todoPath, []byte(content.String()), 0644); err != nil {
+		return fmt.Errorf("failed to write todo file: %w", err)
+	}
+
+	return nil
+}
+
 // ArchiveOptions contains options for archiving tasks.
 type ArchiveOptions struct {
-	TodoPath string
-	BaseDir  string
+	TodoPath  string
+	StatePath string
+	BaseDir   string
 }
 
 // ArchiveResult contains the result of an archive operation.
@@ -156,32 +188,21 @@ type ArchiveResult struct {
 	RemainingCount int
 }
 
-// ArchiveTasks moves completed tasks to an archive file.
+// ArchiveTasks moves completed tasks to an archive file using state as source of truth.
 func (s *TaskService) ArchiveTasks(ctx context.Context, opts ArchiveOptions) (*ArchiveResult, error) {
 	result := &ArchiveResult{}
 
-	allTasks, err := tasks.ReadTasks(ctx, opts.TodoPath)
+	todoState, err := state.Read(opts.StatePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read tasks: %w", err)
+		return nil, fmt.Errorf("failed to read state file: %w", err)
 	}
 
-	// Filter completed tasks
-	var completedTasks []tasks.Task
-
-	var activeTasks []tasks.Task
-
-	for _, task := range allTasks {
-		if task.Completed {
-			completedTasks = append(completedTasks, task)
-		} else {
-			activeTasks = append(activeTasks, task)
-		}
-	}
+	completedTasks := todoState.GetCompletedTasks()
+	activeTasks := todoState.GetActiveTasks()
 
 	if len(completedTasks) == 0 {
 		result.ArchivedCount = 0
 		result.RemainingCount = len(activeTasks)
-
 		return result, nil
 	}
 
@@ -195,13 +216,11 @@ func (s *TaskService) ArchiveTasks(ctx context.Context, opts ArchiveOptions) (*A
 	archiveFile := filepath.Join(archiveDir, fmt.Sprintf("archive-%s.md", now.Format("2006-01")))
 
 	var archiveContent string
-
 	if utils.FileExists(archiveFile) {
 		content, err := os.ReadFile(archiveFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read archive: %w", err)
 		}
-
 		archiveContent = string(content)
 	} else {
 		archiveContent = fmt.Sprintf("# Archive - %s\n\n", now.Format("January 2006"))
@@ -216,34 +235,19 @@ func (s *TaskService) ArchiveTasks(ctx context.Context, opts ArchiveOptions) (*A
 		return nil, fmt.Errorf("failed to write archive: %w", err)
 	}
 
-	// Rebuild todo file with only active tasks - use file locking for safety
 	lockFile, err := utils.LockFile(opts.TodoPath, 10*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire lock: %w", err)
 	}
 	defer utils.UnlockFile(lockFile)
 
-	content, err := os.ReadFile(opts.TodoPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read todo file: %w", err)
-	}
-
-	lines := strings.Split(string(content), "\n")
-
-	var newLines []string
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-
-		// Keep headers and non-task lines
-		if !strings.HasPrefix(trimmed, "- [x]") && !strings.HasPrefix(trimmed, "- [X]") {
-			newLines = append(newLines, line)
-		}
-	}
-
-	newContent := strings.Join(newLines, "\n")
-	if err := utils.AtomicWriteFile(opts.TodoPath, []byte(newContent), 0644); err != nil {
+	if err := s.writeTodoFileFromState(opts.TodoPath, todoState); err != nil {
 		return nil, fmt.Errorf("failed to write todo file: %w", err)
+	}
+
+	todoState.MarkArchived()
+	if err := todoState.Write(opts.StatePath); err != nil {
+		return nil, fmt.Errorf("failed to write state file: %w", err)
 	}
 
 	result.ArchivedCount = len(completedTasks)
@@ -317,4 +321,42 @@ type TaskStats struct {
 	Pending        int
 	Overdue        int
 	CompletionRate float64
+}
+
+// findOptimalSectionInsertionPoint finds the best position for a new date section.
+// It places newer dates before older dates to maintain chronological order.
+func findOptimalSectionInsertionPoint(lines []string, sectionName string) int {
+	dateRegex := regexp.MustCompile(`^## (\d{4}-\d{2}-\d{2})`)
+
+	newDate, _ := time.Parse("2006-01-02", sectionName)
+
+	for i, line := range lines {
+		matches := dateRegex.FindStringSubmatch(line)
+		if len(matches) > 0 {
+			existingDate, _ := time.Parse("2006-01-02", matches[1])
+			if newDate.After(existingDate) || newDate.Equal(existingDate) {
+				return i
+			}
+		}
+	}
+
+	return -1
+}
+
+func findAfterTitleInsertionPoint(lines []string) int {
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "" && i > 0 && strings.HasPrefix(lines[i-1], "# ") {
+			return i + 1
+		}
+	}
+
+	return 1
+}
+
+func insertAtPosition(lines []string, pos int, elements ...string) []string {
+	result := make([]string, 0, len(lines)+len(elements))
+	result = append(result, lines[:pos]...)
+	result = append(result, elements...)
+	result = append(result, lines[pos:]...)
+	return result
 }
