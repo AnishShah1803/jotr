@@ -107,8 +107,10 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 		}
 	}
 
-	if err := todoState.Write(opts.StatePath); err != nil {
-		return nil, fmt.Errorf("failed to write state file: %w", err)
+	if opts.StatePath != "" {
+		if err := todoState.Write(opts.StatePath); err != nil {
+			return nil, fmt.Errorf("failed to write state file: %w", err)
+		}
 	}
 
 	if err := s.writeTodoFileFromState(opts.TodoPath, todoState); err != nil {
@@ -197,6 +199,13 @@ func (s *TaskService) ArchiveTasks(ctx context.Context, opts ArchiveOptions) (*A
 		return nil, fmt.Errorf("failed to read state file: %w", err)
 	}
 
+	if todoState.NeedsMigration() && utils.FileExists(opts.TodoPath) {
+		existingTasks, _ := tasks.ReadTasks(ctx, opts.TodoPath)
+		if len(existingTasks) > 0 {
+			todoState.MigrateFromMarkdown(existingTasks, "migration")
+		}
+	}
+
 	completedTasks := todoState.GetCompletedTasks()
 	activeTasks := todoState.GetActiveTasks()
 
@@ -246,8 +255,10 @@ func (s *TaskService) ArchiveTasks(ctx context.Context, opts ArchiveOptions) (*A
 	}
 
 	todoState.MarkArchived()
-	if err := todoState.Write(opts.StatePath); err != nil {
-		return nil, fmt.Errorf("failed to write state file: %w", err)
+	if opts.StatePath != "" {
+		if err := todoState.Write(opts.StatePath); err != nil {
+			return nil, fmt.Errorf("failed to write state file: %w", err)
+		}
 	}
 
 	result.ArchivedCount = len(completedTasks)
