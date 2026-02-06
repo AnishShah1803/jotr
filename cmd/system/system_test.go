@@ -414,7 +414,7 @@ func TestMonthlySummary(t *testing.T) {
 	}
 
 	// Verify summary was created
-	summaryPath := filepath.Join(diaryPath, "../summaries/01-Jan-Summary.md")
+	summaryPath := filepath.Join(diaryPath, "../summaries/"+now.Format("01-Jan")+"-Summary.md")
 	if !utils.FileExists(summaryPath) {
 		t.Errorf("Expected summary file to exist at %s", summaryPath)
 	}

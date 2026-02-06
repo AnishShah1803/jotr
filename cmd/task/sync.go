@@ -37,6 +37,7 @@ func syncTasks(ctx context.Context, cfg *config.LoadedConfig) error {
 	result, err := taskService.SyncTasks(ctx, services.SyncOptions{
 		DiaryPath:   cfg.DiaryPath,
 		TodoPath:    cfg.TodoPath,
+		StatePath:   cfg.StatePath,
 		TaskSection: cfg.Format.TaskSection,
 	})
 	if err != nil {
