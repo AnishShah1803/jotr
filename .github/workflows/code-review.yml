@@ -15,6 +15,11 @@ jobs:
       (github.event_name == 'pull_request_target' && contains(github.event.label.name, 'trigger-ai-review'))
     runs-on: ubuntu-latest
     
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -30,8 +35,9 @@ jobs:
       uses: anomalyco/opencode/github@latest
       env:
         NANO_GPT_API_KEY: ${{ secrets.NANO_GPT_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        use_github_token: true
         model: nano-gpt/zai-org/glm-4.7
         
         prompt: |
@@ -48,8 +54,6 @@ jobs:
           2. Key findings (positive and negative)
           3. Specific suggestions for improvement
           4. Security or performance concerns
-        
-        fail_on_any_issues: false
         
     - name: Check for TODO comments
       run: |

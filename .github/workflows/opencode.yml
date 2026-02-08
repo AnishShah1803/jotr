@@ -17,8 +17,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
-      pull-requests: read
-      issues: read
+      pull-requests: write
+      issues: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,5 +27,7 @@ jobs:
         uses: anomalyco/opencode/github@latest
         env:
           NANO_GPT_API_KEY: ${{ secrets.NANO_GPT_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          use_github_token: true
           model: nano-gpt/zai-org/glm-4.7
