@@ -18,10 +18,10 @@ jobs:
           persist-credentials: false
       - uses: anomalyco/opencode/github@latest
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NANO_GPT_API_KEY: ${{ secrets.NANO_GPT_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: anthropic/claude-sonnet-4-20250514
+          model: nano-gpt/zai-org/glm-4.7:thinking
           use_github_token: true
           prompt: |
             Review this pull request:
