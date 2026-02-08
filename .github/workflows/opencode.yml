@@ -21,11 +21,13 @@ jobs:
       issues: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Run opencode
         uses: anomalyco/opencode/github@latest
         env:
           NANO_GPT_API_KEY: ${{ secrets.NANO_GPT_API_KEY }}
         with:
-          model: nano-gpt/zai-org/glm-4.7
+          model: nano-gpt/zai-org/glm-4.7:thinking

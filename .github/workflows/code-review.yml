@@ -2,83 +2,29 @@ name: Code Review
 
 on:
   pull_request:
-    branches: [ main, develop ]
-    types: [ opened, synchronize, reopened, labeled ]
-  pull_request_target:
-    types: [labeled]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
-  ai-review:
-    name: AI Code Review
-    if: |
-      github.event_name == 'pull_request' ||
-      (github.event_name == 'pull_request_target' && contains(github.event.label.name, 'trigger-ai-review'))
+  review:
     runs-on: ubuntu-latest
-    
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+      issues: write
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: 1.23
-        
-    - name: Run AI Review
-      uses: anomalyco/opencode/github@latest
-      env:
-        NANO_GPT_API_KEY: ${{ secrets.NANO_GPT_API_KEY }}
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        model: nano-gpt/zai-org/glm-4.7
-        
-        prompt: |
-          Security: Check for common vulnerabilities and insecure coding practices
-          Performance: Review algorithm efficiency and resource usage
-          Code Quality: Evaluate code readability, maintainability, and adherence to Go conventions
-          Testing: Assess test coverage and testing strategies
-          Documentation: Review code comments and API documentation quality
-          Breaking Changes: Ensure breaking changes are properly versioned and documented
-          Dependencies: Check for unnecessary dependencies or security vulnerabilities
-        
-          Provide a concise summary of this PR with:
-          1. Overall assessment (approve/request changes)
-          2. Key findings (positive and negative)
-          3. Specific suggestions for improvement
-          4. Security or performance concerns
-        
-        fail_on_any_issues: false
-        
-    - name: Check for TODO comments
-      run: |
-        echo "🔍 Checking for TODO comments..."
-        TODO_COUNT=$(grep -r "TODO\|FIXME\|XXX" . --include="*.go" --exclude-dir=.git | wc -l || true)
-        if [ "$TODO_COUNT" -gt 0 ]; then
-          echo "⚠️ Found $TODO_COUNT TODO/FIXME/XXX comments:"
-          grep -rn "TODO\|FIXME\|XXX" . --include="*.go" --exclude-dir=.git || true
-        else
-          echo "✅ No TODO/FIXME/XXX comments found"
-        fi
-
-  security-review:
-    name: Security Review
-    if: |
-      github.event_name == 'pull_request' ||
-      (github.event_name == 'pull_request_target' && contains(github.event.label.name, 'trigger-security-review'))
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Run Gosec
-      uses: securecodewarrior/github-action-gosec@master
-      with:
-        args: '-fmt sarif -out gosec.sarif ./...'
-        
-    - name: Upload SARIF file
-      uses: github/codeql-action/upload-sarif@v2
-      with:
-        sarif_file: gosec.sarif
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: anomalyco/opencode/github@latest
+        env:
+          NANO_GPT_API_KEY: ${{ secrets.NANO_GPT_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          model: nano-gpt/zai-org/glm-4.7:thinking
+          use_github_token: true
+          prompt: |
+            Review this pull request:
+            - Check for code quality issues
+            - Look for potential bugs
+            - Suggest improvements
