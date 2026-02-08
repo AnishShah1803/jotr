@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -119,6 +120,7 @@ func TestTaskService_SyncTasks_NoTasksToSync(t *testing.T) {
 	result, err := service.SyncTasks(ctx, SyncOptions{
 		DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
 		TodoPath:    todoPath,
+		StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 		TaskSection: "Tasks",
 	})
 	if err != nil {
@@ -213,7 +215,8 @@ func TestTaskService_ArchiveTasks_WithCompleted(t *testing.T) {
 	}
 
 	// Verify archived file was created
-	fs.AssertFileExists(t, filepath.Join("Archive", "archive-2026-01.md"))
+	expectedArchive := fmt.Sprintf("archive-%s.md", time.Now().Format("2006-01"))
+	fs.AssertFileExists(t, filepath.Join("Archive", expectedArchive))
 }
 
 func TestTaskService_GetTaskSummary(t *testing.T) {
@@ -291,6 +294,7 @@ func TestTaskService_SyncTasks_Deduplication_SubstringFalsePositive(t *testing.T
 	result, err := service.SyncTasks(ctx, SyncOptions{
 		DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
 		TodoPath:    todoPath,
+		StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 		TaskSection: "Tasks",
 	})
 	if err != nil {
@@ -343,6 +347,7 @@ func TestTaskService_SyncTasks_Deduplication_ExactMatch(t *testing.T) {
 	result, err := service.SyncTasks(ctx, SyncOptions{
 		DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
 		TodoPath:    todoPath,
+		StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 		TaskSection: "Tasks",
 	})
 	if err != nil {
@@ -395,6 +400,7 @@ func TestTaskService_SyncTasks_Deduplication_IDBased(t *testing.T) {
 	result, err := service.SyncTasks(ctx, SyncOptions{
 		DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
 		TodoPath:    todoPath,
+		StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 		TaskSection: "Tasks",
 	})
 	if err != nil {
@@ -448,6 +454,7 @@ func TestTaskService_SyncTasks_Deduplication_MultipleSimilar(t *testing.T) {
 	result, err := service.SyncTasks(ctx, SyncOptions{
 		DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
 		TodoPath:    todoPath,
+		StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 		TaskSection: "Tasks",
 	})
 	if err != nil {

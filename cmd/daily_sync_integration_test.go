@@ -123,7 +123,15 @@ func TestSyncCommand_Integration(t *testing.T) {
 	ch := testhelpers.NewConfigHelper(fs)
 	ch.CreateBasicConfig(t)
 
+	cleanupStateAndTodo := func() {
+		statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
+		os.Remove(statePath)
+		todoPath := filepath.Join(fs.BaseDir, "todo.md")
+		os.Remove(todoPath)
+	}
+
 	t.Run("sync_new_tasks", func(t *testing.T) {
+		cleanupStateAndTodo()
 		diaryPath := filepath.Join(fs.BaseDir, "diary")
 		todoPath := filepath.Join(fs.BaseDir, "todo.md")
 
@@ -136,6 +144,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -158,6 +167,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 	})
 
 	t.Run("sync_no_tasks_to_sync", func(t *testing.T) {
+		cleanupStateAndTodo()
 		diaryPath := filepath.Join(fs.BaseDir, "diary")
 		todoPath := filepath.Join(fs.BaseDir, "todo.md")
 
@@ -170,6 +180,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -186,6 +197,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 	})
 
 	t.Run("sync_deduplicates_existing", func(t *testing.T) {
+		cleanupStateAndTodo()
 		diaryPath := filepath.Join(fs.BaseDir, "diary")
 		todoPath := filepath.Join(fs.BaseDir, "todo.md")
 
@@ -200,6 +212,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -213,6 +226,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 	})
 
 	t.Run("sync_with_task_ids", func(t *testing.T) {
+		cleanupStateAndTodo()
 		diaryPath := filepath.Join(fs.BaseDir, "diary")
 		todoPath := filepath.Join(fs.BaseDir, "todo.md")
 
@@ -225,6 +239,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -243,6 +258,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 	})
 
 	t.Run("sync_completed_tasks_excluded", func(t *testing.T) {
+		cleanupStateAndTodo()
 		diaryPath := filepath.Join(fs.BaseDir, "diary")
 		todoPath := filepath.Join(fs.BaseDir, "todo.md")
 
@@ -255,6 +271,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -273,6 +290,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 	})
 
 	t.Run("sync_multiple_similar_tasks", func(t *testing.T) {
+		cleanupStateAndTodo()
 		diaryPath := filepath.Join(fs.BaseDir, "diary")
 		todoPath := filepath.Join(fs.BaseDir, "todo.md")
 
@@ -285,6 +303,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -298,6 +317,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 	})
 
 	t.Run("sync_task_with_priority_and_tags", func(t *testing.T) {
+		cleanupStateAndTodo()
 		diaryPath := filepath.Join(fs.BaseDir, "diary")
 		todoPath := filepath.Join(fs.BaseDir, "todo.md")
 
@@ -310,6 +330,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -331,6 +352,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 	})
 
 	t.Run("sync_handles_empty_todo_file", func(t *testing.T) {
+		cleanupStateAndTodo()
 		diaryPath := filepath.Join(fs.BaseDir, "diary")
 		todoPath := filepath.Join(fs.BaseDir, "todo.md")
 
@@ -345,6 +367,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
@@ -358,6 +381,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 	})
 
 	t.Run("sync_handles_nonexistent_todo_file", func(t *testing.T) {
+		cleanupStateAndTodo()
 		diaryPath := filepath.Join(fs.BaseDir, "diary")
 		todoPath := filepath.Join(fs.BaseDir, "nonexistent-todo.md")
 
@@ -370,6 +394,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
 			DiaryPath:   diaryPath,
 			TodoPath:    todoPath,
+			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
 			TaskSection: "Tasks",
 		})
 
