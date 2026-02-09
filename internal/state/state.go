@@ -170,3 +170,343 @@ func (s *TodoState) MigrateFromMarkdown(tasksList []tasks.Task, source string) i
 	}
 	return migrated
 }
+
+// ChangeType represents the type of change detected
+type ChangeType int
+
+const (
+	NoChange ChangeType = iota
+	Added
+	Modified
+	Deleted
+)
+
+// TaskChange represents a detected change for a task
+type TaskChange struct {
+	TaskID     string
+	ChangeType ChangeType
+	OldTask    *TaskState // nil for Added changes
+	NewTask    *TaskState // nil for Deleted changes
+	Source     string     // Where the change was detected (e.g., "daily-note", "todo-list")
+}
+
+// CompareWithDailyNotes compares the state with tasks from daily notes
+// Returns a list of changes detected
+func (s *TodoState) CompareWithDailyNotes(dailyTasks []tasks.Task, source string) []TaskChange {
+	changes := []TaskChange{}
+	dailyTaskMap := make(map[string]tasks.Task)
+
+	for _, task := range dailyTasks {
+		if task.ID == "" {
+			continue
+		}
+		dailyTaskMap[task.ID] = task
+	}
+
+	for id, stateTask := range s.Tasks {
+		if stateTask.Source != source {
+			continue
+		}
+
+		dailyTask, exists := dailyTaskMap[id]
+		if !exists {
+			continue
+		}
+
+		if s.isTaskModified(stateTask, dailyTask) {
+			changes = append(changes, TaskChange{
+				TaskID:     id,
+				ChangeType: Modified,
+				OldTask:    &stateTask,
+				NewTask: &TaskState{
+					Text:      dailyTask.Text,
+					Section:   dailyTask.Section,
+					Priority:  dailyTask.Priority,
+					Tags:      dailyTask.Tags,
+					ID:        dailyTask.ID,
+					Completed: dailyTask.Completed,
+					Source:    source,
+				},
+				Source: source,
+			})
+		}
+	}
+
+	for _, task := range dailyTasks {
+		if task.ID == "" || !s.HasTask(task.ID) {
+			changes = append(changes, TaskChange{
+				TaskID:     task.ID,
+				ChangeType: Added,
+				NewTask: &TaskState{
+					Text:      task.Text,
+					Section:   task.Section,
+					Priority:  task.Priority,
+					Tags:      task.Tags,
+					ID:        task.ID,
+					Completed: task.Completed,
+					Source:    source,
+				},
+				Source: source,
+			})
+		}
+	}
+
+	return changes
+}
+
+// CompareWithTodoList compares the state with tasks from the todo list
+// Returns a list of changes detected
+func (s *TodoState) CompareWithTodoList(todoTasks []tasks.Task) []TaskChange {
+	changes := []TaskChange{}
+	todoTaskMap := make(map[string]tasks.Task)
+
+	for _, task := range todoTasks {
+		if task.ID == "" {
+			continue
+		}
+		todoTaskMap[task.ID] = task
+	}
+
+	for id, stateTask := range s.Tasks {
+		todoTask, exists := todoTaskMap[id]
+		if !exists {
+			continue
+		}
+
+		if s.isTaskModified(stateTask, todoTask) {
+			changes = append(changes, TaskChange{
+				TaskID:     id,
+				ChangeType: Modified,
+				OldTask:    &stateTask,
+				NewTask: &TaskState{
+					Text:      todoTask.Text,
+					Section:   todoTask.Section,
+					Priority:  todoTask.Priority,
+					Tags:      todoTask.Tags,
+					ID:        todoTask.ID,
+					Completed: todoTask.Completed,
+				},
+				Source: "todo-list",
+			})
+		}
+	}
+
+	return changes
+}
+
+func (s *TodoState) isTaskModified(stateTask TaskState, sourceTask tasks.Task) bool {
+	if stateTask.Text != sourceTask.Text {
+		return true
+	}
+	if stateTask.Priority != sourceTask.Priority {
+		return true
+	}
+	if stateTask.Completed != sourceTask.Completed {
+		return true
+	}
+
+	stateTags := make(map[string]bool)
+	for _, tag := range stateTask.Tags {
+		stateTags[tag] = true
+	}
+	sourceTags := make(map[string]bool)
+	for _, tag := range sourceTask.Tags {
+		sourceTags[tag] = true
+	}
+
+	if len(stateTags) != len(sourceTags) {
+		return true
+	}
+	for tag := range stateTags {
+		if !sourceTags[tag] {
+			return true
+		}
+	}
+
+	return false
+}
+
+// DetectConflicts checks if there are conflicting changes between daily notes and todo list
+// Returns a map of task IDs to conflict descriptions
+func (s *TodoState) DetectConflicts(dailyChanges, todoChanges []TaskChange) map[string]string {
+	conflicts := make(map[string]string)
+
+	dailyChangeMap := make(map[string]TaskChange)
+	for _, change := range dailyChanges {
+		dailyChangeMap[change.TaskID] = change
+	}
+
+	todoChangeMap := make(map[string]TaskChange)
+	for _, change := range todoChanges {
+		todoChangeMap[change.TaskID] = change
+	}
+
+	for id, dailyChange := range dailyChangeMap {
+		if todoChange, exists := todoChangeMap[id]; exists {
+			if dailyChange.ChangeType == Modified && todoChange.ChangeType == Modified {
+				if dailyChange.NewTask != nil && todoChange.NewTask != nil {
+					if dailyChange.NewTask.Text != todoChange.NewTask.Text {
+						conflicts[id] = fmt.Sprintf("Text differs: daily note says '%s', todo list says '%s'",
+							dailyChange.NewTask.Text, todoChange.NewTask.Text)
+					}
+					if dailyChange.NewTask.Completed != todoChange.NewTask.Completed {
+						conflicts[id] = fmt.Sprintf("Completion status differs: daily note says %v, todo list says %v",
+							dailyChange.NewTask.Completed, todoChange.NewTask.Completed)
+					}
+				}
+			}
+		}
+	}
+
+	return conflicts
+}
+
+// SyncDirection represents which way changes should propagate
+type SyncDirection int
+
+const (
+	SyncToState SyncDirection = iota
+	SyncFromState
+	SyncBidirectional
+)
+
+// SyncResult represents the result of a sync operation
+type SyncResult struct {
+	StateUpdated bool
+	DailyChanged bool
+	TodoChanged  bool
+	Conflicts    map[string]string
+	AppliedDaily int
+	AppliedTodo  int
+	Skipped      int
+}
+
+// BidirectionalSync performs bidirectional sync between daily notes and todo list
+// Compares both sources with state and propagates changes appropriately
+func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailySourcePath string) SyncResult {
+	result := SyncResult{
+		Conflicts: make(map[string]string),
+	}
+
+	dailyChanges := s.CompareWithDailyNotes(dailyTasks, dailySourcePath)
+	todoChanges := s.CompareWithTodoList(todoTasks)
+
+	conflicts := s.DetectConflicts(dailyChanges, todoChanges)
+	if len(conflicts) > 0 {
+		result.Conflicts = conflicts
+		return result
+	}
+
+	dailyChangeMap := make(map[string]TaskChange)
+	for _, change := range dailyChanges {
+		dailyChangeMap[change.TaskID] = change
+	}
+
+	todoChangeMap := make(map[string]TaskChange)
+	for _, change := range todoChanges {
+		todoChangeMap[change.TaskID] = change
+	}
+
+	for taskID, dailyChange := range dailyChangeMap {
+		todoChange, todoHasChange := todoChangeMap[taskID]
+
+		if !todoHasChange {
+			s.applyChange(dailyChange)
+			result.AppliedDaily++
+			result.StateUpdated = true
+			result.TodoChanged = true
+		} else if dailyChange.ChangeType == Modified && todoChange.ChangeType == Modified {
+			merged := s.smartMerge(dailyChange, todoChange)
+			if merged != nil {
+				s.applyChange(TaskChange{
+					TaskID:     taskID,
+					ChangeType: Modified,
+					NewTask:    merged,
+					Source:     "merged",
+				})
+				result.AppliedDaily++
+				result.AppliedTodo++
+				result.StateUpdated = true
+				result.DailyChanged = true
+				result.TodoChanged = true
+			} else {
+				result.Skipped++
+			}
+		}
+	}
+
+	for taskID, todoChange := range todoChangeMap {
+		if _, dailyHasChange := dailyChangeMap[taskID]; !dailyHasChange {
+			s.applyChange(todoChange)
+			result.AppliedTodo++
+			result.StateUpdated = true
+			result.DailyChanged = true
+		}
+	}
+
+	return result
+}
+
+func (s *TodoState) applyChange(change TaskChange) {
+	if change.NewTask == nil {
+		return
+	}
+
+	s.Tasks[change.TaskID] = *change.NewTask
+	s.LastSync = time.Now()
+}
+
+// smartMerge attempts to merge non-conflicting changes from both sources
+// Returns nil if merge is not possible
+func (s *TodoState) smartMerge(dailyChange, todoChange TaskChange) *TaskState {
+	if dailyChange.NewTask == nil || todoChange.NewTask == nil {
+		return nil
+	}
+
+	merged := TaskState{
+		ID:        dailyChange.NewTask.ID,
+		Text:      dailyChange.NewTask.Text,
+		Section:   dailyChange.NewTask.Section,
+		Priority:  dailyChange.NewTask.Priority,
+		Tags:      dailyChange.NewTask.Tags,
+		Completed: dailyChange.NewTask.Completed,
+		Source:    "merged",
+	}
+
+	if dailyChange.OldTask != nil {
+		merged.CreatedAt = dailyChange.OldTask.CreatedAt
+		merged.CompletedAt = dailyChange.OldTask.CompletedAt
+	} else if todoChange.OldTask != nil {
+		merged.CreatedAt = todoChange.OldTask.CreatedAt
+		merged.CompletedAt = todoChange.OldTask.CompletedAt
+	}
+
+	merged.LastModified = time.Now()
+
+	if dailyChange.NewTask.Text != todoChange.NewTask.Text {
+		return nil
+	}
+
+	if dailyChange.NewTask.Completed != todoChange.NewTask.Completed {
+		return nil
+	}
+
+	mergedTags := make(map[string]bool)
+	for _, tag := range dailyChange.NewTask.Tags {
+		mergedTags[tag] = true
+	}
+	for _, tag := range todoChange.NewTask.Tags {
+		mergedTags[tag] = true
+	}
+	merged.Tags = make([]string, 0, len(mergedTags))
+	for tag := range mergedTags {
+		merged.Tags = append(merged.Tags, tag)
+	}
+
+	merged.Priority = dailyChange.NewTask.Priority
+	if todoChange.NewTask.Priority != "" {
+		merged.Priority = todoChange.NewTask.Priority
+	}
+
+	return &merged
+}

@@ -38,6 +38,16 @@ type SyncResult struct {
 	TasksSynced int
 }
 
+// BidirectionalSyncResult contains the result of a bidirectional sync operation.
+type BidirectionalSyncResult struct {
+	StatePath      string
+	DailyPath      string
+	TodoPath       string
+	TasksFromDaily int
+	TasksFromTodo  int
+	Conflicts      map[string]string
+}
+
 // SyncTasks reads tasks from the daily note and syncs new ones to the todo file using state as source of truth.
 func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncResult, error) {
 	result := &SyncResult{}
@@ -121,6 +131,167 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 	result.TodoPath = opts.TodoPath
 
 	return result, nil
+}
+
+// BidirectionalSync performs bidirectional sync between daily notes and todo list.
+func (s *TaskService) BidirectionalSync(ctx context.Context, opts SyncOptions) (*BidirectionalSyncResult, error) {
+	result := &BidirectionalSyncResult{
+		StatePath: opts.StatePath,
+		TodoPath:  opts.TodoPath,
+	}
+
+	today := time.Now()
+	notePath := notes.BuildDailyNotePath(opts.DiaryPath, today)
+	result.DailyPath = notePath
+
+	if !utils.FileExists(notePath) {
+		return nil, fmt.Errorf("today's note doesn't exist: %s", notePath)
+	}
+
+	dailyTasks, err := tasks.ReadTasks(ctx, notePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read daily note: %w", err)
+	}
+
+	todoState, err := state.Read(opts.StatePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read state file: %w", err)
+	}
+
+	if todoState.NeedsMigration() && utils.FileExists(opts.TodoPath) {
+		existingTasks, _ := tasks.ReadTasks(ctx, opts.TodoPath)
+		if len(existingTasks) > 0 {
+			todoState.MigrateFromMarkdown(existingTasks, "migration")
+		}
+	}
+
+	var todoTasks []tasks.Task
+	if utils.FileExists(opts.TodoPath) {
+		todoTasks, _ = tasks.ReadTasks(ctx, opts.TodoPath)
+	}
+
+	syncResult := todoState.BidirectionalSync(dailyTasks, todoTasks, notePath)
+
+	result.Conflicts = syncResult.Conflicts
+	if len(syncResult.Conflicts) > 0 {
+		return result, nil
+	}
+
+	if syncResult.StateUpdated {
+		if opts.StatePath != "" {
+			if err := todoState.Write(opts.StatePath); err != nil {
+				return nil, fmt.Errorf("failed to write state file: %w", err)
+			}
+		}
+	}
+
+	if syncResult.TodoChanged {
+		if err := s.writeTodoFileFromState(opts.TodoPath, todoState); err != nil {
+			return nil, fmt.Errorf("failed to write todo file: %w", err)
+		}
+	}
+
+	if syncResult.DailyChanged {
+		if err := s.updateDailyNoteFromState(notePath, dailyTasks, todoState, opts.TaskSection); err != nil {
+			return nil, fmt.Errorf("failed to update daily note: %w", err)
+		}
+	}
+
+	result.TasksFromDaily = syncResult.AppliedDaily
+	result.TasksFromTodo = syncResult.AppliedTodo
+
+	return result, nil
+}
+
+func (s *TaskService) updateDailyNoteFromState(notePath string, dailyTasks []tasks.Task, todoState *state.TodoState, taskSection string) error {
+	if taskSection == "" {
+		taskSection = "Tasks"
+	}
+
+	noteContent, err := os.ReadFile(notePath)
+	if err != nil {
+		return fmt.Errorf("failed to read daily note: %w", err)
+	}
+
+	lines := strings.Split(string(noteContent), "\n")
+	var updatedLines []string
+	var inTaskSection bool
+	var sectionFound bool
+
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		trimmed := strings.TrimSpace(line)
+
+		if strings.HasPrefix(trimmed, "## ") {
+			if sectionFound && inTaskSection {
+				inTaskSection = false
+				sectionName := strings.TrimPrefix(trimmed, "## ")
+				if sectionName == taskSection {
+					sectionFound = false
+				}
+			} else if !sectionFound {
+				sectionName := strings.TrimPrefix(trimmed, "## ")
+				if sectionName == taskSection {
+					sectionFound = true
+					inTaskSection = true
+					updatedLines = append(updatedLines, line)
+					updatedLines = append(updatedLines, "")
+
+					for _, task := range dailyTasks {
+						if task.Section == taskSection {
+							if stateTask, exists := todoState.Tasks[task.ID]; exists {
+								taskLine := s.formatTaskLine(stateTask)
+								updatedLines = append(updatedLines, taskLine)
+							}
+						}
+					}
+					continue
+				}
+			}
+		}
+
+		if !inTaskSection {
+			updatedLines = append(updatedLines, line)
+		}
+	}
+
+	if !sectionFound {
+		return nil
+	}
+
+	content := strings.Join(updatedLines, "\n")
+	if !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+
+	lockFile, err := utils.LockFile(notePath, 10*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to acquire lock on daily note: %w", err)
+	}
+	defer utils.UnlockFile(lockFile)
+
+	if err := utils.AtomicWriteFile(notePath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to write daily note: %w", err)
+	}
+
+	return nil
+}
+
+func (s *TaskService) formatTaskLine(stateTask state.TaskState) string {
+	var sb strings.Builder
+	if stateTask.Completed {
+		sb.WriteString("- [x] ")
+	} else {
+		sb.WriteString("- [ ] ")
+	}
+
+	sb.WriteString(stateTask.Text)
+
+	if stateTask.ID != "" {
+		sb.WriteString(fmt.Sprintf(" <!-- id: %s -->", stateTask.ID))
+	}
+
+	return sb.String()
 }
 
 // writeTodoFileFromState generates and writes the todo markdown file from state.
