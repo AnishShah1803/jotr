@@ -524,17 +524,22 @@ func TestConcurrentBidirectionalSync(t *testing.T) {
 	}
 
 	start := make(chan struct{})
-	var errors [2]error
-	var results [2]SyncResult
+	var wg sync.WaitGroup
 	var mu sync.Mutex
+	var errors []error
+	var results []SyncResult
 
 	for i := 0; i < 2; i++ {
+		wg.Add(1)
 		go func(idx int) {
+			defer wg.Done()
 			<-start
 
 			state, err := Read(statePath)
 			if err != nil {
-				errors[idx] = fmt.Errorf("goroutine %d: failed to read state: %w", idx, err)
+				mu.Lock()
+				errors = append(errors, fmt.Errorf("goroutine %d: failed to read state: %w", idx, err))
+				mu.Unlock()
 				return
 			}
 
@@ -553,50 +558,49 @@ func TestConcurrentBidirectionalSync(t *testing.T) {
 			}
 
 			result := state.BidirectionalSync(dailyTasks, todoTasks, dailyNotePath)
-			results[idx] = result
+
+			mu.Lock()
+			results = append(results, result)
+			mu.Unlock()
 
 			if result.StateUpdated {
 				mu.Lock()
 				if err := state.Write(statePath); err != nil {
-					errors[idx] = fmt.Errorf("goroutine %d: failed to write state: %w", idx, err)
+					errors = append(errors, fmt.Errorf("goroutine %d: failed to write state: %w", idx, err))
 					mu.Unlock()
 					return
 				}
 				mu.Unlock()
 			}
-
-			errors[idx] = nil
 		}(i)
 	}
 
 	close(start)
 
-	timeout := time.After(5 * time.Second)
-	done := make(chan bool)
-
+	done := make(chan struct{})
 	go func() {
-		time.Sleep(100 * time.Millisecond)
-		done <- true
+		wg.Wait()
+		close(done)
 	}()
 
 	select {
 	case <-done:
-	case <-timeout:
+	case <-time.After(5 * time.Second):
 		t.Fatal("Test timed out - possible deadlock detected")
 	}
 
-	for i, err := range errors {
+	for _, err := range errors {
 		if err != nil {
-			t.Errorf("Goroutine %d failed: %v", i, err)
+			t.Errorf("Goroutine failed: %v", err)
 		}
 	}
 
-	for i, result := range results {
+	for _, result := range results {
 		if !result.StateUpdated {
-			t.Errorf("Goroutine %d: Expected StateUpdated=true", i)
+			t.Error("Expected StateUpdated=true")
 		}
 		if len(result.Conflicts) > 0 {
-			t.Logf("Goroutine %d: Had %d conflicts (acceptable for this test)", i, len(result.Conflicts))
+			t.Logf("Had %d conflicts (acceptable for this test)", len(result.Conflicts))
 		}
 	}
 
