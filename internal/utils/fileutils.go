@@ -13,6 +13,9 @@ import (
 	"github.com/AnishShah1803/jotr/internal/utils/platform"
 )
 
+// ErrLockTimeout is returned when a file lock cannot be acquired within the timeout period.
+var ErrLockTimeout = errors.New("timeout waiting for file lock")
+
 // LockFile acquires an exclusive lock on a file for concurrent access protection.
 // Returns a file handle that must be passed to UnlockFile when done.
 // The lock is automatically released when the file handle is closed.
@@ -39,7 +42,7 @@ func LockFile(path string, timeout time.Duration) (*os.File, error) {
 
 		if time.Now().After(deadline) {
 			lockFile.Close()
-			return nil, fmt.Errorf("timeout waiting for file lock on %s", path)
+			return nil, fmt.Errorf("%w: %s", ErrLockTimeout, path)
 		}
 
 		// Brief sleep before retry

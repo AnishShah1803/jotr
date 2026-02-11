@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -97,8 +98,7 @@ func (s *TaskService) isLockTimeoutError(err error) bool {
 	if err == nil {
 		return false
 	}
-	errStr := err.Error()
-	return strings.Contains(errStr, "timeout waiting for file lock")
+	return errors.Is(err, utils.ErrLockTimeout)
 }
 
 // SyncTasks performs bidirectional sync between daily notes and todo list.
@@ -127,7 +127,9 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 	}
 	// Release locks in reverse order when function returns
 	defer func() {
-		// Release in reverse order: daily note → todo file → state file
+		if locks == nil {
+			return
+		}
 		for i := len(locks) - 1; i >= 0; i-- {
 			utils.UnlockFile(locks[i])
 		}

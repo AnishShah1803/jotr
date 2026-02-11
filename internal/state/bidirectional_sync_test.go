@@ -490,17 +490,12 @@ func TestIsTaskModified(t *testing.T) {
 	}
 }
 
-// TestConcurrentBidirectionalSync tests that concurrent sync operations
-// don't cause data loss or corruption. This test simulates two goroutines
-// attempting to sync simultaneously, which should be protected by file locks.
 func TestConcurrentBidirectionalSync(t *testing.T) {
-	// Create temporary files for testing
 	tempDir := t.TempDir()
 	statePath := tempDir + "/.todo_state.json"
 	dailyNotePath := tempDir + "/daily.md"
 	todoFilePath := tempDir + "/todo.md"
 
-	// Initialize state file with some tasks
 	initialState := NewTodoState()
 	initialState.Tasks = map[string]TaskState{
 		"task1": {ID: "task1", Text: "Task 1", Completed: false, Source: "old.md"},
@@ -510,7 +505,6 @@ func TestConcurrentBidirectionalSync(t *testing.T) {
 		t.Fatalf("Failed to write initial state: %v", err)
 	}
 
-	// Create daily note with new task
 	dailyContent := `## Tasks
 - [ ] Task 1 <!-- id: task1 -->
 - [ ] Task 2 <!-- id: task2 -->
@@ -520,7 +514,6 @@ func TestConcurrentBidirectionalSync(t *testing.T) {
 		t.Fatalf("Failed to write daily note: %v", err)
 	}
 
-	// Create todo file
 	todoContent := `## Tasks
 - [ ] Task 1
 - [ ] Task 2
@@ -530,28 +523,23 @@ func TestConcurrentBidirectionalSync(t *testing.T) {
 		t.Fatalf("Failed to write todo file: %v", err)
 	}
 
-	// Use a channel to synchronize the start of both goroutines
 	start := make(chan struct{})
 	var errors [2]error
 	var results [2]SyncResult
 	var mu sync.Mutex
 
-	// Launch two concurrent sync operations
 	for i := 0; i < 2; i++ {
 		go func(idx int) {
 			<-start
 
-			// Read the current state
 			state, err := Read(statePath)
 			if err != nil {
 				errors[idx] = fmt.Errorf("goroutine %d: failed to read state: %w", idx, err)
 				return
 			}
 
-			// Simulate some processing time
 			time.Sleep(10 * time.Millisecond)
 
-			// Read tasks from daily note and todo file
 			dailyTasks := []tasks.Task{
 				{ID: "task1", Text: "Task 1", Completed: false, Section: "Tasks"},
 				{ID: "task2", Text: "Task 2", Completed: false, Section: "Tasks"},
@@ -564,11 +552,9 @@ func TestConcurrentBidirectionalSync(t *testing.T) {
 				{ID: "task4", Text: "Task from Todo", Completed: false},
 			}
 
-			// Perform bidirectional sync
 			result := state.BidirectionalSync(dailyTasks, todoTasks, dailyNotePath)
 			results[idx] = result
 
-			// Write the updated state with mutex to prevent JSON corruption
 			if result.StateUpdated {
 				mu.Lock()
 				if err := state.Write(statePath); err != nil {
@@ -583,10 +569,8 @@ func TestConcurrentBidirectionalSync(t *testing.T) {
 		}(i)
 	}
 
-	// Start both goroutines simultaneously
 	close(start)
 
-	// Wait for both to complete (with timeout)
 	timeout := time.After(5 * time.Second)
 	done := make(chan bool)
 
@@ -601,14 +585,12 @@ func TestConcurrentBidirectionalSync(t *testing.T) {
 		t.Fatal("Test timed out - possible deadlock detected")
 	}
 
-	// Check for errors
 	for i, err := range errors {
 		if err != nil {
 			t.Errorf("Goroutine %d failed: %v", i, err)
 		}
 	}
 
-	// Verify both sync operations produced valid results
 	for i, result := range results {
 		if !result.StateUpdated {
 			t.Errorf("Goroutine %d: Expected StateUpdated=true", i)
@@ -618,14 +600,11 @@ func TestConcurrentBidirectionalSync(t *testing.T) {
 		}
 	}
 
-	// Verify final state is not corrupted
-	// This test demonstrates why file locking is needed - without it, concurrent writes can cause data loss
 	finalState, err := Read(statePath)
 	if err != nil {
 		t.Fatalf("Failed to read final state: %v", err)
 	}
 
-	// Verify base tasks are preserved
 	baseTasks := []string{"task1", "task2"}
 	for _, taskID := range baseTasks {
 		if _, exists := finalState.Tasks[taskID]; !exists {
@@ -633,7 +612,6 @@ func TestConcurrentBidirectionalSync(t *testing.T) {
 		}
 	}
 
-	// Verify no task data corruption
 	for id, task := range finalState.Tasks {
 		if task.Text == "" {
 			t.Errorf("Task %s has empty text (possible corruption)", id)
@@ -643,7 +621,6 @@ func TestConcurrentBidirectionalSync(t *testing.T) {
 		}
 	}
 
-	// At least one sync operation should have added its new task
 	_, hasTask3 := finalState.Tasks["task3"]
 	_, hasTask4 := finalState.Tasks["task4"]
 	if !hasTask3 && !hasTask4 {
@@ -651,13 +628,10 @@ func TestConcurrentBidirectionalSync(t *testing.T) {
 	}
 }
 
-// TestLockTimeoutBehavior tests that sync operations handle lock timeouts gracefully.
-// This test verifies that when a lock cannot be acquired, appropriate error handling occurs.
 func TestLockTimeoutBehavior(t *testing.T) {
 	tempDir := t.TempDir()
 	statePath := tempDir + "/.todo_state.json"
 
-	// Create a state file
 	initialState := NewTodoState()
 	initialState.Tasks = map[string]TaskState{
 		"task1": {ID: "task1", Text: "Task 1", Completed: false, Source: "test.md"},
@@ -666,7 +640,6 @@ func TestLockTimeoutBehavior(t *testing.T) {
 		t.Fatalf("Failed to write initial state: %v", err)
 	}
 
-	// Manually acquire a lock on the state file to simulate another process holding it
 	lockPath := statePath + ".lock"
 	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
@@ -674,39 +647,26 @@ func TestLockTimeoutBehavior(t *testing.T) {
 	}
 	defer lockFile.Close()
 
-	// Try to acquire an exclusive lock (this will succeed for us)
-	// In a real scenario, this would be held by another process
-	// For this test, we'll verify the lock file mechanism works
-
-	// Verify the lock file exists
 	if _, err := os.Stat(lockPath); os.IsNotExist(err) {
 		t.Error("Lock file should exist after locking")
 	}
 
-	// Verify we can read state while lock is held (reads don't require lock)
 	state, err := Read(statePath)
 	if err != nil {
 		t.Errorf("Should be able to read state while lock is held: %v", err)
 	}
 
-	// Verify state has expected data
 	if len(state.Tasks) != 1 {
 		t.Errorf("Expected 1 task, got %d", len(state.Tasks))
 	}
-
-	// The actual timeout behavior is tested at the service level (task_service_test.go)
-	// where the acquireSyncLocks function is called with a timeout
 }
 
-// TestDeadlockPrevention tests that rapid concurrent sync calls don't cause deadlocks.
-// This test verifies the lock ordering (state → todo → daily) prevents deadlock.
 func TestDeadlockPrevention(t *testing.T) {
 	tempDir := t.TempDir()
 	statePath := tempDir + "/.todo_state.json"
 	dailyNotePath := tempDir + "/daily.md"
 	todoFilePath := tempDir + "/todo.md"
 
-	// Initialize all files
 	initialState := NewTodoState()
 	initialState.Tasks = map[string]TaskState{
 		"task1": {ID: "task1", Text: "Task 1", Completed: false, Source: "test.md"},
@@ -729,7 +689,6 @@ func TestDeadlockPrevention(t *testing.T) {
 		t.Fatalf("Failed to write todo file: %v", err)
 	}
 
-	// Launch multiple rapid sync operations to stress-test lock ordering
 	numGoroutines := 5
 	errors := make(chan error, numGoroutines)
 	done := make(chan bool, numGoroutines)
@@ -738,14 +697,12 @@ func TestDeadlockPrevention(t *testing.T) {
 		go func(idx int) {
 			defer func() { done <- true }()
 
-			// Read and sync
 			state, err := Read(statePath)
 			if err != nil {
 				errors <- fmt.Errorf("goroutine %d: failed to read state: %w", idx, err)
 				return
 			}
 
-			// Perform sync (this will acquire locks in correct order)
 			dailyTasks := []tasks.Task{
 				{ID: "task1", Text: "Task 1", Completed: false, Section: "Tasks"},
 			}
@@ -753,7 +710,6 @@ func TestDeadlockPrevention(t *testing.T) {
 
 			result := state.BidirectionalSync(dailyTasks, todoTasks, dailyNotePath)
 
-			// Write back
 			if result.StateUpdated {
 				if err := state.Write(statePath); err != nil {
 					errors <- fmt.Errorf("goroutine %d: failed to write state: %w", idx, err)
@@ -765,7 +721,6 @@ func TestDeadlockPrevention(t *testing.T) {
 		}(i)
 	}
 
-	// Wait for all goroutines to complete with timeout
 	timeout := time.After(10 * time.Second)
 	completed := 0
 
@@ -782,7 +737,6 @@ func TestDeadlockPrevention(t *testing.T) {
 		}
 	}
 
-	// Verify final state is not corrupted
 	finalState, err := Read(statePath)
 	if err != nil {
 		t.Fatalf("Failed to read final state: %v", err)
@@ -792,7 +746,6 @@ func TestDeadlockPrevention(t *testing.T) {
 		t.Error("Final state has no tasks - possible data loss")
 	}
 
-	// Verify no duplicate tasks
 	taskIDs := make(map[string]bool)
 	for id := range finalState.Tasks {
 		if taskIDs[id] {
