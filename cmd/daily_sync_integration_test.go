@@ -152,8 +152,8 @@ func TestSyncCommand_Integration(t *testing.T) {
 			t.Fatalf("SyncTasks failed: %v", err)
 		}
 
-		if result.TasksSynced != 2 {
-			t.Errorf("TasksSynced = %d; want 2", result.TasksSynced)
+		if result.TasksFromDaily != 2 {
+			t.Errorf("TasksSynced = %d; want 2", result.TasksFromDaily)
 		}
 
 		if !fs.FileExists("todo.md") {
@@ -191,8 +191,8 @@ func TestSyncCommand_Integration(t *testing.T) {
 			t.Fatalf("SyncTasks failed: %v", err)
 		}
 
-		if result.TasksSynced != 0 {
-			t.Errorf("TasksSynced = %d; want 0", result.TasksSynced)
+		if result.TasksFromDaily != 0 {
+			t.Errorf("TasksSynced = %d; want 0", result.TasksFromDaily)
 		}
 	})
 
@@ -220,8 +220,8 @@ func TestSyncCommand_Integration(t *testing.T) {
 			t.Fatalf("SyncTasks failed: %v", err)
 		}
 
-		if result.TasksSynced != 0 {
-			t.Errorf("TasksSynced = %d; want 0 (deduplication)", result.TasksSynced)
+		if result.TasksFromDaily != 0 {
+			t.Errorf("TasksSynced = %d; want 0 (deduplication)", result.TasksFromDaily)
 		}
 	})
 
@@ -247,8 +247,8 @@ func TestSyncCommand_Integration(t *testing.T) {
 			t.Fatalf("SyncTasks failed: %v", err)
 		}
 
-		if result.TasksSynced != 2 {
-			t.Errorf("TasksSynced = %d; want 2", result.TasksSynced)
+		if result.TasksFromDaily != 2 {
+			t.Errorf("TasksSynced = %d; want 2", result.TasksFromDaily)
 		}
 
 		todoContent := fs.ReadFile(t, "todo.md")
@@ -279,8 +279,8 @@ func TestSyncCommand_Integration(t *testing.T) {
 			t.Fatalf("SyncTasks failed: %v", err)
 		}
 
-		if result.TasksSynced != 1 {
-			t.Errorf("TasksSynced = %d; want 1", result.TasksSynced)
+		if result.TasksFromDaily != 1 {
+			t.Errorf("TasksSynced = %d; want 1", result.TasksFromDaily)
 		}
 
 		todoContent := fs.ReadFile(t, "todo.md")
@@ -311,8 +311,8 @@ func TestSyncCommand_Integration(t *testing.T) {
 			t.Fatalf("SyncTasks failed: %v", err)
 		}
 
-		if result.TasksSynced != 3 {
-			t.Errorf("TasksSynced = %d; want 3 (similar but different tasks)", result.TasksSynced)
+		if result.TasksFromDaily != 3 {
+			t.Errorf("TasksSynced = %d; want 3 (similar but different tasks)", result.TasksFromDaily)
 		}
 	})
 
@@ -338,8 +338,8 @@ func TestSyncCommand_Integration(t *testing.T) {
 			t.Fatalf("SyncTasks failed: %v", err)
 		}
 
-		if result.TasksSynced != 1 {
-			t.Errorf("TasksSynced = %d; want 1", result.TasksSynced)
+		if result.TasksFromDaily != 1 {
+			t.Errorf("TasksSynced = %d; want 1", result.TasksFromDaily)
 		}
 
 		todoContent := fs.ReadFile(t, "todo.md")
@@ -375,8 +375,8 @@ func TestSyncCommand_Integration(t *testing.T) {
 			t.Fatalf("SyncTasks failed: %v", err)
 		}
 
-		if result.TasksSynced != 1 {
-			t.Errorf("TasksSynced = %d; want 1", result.TasksSynced)
+		if result.TasksFromDaily != 1 {
+			t.Errorf("TasksSynced = %d; want 1", result.TasksFromDaily)
 		}
 	})
 
@@ -402,8 +402,8 @@ func TestSyncCommand_Integration(t *testing.T) {
 			t.Fatalf("SyncTasks failed: %v", err)
 		}
 
-		if result.TasksSynced != 1 {
-			t.Errorf("TasksSynced = %d; want 1", result.TasksSynced)
+		if result.TasksFromDaily != 1 {
+			t.Errorf("TasksSynced = %d; want 1", result.TasksFromDaily)
 		}
 
 		if !fs.FileExists("nonexistent-todo.md") {

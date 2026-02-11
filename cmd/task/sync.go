@@ -12,13 +12,15 @@ import (
 
 var SyncCmd = &cobra.Command{
 	Use:   "sync",
-	Short: "Sync tasks to to-do list",
-	Long: `Sync tasks from daily notes to the main to-do list.
+	Short: "Sync tasks bidirectionally",
+	Long: `Sync tasks between daily notes and todo list.
 
-Tasks are extracted from the Tasks section and added to your todo file.
+Changes in daily notes are propagated to the todo list.
+Changes in the todo list are propagated to daily notes.
+Conflicts are detected and reported.
 
 Examples:
-  jotr sync                    # Sync tasks from today
+  jotr sync                    # Sync tasks bidirectionally
   jotr s                       # Using alias`,
 	Aliases: []string{"s"},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -44,12 +46,27 @@ func syncTasks(ctx context.Context, cfg *config.LoadedConfig) error {
 		return err
 	}
 
-	if result.TasksSynced == 0 {
-		fmt.Println("No tasks to sync")
+	if len(result.Conflicts) > 0 {
+		fmt.Println("⚠ Conflicts detected:")
+		for taskID, conflict := range result.Conflicts {
+			fmt.Printf("  - Task %s: %s\n", taskID, conflict)
+		}
+		fmt.Println("\nResolve conflicts manually and run sync again.")
 		return nil
 	}
 
-	fmt.Printf("✓ Synced %d tasks to: %s\n", result.TasksSynced, result.TodoPath)
+	totalChanges := result.TasksFromDaily + result.TasksFromTodo
+	if totalChanges == 0 {
+		fmt.Println("✓ Everything is in sync")
+		return nil
+	}
+
+	if result.TasksFromDaily > 0 {
+		fmt.Printf("✓ Synced %d task(s) from daily notes to todo list\n", result.TasksFromDaily)
+	}
+	if result.TasksFromTodo > 0 {
+		fmt.Printf("✓ Synced %d task(s) from todo list to daily notes\n", result.TasksFromTodo)
+	}
 
 	return nil
 }

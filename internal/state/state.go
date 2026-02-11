@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/AnishShah1803/jotr/internal/tasks"
@@ -98,7 +99,7 @@ func (s *TodoState) AddTask(task tasks.Task, source string) {
 		ts.CreatedAt = now
 	}
 
-	if task.Completed && !ts.CompletedAt.IsZero() {
+	if task.Completed && ts.CompletedAt.IsZero() {
 		ts.CompletedAt = now
 	}
 
@@ -204,10 +205,6 @@ func (s *TodoState) CompareWithDailyNotes(dailyTasks []tasks.Task, source string
 	}
 
 	for id, stateTask := range s.Tasks {
-		if stateTask.Source != source {
-			continue
-		}
-
 		dailyTask, exists := dailyTaskMap[id]
 		if !exists {
 			continue
@@ -345,13 +342,17 @@ func (s *TodoState) DetectConflicts(dailyChanges, todoChanges []TaskChange) map[
 		if todoChange, exists := todoChangeMap[id]; exists {
 			if dailyChange.ChangeType == Modified && todoChange.ChangeType == Modified {
 				if dailyChange.NewTask != nil && todoChange.NewTask != nil {
+					var conflictParts []string
 					if dailyChange.NewTask.Text != todoChange.NewTask.Text {
-						conflicts[id] = fmt.Sprintf("Text differs: daily note says '%s', todo list says '%s'",
-							dailyChange.NewTask.Text, todoChange.NewTask.Text)
+						conflictParts = append(conflictParts, fmt.Sprintf("text differs (daily: '%s', todo: '%s')",
+							dailyChange.NewTask.Text, todoChange.NewTask.Text))
 					}
 					if dailyChange.NewTask.Completed != todoChange.NewTask.Completed {
-						conflicts[id] = fmt.Sprintf("Completion status differs: daily note says %v, todo list says %v",
-							dailyChange.NewTask.Completed, todoChange.NewTask.Completed)
+						conflictParts = append(conflictParts, fmt.Sprintf("completion differs (daily: %v, todo: %v)",
+							dailyChange.NewTask.Completed, todoChange.NewTask.Completed))
+					}
+					if len(conflictParts) > 0 {
+						conflicts[id] = strings.Join(conflictParts, "; ")
 					}
 				}
 			}
@@ -360,15 +361,6 @@ func (s *TodoState) DetectConflicts(dailyChanges, todoChanges []TaskChange) map[
 
 	return conflicts
 }
-
-// SyncDirection represents which way changes should propagate
-type SyncDirection int
-
-const (
-	SyncToState SyncDirection = iota
-	SyncFromState
-	SyncBidirectional
-)
 
 // SyncResult represents the result of a sync operation
 type SyncResult struct {
@@ -483,14 +475,7 @@ func (s *TodoState) smartMerge(dailyChange, todoChange TaskChange) *TaskState {
 
 	merged.LastModified = time.Now()
 
-	if dailyChange.NewTask.Text != todoChange.NewTask.Text {
-		return nil
-	}
-
-	if dailyChange.NewTask.Completed != todoChange.NewTask.Completed {
-		return nil
-	}
-
+	// Merge tags from both sources
 	mergedTags := make(map[string]bool)
 	for _, tag := range dailyChange.NewTask.Tags {
 		mergedTags[tag] = true
@@ -503,10 +488,18 @@ func (s *TodoState) smartMerge(dailyChange, todoChange TaskChange) *TaskState {
 		merged.Tags = append(merged.Tags, tag)
 	}
 
+	// Priority: daily note takes precedence, fallback to todo if daily has none
 	merged.Priority = dailyChange.NewTask.Priority
-	if todoChange.NewTask.Priority != "" {
+	if merged.Priority == "" {
 		merged.Priority = todoChange.NewTask.Priority
 	}
 
-	return &merged
+	// If both modified to the same state, just use that state (no real conflict)
+	if dailyChange.NewTask.Text == todoChange.NewTask.Text &&
+		dailyChange.NewTask.Completed == todoChange.NewTask.Completed {
+		return &merged
+	}
+
+	// Real conflict - return nil to indicate merge not possible
+	return nil
 }

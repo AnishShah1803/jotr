@@ -384,6 +384,23 @@ func TestSmartMerge(t *testing.T) {
 			},
 			expectMerge: false,
 		},
+		{
+			name: "merge when both modified to same state - converged changes",
+			dailyChange: TaskChange{
+				TaskID:     "abc123",
+				ChangeType: Modified,
+				OldTask:    &TaskState{ID: "abc123", Text: "Task", Completed: false, CreatedAt: now},
+				NewTask:    &TaskState{ID: "abc123", Text: "Updated task", Completed: true},
+			},
+			todoChange: TaskChange{
+				TaskID:     "abc123",
+				ChangeType: Modified,
+				OldTask:    &TaskState{ID: "abc123", Text: "Task", Completed: false, CreatedAt: now},
+				NewTask:    &TaskState{ID: "abc123", Text: "Updated task", Completed: true},
+			},
+			expectMerge:  true,
+			expectedText: "Updated task",
+		},
 	}
 
 	for _, tt := range tests {
