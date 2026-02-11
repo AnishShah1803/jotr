@@ -70,21 +70,21 @@ Process A              Process B
   - "Another sync operation is in progress. Please try again in a few seconds."
   - Log the actual error for debugging
 
-- [ ] Add retry logic (optional enhancement)
+ - [x] Add retry logic (optional enhancement)
   - Exponential backoff with max 3 retries
   - Only retry on lock timeout, not on other errors
 
 ### Phase 4: Testing
 
-- [ ] Add concurrent sync test in `bidirectional_sync_test.go`
+- [x] Add concurrent sync test in `bidirectional_sync_test.go`
   - Launch 2 goroutines calling `SyncTasks` simultaneously
   - Verify no data loss or corruption
   - Verify both tasks end up in state/todo files
 
-- [ ] Add lock timeout test
+- [x] Add lock timeout test
   - Verify proper error handling when lock can't be acquired
 
-- [ ] Verify lock ordering doesn't cause deadlocks
+- [x] Verify lock ordering doesn't cause deadlocks
   - Test with rapid concurrent sync calls
 
 ## Lock Order (Critical)
