@@ -21,7 +21,7 @@ jobs:
           NANO_GPT_API_KEY: ${{ secrets.NANO_GPT_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: nano-gpt/zai-org/glm-4.7:thinking
+          model: nano-gpt/zai-org/glm-4.7
           use_github_token: true
           prompt: |
             Review this pull request:

@@ -127,8 +127,8 @@ func TestTaskService_SyncTasks_NoTasksToSync(t *testing.T) {
 		t.Fatalf("SyncTasks() error = %v", err)
 	}
 
-	if result.TasksSynced != 0 {
-		t.Errorf("SyncTasks().TasksSynced = %d; want 0", result.TasksSynced)
+	if result.TasksFromDaily != 0 && result.TasksFromTodo != 0 {
+		t.Errorf("SyncTasks() synced %d from daily and %d from todo; want 0 changes", result.TasksFromDaily, result.TasksFromTodo)
 	}
 }
 
@@ -302,8 +302,8 @@ func TestTaskService_SyncTasks_Deduplication_SubstringFalsePositive(t *testing.T
 	}
 
 	// Should sync 1 task because "Review proposal" is not the same as "Review proposal document"
-	if result.TasksSynced != 1 {
-		t.Errorf("SyncTasks().TasksSynced = %d; want 1 (substring false positive prevention)", result.TasksSynced)
+	if result.TasksFromDaily != 1 {
+		t.Errorf("SyncTasks().TasksFromDaily = %d; want 1 (substring false positive prevention)", result.TasksFromDaily)
 	}
 }
 
@@ -355,8 +355,8 @@ func TestTaskService_SyncTasks_Deduplication_ExactMatch(t *testing.T) {
 	}
 
 	// Should NOT sync because exact match already exists
-	if result.TasksSynced != 0 {
-		t.Errorf("SyncTasks().TasksSynced = %d; want 0 (exact match should be deduplicated)", result.TasksSynced)
+	if result.TasksFromDaily != 0 && result.TasksFromTodo != 0 {
+		t.Errorf("SyncTasks() synced %d from daily and %d from todo; want 0 changes (exact match should be deduplicated)", result.TasksFromDaily, result.TasksFromTodo)
 	}
 }
 
@@ -408,8 +408,8 @@ func TestTaskService_SyncTasks_Deduplication_IDBased(t *testing.T) {
 	}
 
 	// Should NOT sync because task with same ID already exists
-	if result.TasksSynced != 0 {
-		t.Errorf("SyncTasks().TasksSynced = %d; want 0 (ID-based match should be deduplicated)", result.TasksSynced)
+	if result.TasksFromDaily != 0 && result.TasksFromTodo != 0 {
+		t.Errorf("SyncTasks() synced %d from daily and %d from todo; want 0 changes (ID-based match should be deduplicated)", result.TasksFromDaily, result.TasksFromTodo)
 	}
 }
 
@@ -463,8 +463,8 @@ func TestTaskService_SyncTasks_Deduplication_MultipleSimilar(t *testing.T) {
 
 	// Should sync 2 tasks: "Update documentation" and "Update config"
 	// Neither is a substring match of "Update" (exact) and "Update" is already in todo
-	if result.TasksSynced != 2 {
-		t.Errorf("SyncTasks().TasksSynced = %d; want 2 (similar but different tasks should sync)", result.TasksSynced)
+	if result.TasksFromDaily != 2 {
+		t.Errorf("SyncTasks().TasksFromDaily = %d; want 2 (similar but different tasks should sync)", result.TasksFromDaily)
 	}
 }
 
