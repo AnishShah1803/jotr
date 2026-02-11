@@ -13,30 +13,21 @@ import (
 	"github.com/AnishShah1803/jotr/internal/utils/platform"
 )
 
-// ErrLockTimeout is returned when a file lock cannot be acquired within the timeout period.
 var ErrLockTimeout = errors.New("timeout waiting for file lock")
 
-// LockFile acquires an exclusive lock on a file for concurrent access protection.
-// Returns a file handle that must be passed to UnlockFile when done.
-// The lock is automatically released when the file handle is closed.
 func LockFile(path string, timeout time.Duration) (*os.File, error) {
-	// Create lock file path adjacent to the target file
 	lockPath := path + ".lock"
 
-	// Open or create the lock file
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0644)
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open lock file: %w", err)
 	}
 
-	// Calculate deadline for timeout
 	deadline := time.Now().Add(timeout)
 
-	// Try to acquire exclusive lock with timeout
 	for {
 		err := platform.Flock(int(lockFile.Fd()), platform.LOCK_EX)
 		if err == nil {
-			// Lock acquired successfully
 			return lockFile, nil
 		}
 
@@ -45,7 +36,6 @@ func LockFile(path string, timeout time.Duration) (*os.File, error) {
 			return nil, fmt.Errorf("%w: %s", ErrLockTimeout, path)
 		}
 
-		// Brief sleep before retry
 		time.Sleep(50 * time.Millisecond)
 	}
 }
@@ -74,7 +64,7 @@ func UnlockFile(lockFile *os.File) error {
 func TryLockFile(path string) (*os.File, error) {
 	lockPath := path + ".lock"
 
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0644)
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open lock file: %w", err)
 	}

@@ -30,6 +30,7 @@ type SyncOptions struct {
 	TodoPath    string
 	StatePath   string
 	TaskSection string
+	LockTimeout time.Duration // Timeout for acquiring file locks (default: 10s)
 }
 
 // SyncResult contains the result of a sync operation.
@@ -78,16 +79,18 @@ func (s *TaskService) acquireSyncLocks(statePath, todoPath, notePath string, tim
 		locks = append(locks, lockFile)
 	}
 
-	// Lock daily note
-	lockFile, err := utils.LockFile(notePath, timeout)
-	if err != nil {
-		// Release any already acquired locks
-		for _, l := range locks {
-			utils.UnlockFile(l)
+	// Lock daily note (if provided)
+	if notePath != "" {
+		lockFile, err := utils.LockFile(notePath, timeout)
+		if err != nil {
+			// Release any already acquired locks
+			for _, l := range locks {
+				utils.UnlockFile(l)
+			}
+			return nil, fmt.Errorf("failed to acquire lock on daily note: %w", err)
 		}
-		return nil, fmt.Errorf("failed to acquire lock on daily note: %w", err)
+		locks = append(locks, lockFile)
 	}
-	locks = append(locks, lockFile)
 
 	return locks, nil
 }
@@ -118,7 +121,11 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 
 	// Acquire locks on all three files before reading any data
 	// Lock order: state file → todo file → daily note
-	locks, err := s.acquireSyncLocks(opts.StatePath, opts.TodoPath, notePath, 10*time.Second)
+	lockTimeout := opts.LockTimeout
+	if lockTimeout <= 0 {
+		lockTimeout = 10 * time.Second
+	}
+	locks, err := s.acquireSyncLocks(opts.StatePath, opts.TodoPath, notePath, lockTimeout)
 	if err != nil {
 		if s.isLockTimeoutError(err) {
 			return nil, fmt.Errorf("another sync operation is in progress. Please try again in a few seconds")
@@ -135,6 +142,7 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 		}
 	}()
 
+	// Read all data AFTER acquiring locks to prevent race conditions
 	dailyTasks, err := tasks.ReadTasks(ctx, notePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read daily note: %w", err)
@@ -368,9 +376,10 @@ func (s *TaskService) writeTodoFileFromState(todoPath string, todoState *state.T
 
 // ArchiveOptions contains options for archiving tasks.
 type ArchiveOptions struct {
-	TodoPath  string
-	StatePath string
-	BaseDir   string
+	TodoPath    string
+	StatePath   string
+	BaseDir     string
+	LockTimeout time.Duration // Timeout for acquiring file locks (default: 10s)
 }
 
 // ArchiveResult contains the result of an archive operation.
@@ -383,6 +392,26 @@ type ArchiveResult struct {
 // ArchiveTasks moves completed tasks to an archive file using state as source of truth.
 func (s *TaskService) ArchiveTasks(ctx context.Context, opts ArchiveOptions) (*ArchiveResult, error) {
 	result := &ArchiveResult{}
+
+	lockTimeout := opts.LockTimeout
+	if lockTimeout <= 0 {
+		lockTimeout = 10 * time.Second
+	}
+	locks, err := s.acquireSyncLocks(opts.StatePath, opts.TodoPath, "", lockTimeout)
+	if err != nil {
+		if s.isLockTimeoutError(err) {
+			return nil, fmt.Errorf("another archive operation is in progress. Please try again in a few seconds")
+		}
+		return nil, err
+	}
+	defer func() {
+		if locks == nil {
+			return
+		}
+		for i := len(locks) - 1; i >= 0; i-- {
+			utils.UnlockFile(locks[i])
+		}
+	}()
 
 	todoState, err := state.Read(opts.StatePath)
 	if err != nil {
@@ -433,12 +462,6 @@ func (s *TaskService) ArchiveTasks(ctx context.Context, opts ArchiveOptions) (*A
 	if err := utils.AtomicWriteFile(archiveFile, []byte(archiveContent), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write archive: %w", err)
 	}
-
-	lockFile, err := utils.LockFile(opts.TodoPath, 10*time.Second)
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire lock: %w", err)
-	}
-	defer utils.UnlockFile(lockFile)
 
 	if err := s.writeTodoFileFromState(opts.TodoPath, todoState, false); err != nil {
 		return nil, fmt.Errorf("failed to write todo file: %w", err)
