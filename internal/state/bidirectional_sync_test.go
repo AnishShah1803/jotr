@@ -645,19 +645,19 @@ func TestLockTimeoutBehavior(t *testing.T) {
 	}
 
 	lockPath := statePath + ".lock"
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0644)
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		t.Fatalf("Failed to open lock file: %v", err)
 	}
 	defer lockFile.Close()
 
 	if _, err := os.Stat(lockPath); os.IsNotExist(err) {
-		t.Error("Lock file should exist after locking")
+		t.Error("Lock file should exist after opening")
 	}
 
 	state, err := Read(statePath)
 	if err != nil {
-		t.Errorf("Should be able to read state while lock is held: %v", err)
+		t.Errorf("Should be able to read state while lock file exists: %v", err)
 	}
 
 	if len(state.Tasks) != 1 {
