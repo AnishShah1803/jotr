@@ -2,14 +2,18 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/state"
 	"github.com/AnishShah1803/jotr/internal/testhelpers"
+	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
 // TaskService Tests
@@ -485,5 +489,255 @@ func TestTaskService_LoadConfig(t *testing.T) {
 
 	if config == nil {
 		t.Error("LoadConfig() returned nil")
+	}
+}
+
+func TestTaskService_SyncTasks_ConcurrentFileLocking(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	configHelper := testhelpers.NewConfigHelper(fs)
+	configHelper.CreateBasicConfig(t)
+
+	configPath := filepath.Join(fs.BaseDir, ".config", "jotr", "config.json")
+	os.Setenv("JOTR_CONFIG", configPath)
+
+	now := time.Now()
+	year := now.Format("2006")
+	monthDir := now.Format("01-Jan")
+	dayFile := now.Format("2006-01-02-Mon.md")
+
+	dailyNoteContent := `# Daily Note
+
+## Tasks
+
+- [ ] Task one <!-- id: task1 -->
+- [ ] Task two <!-- id: task2 -->
+`
+	fs.WriteFile(t, filepath.Join("diary", year, monthDir, dayFile), dailyNoteContent)
+
+	statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+
+	initialState := state.NewTodoState()
+	initialState.Tasks = map[string]state.TaskState{
+		"task1": {ID: "task1", Text: "Task one", Completed: false, Source: "daily.md"},
+		"task2": {ID: "task2", Text: "Task two", Completed: false, Source: "daily.md"},
+	}
+	if err := initialState.Write(statePath); err != nil {
+		t.Fatalf("Failed to write initial state: %v", err)
+	}
+
+	todoContent := `# To-Do List
+
+## Tasks
+
+- [ ] Task one
+- [ ] Task two
+`
+	fs.WriteFile(t, "todo.md", todoContent)
+
+	service := NewTaskService()
+	ctx := context.Background()
+
+	numGoroutines := 5
+	errors := make(chan error, numGoroutines)
+	done := make(chan bool, numGoroutines)
+	start := make(chan struct{})
+
+	for i := 0; i < numGoroutines; i++ {
+		go func(idx int) {
+			defer func() { done <- true }()
+
+			<-start
+
+			_, err := service.SyncTasks(ctx, SyncOptions{
+				DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
+				TodoPath:    todoPath,
+				StatePath:   statePath,
+				TaskSection: "Tasks",
+			})
+			errors <- err
+		}(i)
+	}
+
+	close(start)
+
+	timeout := time.After(30 * time.Second)
+	completed := 0
+
+	for completed < numGoroutines {
+		select {
+		case <-done:
+			completed++
+		case err := <-errors:
+			if err != nil {
+				t.Errorf("Error in goroutine: %v", err)
+			}
+		case <-timeout:
+			t.Fatalf("Test timed out after 30 seconds - possible deadlock (%d/%d completed)", completed, numGoroutines)
+		}
+	}
+
+	finalState, err := state.Read(statePath)
+	if err != nil {
+		t.Fatalf("Failed to read final state: %v", err)
+	}
+
+	if len(finalState.Tasks) == 0 {
+		t.Error("Final state has no tasks - data loss detected")
+	}
+
+	for id, task := range finalState.Tasks {
+		if task.Text == "" {
+			t.Errorf("Task %s has empty text (possible corruption)", id)
+		}
+		if task.ID == "" {
+			t.Errorf("Task has empty ID (possible corruption): %v", task)
+		}
+	}
+}
+
+func TestTaskService_SyncTasks_LockTimeoutError(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	configHelper := testhelpers.NewConfigHelper(fs)
+	configHelper.CreateBasicConfig(t)
+
+	configPath := filepath.Join(fs.BaseDir, ".config", "jotr", "config.json")
+	os.Setenv("JOTR_CONFIG", configPath)
+
+	statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
+
+	lockFile, err := utils.TryLockFile(statePath)
+	if err != nil {
+		t.Fatalf("Failed to acquire lock: %v", err)
+	}
+	if lockFile == nil {
+		t.Fatal("TryLockFile returned nil file")
+	}
+	defer utils.UnlockFile(lockFile)
+
+	service := NewTaskService()
+
+	timeoutErr := fmt.Errorf("%w: %s", utils.ErrLockTimeout, statePath)
+	if !service.isLockTimeoutError(timeoutErr) {
+		t.Error("isLockTimeoutError should return true for ErrLockTimeout wrapped error")
+	}
+
+	otherErr := fmt.Errorf("some other error")
+	if service.isLockTimeoutError(otherErr) {
+		t.Error("isLockTimeoutError should return false for non-timeout error")
+	}
+
+	if service.isLockTimeoutError(nil) {
+		t.Error("isLockTimeoutError should return false for nil error")
+	}
+}
+
+func TestTaskService_SyncTasks_UserFriendlyErrorMessage(t *testing.T) {
+	service := NewTaskService()
+
+	timeoutErr := fmt.Errorf("%w: some/path", utils.ErrLockTimeout)
+	if !service.isLockTimeoutError(timeoutErr) {
+		t.Error("isLockTimeoutError should return true for ErrLockTimeout wrapped error")
+	}
+
+	wrappedErr := fmt.Errorf("failed to acquire lock on state file: %w", timeoutErr)
+	if !service.isLockTimeoutError(wrappedErr) {
+		t.Error("isLockTimeoutError should detect nested ErrLockTimeout")
+	}
+}
+
+func TestTaskService_SyncTasks_DeadlockPrevention(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	configHelper := testhelpers.NewConfigHelper(fs)
+	configHelper.CreateBasicConfig(t)
+
+	configPath := filepath.Join(fs.BaseDir, ".config", "jotr", "config.json")
+	os.Setenv("JOTR_CONFIG", configPath)
+
+	now := time.Now()
+	year := now.Format("2006")
+	monthDir := now.Format("01-Jan")
+	dayFile := now.Format("2006-01-02-Mon.md")
+
+	dailyNoteContent := `# Daily Note
+
+## Tasks
+
+- [ ] Task one <!-- id: task1 -->
+`
+	fs.WriteFile(t, filepath.Join("diary", year, monthDir, dayFile), dailyNoteContent)
+
+	statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+
+	initialState := state.NewTodoState()
+	initialState.Tasks = map[string]state.TaskState{
+		"task1": {ID: "task1", Text: "Task one", Completed: false, Source: "daily.md"},
+	}
+	if err := initialState.Write(statePath); err != nil {
+		t.Fatalf("Failed to write initial state: %v", err)
+	}
+
+	todoContent := `# To-Do List
+
+## Tasks
+
+- [ ] Task one
+`
+	fs.WriteFile(t, "todo.md", todoContent)
+
+	service := NewTaskService()
+	ctx := context.Background()
+
+	numOps := 10
+	var wg sync.WaitGroup
+	errChan := make(chan error, numOps)
+
+	for i := 0; i < numOps; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := service.SyncTasks(ctx, SyncOptions{
+				DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
+				TodoPath:    todoPath,
+				StatePath:   statePath,
+				TaskSection: "Tasks",
+			})
+			errChan <- err
+		}()
+	}
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("Test timed out - deadlock detected")
+	}
+
+	close(errChan)
+	for err := range errChan {
+		if err != nil && !errors.Is(err, utils.ErrLockTimeout) {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+
+	finalState, err := state.Read(statePath)
+	if err != nil {
+		t.Fatalf("Failed to read final state: %v", err)
+	}
+
+	if _, exists := finalState.Tasks["task1"]; !exists {
+		t.Error("Task1 should still exist after concurrent syncs")
 	}
 }

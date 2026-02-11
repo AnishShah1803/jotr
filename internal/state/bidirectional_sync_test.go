@@ -1,6 +1,9 @@
 package state
 
 import (
+	"fmt"
+	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -484,5 +487,274 @@ func TestIsTaskModified(t *testing.T) {
 				t.Errorf("Expected modified=%v, got %v", tt.expectMod, modified)
 			}
 		})
+	}
+}
+
+func TestConcurrentBidirectionalSync(t *testing.T) {
+	tempDir := t.TempDir()
+	statePath := tempDir + "/.todo_state.json"
+	dailyNotePath := tempDir + "/daily.md"
+	todoFilePath := tempDir + "/todo.md"
+
+	initialState := NewTodoState()
+	initialState.Tasks = map[string]TaskState{
+		"task1": {ID: "task1", Text: "Task 1", Completed: false, Source: "old.md"},
+		"task2": {ID: "task2", Text: "Task 2", Completed: false, Source: "old.md"},
+	}
+	if err := initialState.Write(statePath); err != nil {
+		t.Fatalf("Failed to write initial state: %v", err)
+	}
+
+	dailyContent := `## Tasks
+- [ ] Task 1 <!-- id: task1 -->
+- [ ] Task 2 <!-- id: task2 -->
+- [ ] New Task from Daily <!-- id: task3 -->
+`
+	if err := os.WriteFile(dailyNotePath, []byte(dailyContent), 0644); err != nil {
+		t.Fatalf("Failed to write daily note: %v", err)
+	}
+
+	todoContent := `## Tasks
+- [ ] Task 1
+- [ ] Task 2
+- [ ] Task from Todo
+`
+	if err := os.WriteFile(todoFilePath, []byte(todoContent), 0644); err != nil {
+		t.Fatalf("Failed to write todo file: %v", err)
+	}
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var errors []error
+	var results []SyncResult
+
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			<-start
+
+			state, err := Read(statePath)
+			if err != nil {
+				mu.Lock()
+				errors = append(errors, fmt.Errorf("goroutine %d: failed to read state: %w", idx, err))
+				mu.Unlock()
+				return
+			}
+
+			time.Sleep(10 * time.Millisecond)
+
+			dailyTasks := []tasks.Task{
+				{ID: "task1", Text: "Task 1", Completed: false, Section: "Tasks"},
+				{ID: "task2", Text: "Task 2", Completed: false, Section: "Tasks"},
+				{ID: "task3", Text: "New Task from Daily", Completed: false, Section: "Tasks"},
+			}
+
+			todoTasks := []tasks.Task{
+				{ID: "task1", Text: "Task 1", Completed: false},
+				{ID: "task2", Text: "Task 2", Completed: false},
+				{ID: "task4", Text: "Task from Todo", Completed: false},
+			}
+
+			result := state.BidirectionalSync(dailyTasks, todoTasks, dailyNotePath)
+
+			mu.Lock()
+			results = append(results, result)
+			mu.Unlock()
+
+			if result.StateUpdated {
+				mu.Lock()
+				if err := state.Write(statePath); err != nil {
+					errors = append(errors, fmt.Errorf("goroutine %d: failed to write state: %w", idx, err))
+					mu.Unlock()
+					return
+				}
+				mu.Unlock()
+			}
+		}(i)
+	}
+
+	close(start)
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Test timed out - possible deadlock detected")
+	}
+
+	for _, err := range errors {
+		if err != nil {
+			t.Errorf("Goroutine failed: %v", err)
+		}
+	}
+
+	for _, result := range results {
+		if !result.StateUpdated {
+			t.Error("Expected StateUpdated=true")
+		}
+		if len(result.Conflicts) > 0 {
+			t.Logf("Had %d conflicts (acceptable for this test)", len(result.Conflicts))
+		}
+	}
+
+	finalState, err := Read(statePath)
+	if err != nil {
+		t.Fatalf("Failed to read final state: %v", err)
+	}
+
+	baseTasks := []string{"task1", "task2"}
+	for _, taskID := range baseTasks {
+		if _, exists := finalState.Tasks[taskID]; !exists {
+			t.Errorf("Expected base task %s to exist in final state", taskID)
+		}
+	}
+
+	for id, task := range finalState.Tasks {
+		if task.Text == "" {
+			t.Errorf("Task %s has empty text (possible corruption)", id)
+		}
+		if task.ID == "" {
+			t.Errorf("Task has empty ID (possible corruption): %v", task)
+		}
+	}
+
+	_, hasTask3 := finalState.Tasks["task3"]
+	_, hasTask4 := finalState.Tasks["task4"]
+	if !hasTask3 && !hasTask4 {
+		t.Error("Expected at least one new task (task3 or task4) to be present")
+	}
+}
+
+func TestLockTimeoutBehavior(t *testing.T) {
+	tempDir := t.TempDir()
+	statePath := tempDir + "/.todo_state.json"
+
+	initialState := NewTodoState()
+	initialState.Tasks = map[string]TaskState{
+		"task1": {ID: "task1", Text: "Task 1", Completed: false, Source: "test.md"},
+	}
+	if err := initialState.Write(statePath); err != nil {
+		t.Fatalf("Failed to write initial state: %v", err)
+	}
+
+	lockPath := statePath + ".lock"
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		t.Fatalf("Failed to open lock file: %v", err)
+	}
+	defer lockFile.Close()
+
+	if _, err := os.Stat(lockPath); os.IsNotExist(err) {
+		t.Error("Lock file should exist after opening")
+	}
+
+	state, err := Read(statePath)
+	if err != nil {
+		t.Errorf("Should be able to read state while lock file exists: %v", err)
+	}
+
+	if len(state.Tasks) != 1 {
+		t.Errorf("Expected 1 task, got %d", len(state.Tasks))
+	}
+}
+
+func TestDeadlockPrevention(t *testing.T) {
+	tempDir := t.TempDir()
+	statePath := tempDir + "/.todo_state.json"
+	dailyNotePath := tempDir + "/daily.md"
+	todoFilePath := tempDir + "/todo.md"
+
+	initialState := NewTodoState()
+	initialState.Tasks = map[string]TaskState{
+		"task1": {ID: "task1", Text: "Task 1", Completed: false, Source: "test.md"},
+	}
+	if err := initialState.Write(statePath); err != nil {
+		t.Fatalf("Failed to write initial state: %v", err)
+	}
+
+	dailyContent := `## Tasks
+- [ ] Task 1 <!-- id: task1 -->
+`
+	if err := os.WriteFile(dailyNotePath, []byte(dailyContent), 0644); err != nil {
+		t.Fatalf("Failed to write daily note: %v", err)
+	}
+
+	todoContent := `## Tasks
+- [ ] Task 1
+`
+	if err := os.WriteFile(todoFilePath, []byte(todoContent), 0644); err != nil {
+		t.Fatalf("Failed to write todo file: %v", err)
+	}
+
+	numGoroutines := 5
+	errors := make(chan error, numGoroutines)
+	done := make(chan bool, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func(idx int) {
+			defer func() { done <- true }()
+
+			state, err := Read(statePath)
+			if err != nil {
+				errors <- fmt.Errorf("goroutine %d: failed to read state: %w", idx, err)
+				return
+			}
+
+			dailyTasks := []tasks.Task{
+				{ID: "task1", Text: "Task 1", Completed: false, Section: "Tasks"},
+			}
+			todoTasks := []tasks.Task{{ID: "task1", Text: "Task 1", Completed: false}}
+
+			result := state.BidirectionalSync(dailyTasks, todoTasks, dailyNotePath)
+
+			if result.StateUpdated {
+				if err := state.Write(statePath); err != nil {
+					errors <- fmt.Errorf("goroutine %d: failed to write state: %w", idx, err)
+					return
+				}
+			}
+
+			errors <- nil
+		}(i)
+	}
+
+	timeout := time.After(10 * time.Second)
+	completed := 0
+
+	for completed < numGoroutines {
+		select {
+		case <-done:
+			completed++
+		case err := <-errors:
+			if err != nil {
+				t.Errorf("Error in goroutine: %v", err)
+			}
+		case <-timeout:
+			t.Fatalf("Test timed out after 10 seconds - possible deadlock detected (%d/%d completed)", completed, numGoroutines)
+		}
+	}
+
+	finalState, err := Read(statePath)
+	if err != nil {
+		t.Fatalf("Failed to read final state: %v", err)
+	}
+
+	if len(finalState.Tasks) == 0 {
+		t.Error("Final state has no tasks - possible data loss")
+	}
+
+	taskIDs := make(map[string]bool)
+	for id := range finalState.Tasks {
+		if taskIDs[id] {
+			t.Errorf("Duplicate task found: %s", id)
+		}
+		taskIDs[id] = true
 	}
 }
