@@ -42,6 +42,65 @@ type SyncResult struct {
 	Conflicts      map[string]string
 }
 
+// acquireSyncLocks acquires locks on state, todo, and daily note files in the correct order.
+// Returns a slice of file handles that must be released in reverse order.
+// Lock order: state file → todo file → daily note
+func (s *TaskService) acquireSyncLocks(statePath, todoPath, notePath string, timeout time.Duration) ([]*os.File, error) {
+	var locks []*os.File
+
+	// Acquire lock order: state file → todo file → daily note
+	// This ordering must be consistent to prevent deadlocks
+
+	// Lock state file
+	if statePath != "" {
+		lockFile, err := utils.LockFile(statePath, timeout)
+		if err != nil {
+			// Release any already acquired locks
+			for _, l := range locks {
+				utils.UnlockFile(l)
+			}
+			return nil, fmt.Errorf("failed to acquire lock on state file: %w", err)
+		}
+		locks = append(locks, lockFile)
+	}
+
+	// Lock todo file
+	if todoPath != "" {
+		lockFile, err := utils.LockFile(todoPath, timeout)
+		if err != nil {
+			// Release any already acquired locks
+			for _, l := range locks {
+				utils.UnlockFile(l)
+			}
+			return nil, fmt.Errorf("failed to acquire lock on todo file: %w", err)
+		}
+		locks = append(locks, lockFile)
+	}
+
+	// Lock daily note
+	lockFile, err := utils.LockFile(notePath, timeout)
+	if err != nil {
+		// Release any already acquired locks
+		for _, l := range locks {
+			utils.UnlockFile(l)
+		}
+		return nil, fmt.Errorf("failed to acquire lock on daily note: %w", err)
+	}
+	locks = append(locks, lockFile)
+
+	return locks, nil
+}
+
+// isLockTimeoutError checks if an error is a lock timeout error.
+// This is used to provide user-friendly error messages for sync operations.
+func (s *TaskService) isLockTimeoutError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	return strings.Contains(errStr, "timeout waiting for file lock")
+}
+
 // SyncTasks performs bidirectional sync between daily notes and todo list.
 func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncResult, error) {
 	result := &SyncResult{
@@ -56,6 +115,23 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 	if !utils.FileExists(notePath) {
 		return nil, fmt.Errorf("today's note doesn't exist: %s", notePath)
 	}
+
+	// Acquire locks on all three files before reading any data
+	// Lock order: state file → todo file → daily note
+	locks, err := s.acquireSyncLocks(opts.StatePath, opts.TodoPath, notePath, 10*time.Second)
+	if err != nil {
+		if s.isLockTimeoutError(err) {
+			return nil, fmt.Errorf("another sync operation is in progress. Please try again in a few seconds")
+		}
+		return nil, err
+	}
+	// Release locks in reverse order when function returns
+	defer func() {
+		// Release in reverse order: daily note → todo file → state file
+		for i := len(locks) - 1; i >= 0; i-- {
+			utils.UnlockFile(locks[i])
+		}
+	}()
 
 	dailyTasks, err := tasks.ReadTasks(ctx, notePath)
 	if err != nil {
@@ -190,12 +266,6 @@ func (s *TaskService) updateDailyNoteFromState(notePath string, dailyTasks []tas
 	if !strings.HasSuffix(content, "\n") {
 		content += "\n"
 	}
-
-	lockFile, err := utils.LockFile(notePath, 10*time.Second)
-	if err != nil {
-		return fmt.Errorf("failed to acquire lock on daily note: %w", err)
-	}
-	defer utils.UnlockFile(lockFile)
 
 	if err := utils.AtomicWriteFile(notePath, []byte(content), 0644); err != nil {
 		return fmt.Errorf("failed to write daily note: %w", err)
