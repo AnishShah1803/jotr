@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -647,6 +648,102 @@ func TestTaskService_SyncTasks_UserFriendlyErrorMessage(t *testing.T) {
 	wrappedErr := fmt.Errorf("failed to acquire lock on state file: %w", timeoutErr)
 	if !service.isLockTimeoutError(wrappedErr) {
 		t.Error("isLockTimeoutError should detect nested ErrLockTimeout")
+	}
+}
+
+func TestTaskService_WriteTodoFileFromState_CompletedDateSection(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	// Create a state with a task that:
+	// - was created under section "2026-02-01"
+	// - is completed with CompletedDate="2026-02-06"
+	// - should appear under "## 2026-02-06" section in output, not "## 2026-02-01"
+	todoState := state.NewTodoState()
+	todoState.Tasks["task123"] = state.TaskState{
+		ID:            "task123",
+		Text:          "Review project proposal",
+		Section:       "2026-02-01",
+		Completed:     true,
+		CompletedDate: "2026-02-06",
+		CreatedDate:   "2026-02-01",
+		Source:        "diary/2026-02-01.md",
+	}
+
+	// Also add an incomplete task under the same section to verify it stays there
+	todoState.Tasks["task456"] = state.TaskState{
+		ID:          "task456",
+		Text:        "Ongoing task",
+		Section:     "2026-02-01",
+		Completed:   false,
+		CreatedDate: "2026-02-01",
+		Source:      "diary/2026-02-01.md",
+	}
+
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+
+	service := NewTaskService()
+	if err := service.writeTodoFileFromState(todoPath, todoState, true); err != nil {
+		t.Fatalf("writeTodoFileFromState() error = %v", err)
+	}
+
+	// Read the generated file
+	content, err := os.ReadFile(todoPath)
+	if err != nil {
+		t.Fatalf("Failed to read generated todo file: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Verify the completed task appears under "## 2026-02-06" section
+	// Find the section boundaries
+	idx0206 := strings.Index(contentStr, "## 2026-02-06")
+	idx0201 := strings.Index(contentStr, "## 2026-02-01")
+
+	if idx0206 == -1 {
+		t.Error("Expected '## 2026-02-06' section header for completed task, not found")
+	}
+	if idx0201 == -1 {
+		t.Error("Expected '## 2026-02-01' section header for incomplete task, not found")
+	}
+
+	// Find task positions
+	idxCompleted := strings.Index(contentStr, "Review project proposal")
+	idxIncomplete := strings.Index(contentStr, "Ongoing task")
+
+	if idxCompleted == -1 {
+		t.Error("Completed task 'Review project proposal' not found in output")
+	}
+	if idxIncomplete == -1 {
+		t.Error("Incomplete task 'Ongoing task' not found in output")
+	}
+
+	// Verify completed task is in the 2026-02-06 section (after its header but before next section)
+	if idx0206 != -1 && idxCompleted != -1 {
+		if idxCompleted < idx0206 {
+			t.Error("Completed task should appear after '## 2026-02-06' header")
+		}
+		// If there's a section after 2026-02-06, task should be before it
+		if idx0201 > idx0206 && idxCompleted > idx0201 {
+			t.Error("Completed task should be in '## 2026-02-06' section, not after '## 2026-02-01'")
+		}
+	}
+
+	// Verify incomplete task is in the 2026-02-01 section
+	if idx0201 != -1 && idxIncomplete != -1 {
+		if idxIncomplete < idx0201 {
+			t.Error("Incomplete task should appear after '## 2026-02-01' header")
+		}
+	}
+
+	// Verify completed task has [x] checkbox
+	if !strings.Contains(contentStr, "- [x] Review project proposal") {
+		t.Error("Completed task should have [x] checkbox")
+	}
+
+	// Verify incomplete task has [ ] checkbox
+	if !strings.Contains(contentStr, "- [ ] Ongoing task") {
+		t.Error("Incomplete task should have [ ] checkbox")
 	}
 }
 
