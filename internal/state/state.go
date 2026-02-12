@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -547,6 +548,7 @@ func (s *TodoState) smartMerge(dailyChange, todoChange TaskChange) *TaskState {
 	for tag := range mergedTags {
 		merged.Tags = append(merged.Tags, tag)
 	}
+	sort.Strings(merged.Tags)
 
 	// Priority: daily note takes precedence, fallback to todo if daily has none
 	merged.Priority = dailyChange.NewTask.Priority
