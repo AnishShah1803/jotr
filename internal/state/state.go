@@ -384,13 +384,14 @@ func (s *TodoState) DetectConflicts(dailyChanges, todoChanges []TaskChange) map[
 
 // SyncResult represents the result of a sync operation
 type SyncResult struct {
-	StateUpdated bool
-	DailyChanged bool
-	TodoChanged  bool
-	Conflicts    map[string]string
-	AppliedDaily int
-	AppliedTodo  int
-	Skipped      int
+	StateUpdated   bool
+	DailyChanged   bool
+	TodoChanged    bool
+	Conflicts      map[string]string
+	AppliedDaily   int
+	AppliedTodo    int
+	Skipped        int
+	ChangedTaskIDs []string // Task IDs that changed and may need their source files updated
 }
 
 // BidirectionalSync performs bidirectional sync between daily notes and todo list
@@ -427,6 +428,7 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 			result.AppliedDaily++
 			result.StateUpdated = true
 			result.TodoChanged = true
+			result.ChangedTaskIDs = append(result.ChangedTaskIDs, taskID)
 		} else if dailyChange.ChangeType == Modified && todoChange.ChangeType == Modified {
 			merged := s.smartMerge(dailyChange, todoChange)
 			if merged != nil {
@@ -441,6 +443,7 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 				result.StateUpdated = true
 				result.DailyChanged = true
 				result.TodoChanged = true
+				result.ChangedTaskIDs = append(result.ChangedTaskIDs, taskID)
 			} else {
 				result.Skipped++
 			}
@@ -457,6 +460,7 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 			result.AppliedTodo++
 			result.StateUpdated = true
 			result.DailyChanged = true
+			result.ChangedTaskIDs = append(result.ChangedTaskIDs, taskID)
 		}
 	}
 

@@ -205,8 +205,22 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 	}
 
 	if syncResult.DailyChanged {
-		if err := s.updateDailyNoteFromState(notePath, dailyTasks, todoState, opts.TaskSection); err != nil {
-			return nil, fmt.Errorf("failed to update daily note: %w", err)
+		sourceFiles := make(map[string]bool)
+		for _, taskID := range syncResult.ChangedTaskIDs {
+			if taskState, exists := todoState.Tasks[taskID]; exists && taskState.Source != "" {
+				sourceFiles[taskState.Source] = true
+			}
+		}
+
+		for sourceFile := range sourceFiles {
+			sourceTasks, err := tasks.ReadTasks(ctx, sourceFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read source file %s: %w", sourceFile, err)
+			}
+
+			if err := s.updateDailyNoteFromState(sourceFile, sourceTasks, todoState, opts.TaskSection); err != nil {
+				return nil, fmt.Errorf("failed to update daily note %s: %w", sourceFile, err)
+			}
 		}
 	}
 
