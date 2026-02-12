@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -209,6 +210,8 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 		for _, taskID := range syncResult.ChangedTaskIDs {
 			if taskState, exists := todoState.Tasks[taskID]; exists && taskState.Source != "" {
 				sourceFiles[taskState.Source] = true
+			} else if exists && taskState.Source == "" {
+				utils.VerboseLogWithContext(ctx, "task %s has no source file, skipping daily note update", taskID)
 			}
 		}
 
@@ -355,20 +358,15 @@ func (s *TaskService) writeTodoFileFromState(todoPath string, todoState *state.T
 
 	dateRegex := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
-	for i := 0; i < len(sectionNames)-1; i++ {
-		for j := i + 1; j < len(sectionNames); j++ {
-			dateI := dateRegex.MatchString(sectionNames[i])
-			dateJ := dateRegex.MatchString(sectionNames[j])
+	sort.Slice(sectionNames, func(i, j int) bool {
+		dateI := dateRegex.MatchString(sectionNames[i])
+		dateJ := dateRegex.MatchString(sectionNames[j])
 
-			if dateI && dateJ {
-				if sectionNames[i] < sectionNames[j] {
-					sectionNames[i], sectionNames[j] = sectionNames[j], sectionNames[i]
-				}
-			} else if !dateI && dateJ {
-				sectionNames[i], sectionNames[j] = sectionNames[j], sectionNames[i]
-			}
+		if dateI && dateJ {
+			return sectionNames[i] > sectionNames[j]
 		}
-	}
+		return dateI && !dateJ
+	})
 
 	for _, sectionName := range sectionNames {
 		content.WriteString(fmt.Sprintf("## %s\n\n", sectionName))

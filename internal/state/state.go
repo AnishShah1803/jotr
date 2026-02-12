@@ -452,10 +452,6 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 
 	for taskID, todoChange := range todoChangeMap {
 		if _, dailyHasChange := dailyChangeMap[taskID]; !dailyHasChange {
-			// Set CompletedDate if task transitioned to complete
-			if todoChange.NewTask.Completed && (todoChange.OldTask == nil || !todoChange.OldTask.Completed) {
-				todoChange.NewTask.CompletedDate = time.Now().Format("2006-01-02")
-			}
 			s.applyChange(todoChange)
 			result.AppliedTodo++
 			result.StateUpdated = true

@@ -258,7 +258,9 @@ func StripCompletedTag(text string) string {
 func ExtractCompletedDate(text string) string {
 	completedRe := regexp.MustCompile(`@completed\((\d{4}-\d{2}-\d{2})\)`)
 	if match := completedRe.FindStringSubmatch(text); len(match) > 1 {
-		return match[1]
+		if _, err := time.Parse("2006-01-02", match[1]); err == nil {
+			return match[1]
+		}
 	}
 	return ""
 }
