@@ -449,6 +449,10 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 
 	for taskID, todoChange := range todoChangeMap {
 		if _, dailyHasChange := dailyChangeMap[taskID]; !dailyHasChange {
+			// Set CompletedDate if task transitioned to complete
+			if todoChange.NewTask.Completed && (todoChange.OldTask == nil || !todoChange.OldTask.Completed) {
+				todoChange.NewTask.CompletedDate = time.Now().Format("2006-01-02")
+			}
 			s.applyChange(todoChange)
 			result.AppliedTodo++
 			result.StateUpdated = true
@@ -485,12 +489,29 @@ func (s *TodoState) smartMerge(dailyChange, todoChange TaskChange) *TaskState {
 		Source:    "merged",
 	}
 
+	var wasCompleted bool
+	var createdDate string
 	if dailyChange.OldTask != nil {
 		merged.CreatedAt = dailyChange.OldTask.CreatedAt
 		merged.CompletedAt = dailyChange.OldTask.CompletedAt
+		wasCompleted = dailyChange.OldTask.Completed
+		createdDate = dailyChange.OldTask.CreatedDate
 	} else if todoChange.OldTask != nil {
 		merged.CreatedAt = todoChange.OldTask.CreatedAt
 		merged.CompletedAt = todoChange.OldTask.CompletedAt
+		wasCompleted = todoChange.OldTask.Completed
+		createdDate = todoChange.OldTask.CreatedDate
+	}
+	merged.CreatedDate = createdDate
+	if merged.Completed && !wasCompleted {
+		merged.CompletedDate = time.Now().Format("2006-01-02")
+	} else if wasCompleted {
+		// Preserve existing CompletedDate if task was already completed
+		if dailyChange.OldTask != nil {
+			merged.CompletedDate = dailyChange.OldTask.CompletedDate
+		} else if todoChange.OldTask != nil {
+			merged.CompletedDate = todoChange.OldTask.CompletedDate
+		}
 	}
 
 	merged.LastModified = time.Now()

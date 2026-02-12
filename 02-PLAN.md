@@ -70,7 +70,7 @@ User completes it in todo.md on 2026-02-06:
 
 > When `BidirectionalSync` detects a task was completed in todo.md, we need to propagate the completion back to the originating daily note, not just today's daily note.
 
-- [ ] **4.1** In `state.BidirectionalSync()` (`internal/state/state.go` line ~378), when applying a `todoChange` where the task transitions from incomplete→complete, set `CompletedDate` on the `NewTask` to `time.Now().Format("2006-01-02")`.
+- [x] **4.1** In `state.BidirectionalSync()` (`internal/state/state.go` line ~378), when applying a `todoChange` where the task transitions from incomplete→complete, set `CompletedDate` on the `NewTask` to `time.Now().Format("2006-01-02")`.
 - [ ] **4.2** In `TaskService.SyncTasks()` (`internal/services/task_service.go` line ~108), after sync completes, if `syncResult.DailyChanged` is true, identify which daily notes need updating by examining state tasks that changed. For each changed task, look up `Source` (the original daily note path) and update that file — not just today's note.
 - [ ] **4.3** Refactor `updateDailyNoteFromState()` to accept a specific file path and a filtered list of tasks relevant to that file (currently it only updates `notePath` which is today's daily note). It may need to be called multiple times — once per distinct `Source` path among changed tasks.
 - [ ] **4.4** Verify: run `go build ./...` — must compile cleanly.
