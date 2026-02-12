@@ -298,6 +298,10 @@ func (s *TaskService) formatTaskLine(stateTask state.TaskState) string {
 		sb.WriteString(fmt.Sprintf(" <!-- id: %s -->", stateTask.ID))
 	}
 
+	if stateTask.Completed && stateTask.CompletedDate != "" {
+		sb.WriteString(fmt.Sprintf(" @completed(%s)", stateTask.CompletedDate))
+	}
+
 	return sb.String()
 }
 
