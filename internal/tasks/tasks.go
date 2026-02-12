@@ -242,3 +242,9 @@ func StripTaskID(text string) string {
 	idRe := regexp.MustCompile(`\s*<!-- id: [a-f0-9]{8} -->`)
 	return idRe.ReplaceAllString(text, "")
 }
+
+// StripCompletedTag removes @completed(YYYY-MM-DD) tag from task text for clean display.
+func StripCompletedTag(text string) string {
+	completedRe := regexp.MustCompile(`\s*@completed\(\d{4}-\d{2}-\d{2}\)`)
+	return completedRe.ReplaceAllString(text, "")
+}
