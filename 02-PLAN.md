@@ -79,7 +79,7 @@ User completes it in todo.md on 2026-02-06:
 
 > When a task is completed directly in a daily note, sync should propagate that to todo.md and move it to the completion date section.
 
-- [ ] **5.1** Confirm that the existing `CompareWithDailyNotes()` already detects completion changes (it compares `stateTask.Completed` vs `sourceTask.Completed` in `isTaskModified()` at line ~303). If a task goes `false→true`, it should be detected as `Modified`. **No code change expected — just verify this path works.**
+- [x] **5.1** Confirm that the existing `CompareWithDailyNotes()` already detects completion changes (it compares `stateTask.Completed` vs `sourceTask.Completed` in `isTaskModified()` at line ~303). If a task goes `false→true`, it should be detected as `Modified`. **No code change expected — just verify this path works.**
 - [ ] **5.2** In `state.applyChange()` (`internal/state/state.go` line ~442), when applying a change where `NewTask.Completed` is true and the existing task was not completed, set `CompletedDate` to `time.Now().Format("2006-01-02")`.
 - [ ] **5.3** Verify that `writeTodoFileFromState()` (modified in Phase 2) correctly places the newly-completed task under the `CompletedDate` section in todo.md.
 - [ ] **5.4** Verify: run `go build ./...` — must compile cleanly.
