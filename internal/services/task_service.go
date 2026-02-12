@@ -326,17 +326,8 @@ func (s *TaskService) writeTodoFileFromState(todoPath string, todoState *state.T
 
 	var tasksToWrite []state.TaskState
 	if includeCompleted {
-		// Get all tasks including completed ones
-		allTasks := todoState.ToTasks()
-		for _, task := range allTasks {
-			tasksToWrite = append(tasksToWrite, state.TaskState{
-				Text:      task.Text,
-				Section:   task.Section,
-				Priority:  task.Priority,
-				Tags:      task.Tags,
-				ID:        task.ID,
-				Completed: task.Completed,
-			})
+		for _, ts := range todoState.Tasks {
+			tasksToWrite = append(tasksToWrite, ts)
 		}
 	} else {
 		tasksToWrite = todoState.GetActiveTasks()

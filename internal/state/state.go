@@ -472,8 +472,27 @@ func (s *TodoState) applyChange(change TaskChange) {
 		return
 	}
 
-	s.Tasks[change.TaskID] = *change.NewTask
-	s.LastSync = time.Now()
+	now := time.Now()
+	task := *change.NewTask
+
+	// Preserve fields from existing task
+	if existing, exists := s.Tasks[change.TaskID]; exists {
+		task.CreatedAt = existing.CreatedAt
+		task.CompletedAt = existing.CompletedAt
+		task.CreatedDate = existing.CreatedDate
+		task.CompletedDate = existing.CompletedDate
+	}
+
+	// Set CompletedDate if task transitioned to complete
+	if task.Completed && (change.OldTask == nil || !change.OldTask.Completed) {
+		if task.CompletedDate == "" {
+			task.CompletedDate = now.Format("2006-01-02")
+		}
+	}
+
+	task.LastModified = now
+	s.Tasks[change.TaskID] = task
+	s.LastSync = now
 }
 
 // smartMerge attempts to merge non-conflicting changes from both sources
