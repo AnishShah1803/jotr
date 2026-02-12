@@ -88,9 +88,9 @@ User completes it in todo.md on 2026-02-06:
 
 > Currently `writeTodoFileFromState()` writes `- [x] {text}` without the ID comment. It must include the ID.
 
-- [ ] **6.1** In `TaskService.writeTodoFileFromState()` (`internal/services/task_service.go` line ~365), change the task line format from `fmt.Sprintf("- %s %s\n", checkbox, task.Text)` to include the task ID: `fmt.Sprintf("- %s %s <!-- id: %s -->\n", checkbox, task.Text, task.ID)`. Only append the ID comment if `task.ID != ""`.
-- [ ] **6.2** Verify that `tasks.ParseTasks()` correctly re-extracts the ID on the next read (it uses `ExtractTaskID` which matches `<!-- id: [a-f0-9]{8} -->`). Confirm the round-trip works: write→read→write produces stable output.
-- [ ] **6.3** Verify: run `go build ./...` — must compile cleanly.
+- [x] **6.1** In `TaskService.writeTodoFileFromState()` (`internal/services/task_service.go` line ~365), change the task line format from `fmt.Sprintf("- %s %s\n", checkbox, task.Text)` to include the task ID: `fmt.Sprintf("- %s %s <!-- id: %s -->\n", checkbox, task.Text, task.ID)`. Only append the ID comment if `task.ID != ""`.
+- [x] **6.2** Verify that `tasks.ParseTasks()` correctly re-extracts the ID on the next read (it uses `ExtractTaskID` which matches `<!-- id: [a-f0-9]{8} -->`). Confirm the round-trip works: write→read→write produces stable output.
+- [x] **6.3** Verify: run `go build ./...` — must compile cleanly.
 
 ### Phase 7: Tests
 
