@@ -326,9 +326,15 @@ func (s *TaskService) writeTodoFileFromState(todoPath string, todoState *state.T
 
 	sections := make(map[string][]state.TaskState)
 	for _, task := range tasksToWrite {
-		section := task.Section
-		if section == "" {
-			section = "Tasks"
+		var section string
+		// If task is completed and has a CompletedDate, use that as the section
+		if task.Completed && task.CompletedDate != "" {
+			section = task.CompletedDate
+		} else {
+			section = task.Section
+			if section == "" {
+				section = "Tasks"
+			}
 		}
 		sections[section] = append(sections[section], task)
 	}

@@ -20,16 +20,18 @@ type TodoState struct {
 
 // TaskState represents the state of a single task
 type TaskState struct {
-	Text         string    `json:"text"`
-	Section      string    `json:"section"`
-	Priority     string    `json:"priority,omitempty"`
-	Tags         []string  `json:"tags,omitempty"`
-	ID           string    `json:"id"`
-	Completed    bool      `json:"completed"`
-	CreatedAt    time.Time `json:"createdAt"`
-	CompletedAt  time.Time `json:"completedAt,omitempty"`
-	LastModified time.Time `json:"lastModified"`
-	Source       string    `json:"source,omitempty"`
+	Text          string    `json:"text"`
+	Section       string    `json:"section"`
+	Priority      string    `json:"priority,omitempty"`
+	Tags          []string  `json:"tags,omitempty"`
+	ID            string    `json:"id"`
+	Completed     bool      `json:"completed"`
+	CreatedAt     time.Time `json:"createdAt"`
+	CompletedAt   time.Time `json:"completedAt,omitempty"`
+	LastModified  time.Time `json:"lastModified"`
+	Source        string    `json:"source,omitempty"`
+	CreatedDate   string    `json:"createdDate,omitempty"`
+	CompletedDate string    `json:"completedDate,omitempty"`
 }
 
 // NewTodoState creates a new empty TodoState
@@ -77,9 +79,19 @@ func (s *TodoState) Write(statePath string) error {
 	return nil
 }
 
+// isDateSection checks if a string matches YYYY-MM-DD format
+func isDateSection(s string) bool {
+	if len(s) != 10 {
+		return false
+	}
+	_, err := time.Parse("2006-01-02", s)
+	return err == nil
+}
+
 // AddTask adds or updates a task in the state
 func (s *TodoState) AddTask(task tasks.Task, source string) {
 	now := time.Now()
+	today := now.Format("2006-01-02")
 
 	ts := TaskState{
 		Text:         task.Text,
@@ -95,12 +107,20 @@ func (s *TodoState) AddTask(task tasks.Task, source string) {
 	if existing, ok := s.Tasks[task.ID]; ok {
 		ts.CreatedAt = existing.CreatedAt
 		ts.CompletedAt = existing.CompletedAt
+		ts.CreatedDate = existing.CreatedDate
+		ts.CompletedDate = existing.CompletedDate
 	} else {
 		ts.CreatedAt = now
+		if isDateSection(task.Section) {
+			ts.CreatedDate = task.Section
+		} else {
+			ts.CreatedDate = today
+		}
 	}
 
 	if task.Completed && ts.CompletedAt.IsZero() {
 		ts.CompletedAt = now
+		ts.CompletedDate = today
 	}
 
 	s.Tasks[task.ID] = ts
