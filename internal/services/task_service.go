@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -205,8 +206,24 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 	}
 
 	if syncResult.DailyChanged {
-		if err := s.updateDailyNoteFromState(notePath, dailyTasks, todoState, opts.TaskSection); err != nil {
-			return nil, fmt.Errorf("failed to update daily note: %w", err)
+		sourceFiles := make(map[string]bool)
+		for _, taskID := range syncResult.ChangedTaskIDs {
+			if taskState, exists := todoState.Tasks[taskID]; exists && taskState.Source != "" {
+				sourceFiles[taskState.Source] = true
+			} else if exists && taskState.Source == "" {
+				utils.VerboseLogWithContext(ctx, "task %s has no source file, skipping daily note update", taskID)
+			}
+		}
+
+		for sourceFile := range sourceFiles {
+			sourceTasks, err := tasks.ReadTasks(ctx, sourceFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read source file %s: %w", sourceFile, err)
+			}
+
+			if err := s.updateDailyNoteFromState(sourceFile, sourceTasks, todoState, opts.TaskSection); err != nil {
+				return nil, fmt.Errorf("failed to update daily note %s: %w", sourceFile, err)
+			}
 		}
 	}
 
@@ -298,6 +315,10 @@ func (s *TaskService) formatTaskLine(stateTask state.TaskState) string {
 		sb.WriteString(fmt.Sprintf(" <!-- id: %s -->", stateTask.ID))
 	}
 
+	if stateTask.Completed && stateTask.CompletedDate != "" {
+		sb.WriteString(fmt.Sprintf(" @completed(%s)", stateTask.CompletedDate))
+	}
+
 	return sb.String()
 }
 
@@ -308,17 +329,8 @@ func (s *TaskService) writeTodoFileFromState(todoPath string, todoState *state.T
 
 	var tasksToWrite []state.TaskState
 	if includeCompleted {
-		// Get all tasks including completed ones
-		allTasks := todoState.ToTasks()
-		for _, task := range allTasks {
-			tasksToWrite = append(tasksToWrite, state.TaskState{
-				Text:      task.Text,
-				Section:   task.Section,
-				Priority:  task.Priority,
-				Tags:      task.Tags,
-				ID:        task.ID,
-				Completed: task.Completed,
-			})
+		for _, ts := range todoState.Tasks {
+			tasksToWrite = append(tasksToWrite, ts)
 		}
 	} else {
 		tasksToWrite = todoState.GetActiveTasks()
@@ -326,9 +338,15 @@ func (s *TaskService) writeTodoFileFromState(todoPath string, todoState *state.T
 
 	sections := make(map[string][]state.TaskState)
 	for _, task := range tasksToWrite {
-		section := task.Section
-		if section == "" {
-			section = "Tasks"
+		var section string
+		// If task is completed and has a CompletedDate, use that as the section
+		if task.Completed && task.CompletedDate != "" {
+			section = task.CompletedDate
+		} else {
+			section = task.Section
+			if section == "" {
+				section = "Tasks"
+			}
 		}
 		sections[section] = append(sections[section], task)
 	}
@@ -340,29 +358,20 @@ func (s *TaskService) writeTodoFileFromState(todoPath string, todoState *state.T
 
 	dateRegex := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
-	for i := 0; i < len(sectionNames)-1; i++ {
-		for j := i + 1; j < len(sectionNames); j++ {
-			dateI := dateRegex.MatchString(sectionNames[i])
-			dateJ := dateRegex.MatchString(sectionNames[j])
+	sort.Slice(sectionNames, func(i, j int) bool {
+		dateI := dateRegex.MatchString(sectionNames[i])
+		dateJ := dateRegex.MatchString(sectionNames[j])
 
-			if dateI && dateJ {
-				if sectionNames[i] < sectionNames[j] {
-					sectionNames[i], sectionNames[j] = sectionNames[j], sectionNames[i]
-				}
-			} else if !dateI && dateJ {
-				sectionNames[i], sectionNames[j] = sectionNames[j], sectionNames[i]
-			}
+		if dateI && dateJ {
+			return sectionNames[i] > sectionNames[j]
 		}
-	}
+		return dateI && !dateJ
+	})
 
 	for _, sectionName := range sectionNames {
 		content.WriteString(fmt.Sprintf("## %s\n\n", sectionName))
 		for _, task := range sections[sectionName] {
-			checkbox := "[ ]"
-			if task.Completed {
-				checkbox = "[x]"
-			}
-			content.WriteString(fmt.Sprintf("- %s %s\n", checkbox, task.Text))
+			content.WriteString(s.formatTaskLine(task) + "\n")
 		}
 		content.WriteString("\n")
 	}

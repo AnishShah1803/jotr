@@ -12,13 +12,14 @@ import (
 
 // Task represents a task item.
 type Task struct {
-	Text      string
-	Priority  string
-	Section   string
-	ID        string
-	Tags      []string
-	Line      int
-	Completed bool
+	Text          string
+	Priority      string
+	Section       string
+	ID            string
+	Tags          []string
+	Line          int
+	Completed     bool
+	CompletedDate string // Extracted from @completed(YYYY-MM-DD) tag
 }
 
 // taskFormatRegex matches common markdown task list formats:
@@ -81,6 +82,11 @@ func ParseTasks(content string) []Task {
 		task.ID = ExtractTaskID(task.Text)
 		// Strip ID from text for clean display
 		task.Text = StripTaskID(task.Text)
+
+		// Extract completed date from @completed(date) tag
+		task.CompletedDate = ExtractCompletedDate(task.Text)
+		// Strip completed tag from text for clean display
+		task.Text = StripCompletedTag(task.Text)
 
 		tasks = append(tasks, task)
 	}
@@ -241,4 +247,20 @@ func EnsureTaskID(task *Task) {
 func StripTaskID(text string) string {
 	idRe := regexp.MustCompile(`\s*<!-- id: [a-f0-9]{8} -->`)
 	return idRe.ReplaceAllString(text, "")
+}
+
+// StripCompletedTag removes @completed(YYYY-MM-DD) tag from task text for clean display.
+func StripCompletedTag(text string) string {
+	completedRe := regexp.MustCompile(`\s*@completed\(\d{4}-\d{2}-\d{2}\)`)
+	return completedRe.ReplaceAllString(text, "")
+}
+
+func ExtractCompletedDate(text string) string {
+	completedRe := regexp.MustCompile(`@completed\((\d{4}-\d{2}-\d{2})\)`)
+	if match := completedRe.FindStringSubmatch(text); len(match) > 1 {
+		if _, err := time.Parse("2006-01-02", match[1]); err == nil {
+			return match[1]
+		}
+	}
+	return ""
 }

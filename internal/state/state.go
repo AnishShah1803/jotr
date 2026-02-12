@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -20,16 +21,18 @@ type TodoState struct {
 
 // TaskState represents the state of a single task
 type TaskState struct {
-	Text         string    `json:"text"`
-	Section      string    `json:"section"`
-	Priority     string    `json:"priority,omitempty"`
-	Tags         []string  `json:"tags,omitempty"`
-	ID           string    `json:"id"`
-	Completed    bool      `json:"completed"`
-	CreatedAt    time.Time `json:"createdAt"`
-	CompletedAt  time.Time `json:"completedAt,omitempty"`
-	LastModified time.Time `json:"lastModified"`
-	Source       string    `json:"source,omitempty"`
+	Text          string    `json:"text"`
+	Section       string    `json:"section"`
+	Priority      string    `json:"priority,omitempty"`
+	Tags          []string  `json:"tags,omitempty"`
+	ID            string    `json:"id"`
+	Completed     bool      `json:"completed"`
+	CreatedAt     time.Time `json:"createdAt"`
+	CompletedAt   time.Time `json:"completedAt,omitempty"`
+	LastModified  time.Time `json:"lastModified"`
+	Source        string    `json:"source,omitempty"`
+	CreatedDate   string    `json:"createdDate,omitempty"`
+	CompletedDate string    `json:"completedDate,omitempty"`
 }
 
 // NewTodoState creates a new empty TodoState
@@ -77,9 +80,19 @@ func (s *TodoState) Write(statePath string) error {
 	return nil
 }
 
+// isDateSection checks if a string matches YYYY-MM-DD format
+func isDateSection(s string) bool {
+	if len(s) != 10 {
+		return false
+	}
+	_, err := time.Parse("2006-01-02", s)
+	return err == nil
+}
+
 // AddTask adds or updates a task in the state
 func (s *TodoState) AddTask(task tasks.Task, source string) {
 	now := time.Now()
+	today := now.Format("2006-01-02")
 
 	ts := TaskState{
 		Text:         task.Text,
@@ -95,12 +108,20 @@ func (s *TodoState) AddTask(task tasks.Task, source string) {
 	if existing, ok := s.Tasks[task.ID]; ok {
 		ts.CreatedAt = existing.CreatedAt
 		ts.CompletedAt = existing.CompletedAt
+		ts.CreatedDate = existing.CreatedDate
+		ts.CompletedDate = existing.CompletedDate
 	} else {
 		ts.CreatedAt = now
+		if isDateSection(task.Section) {
+			ts.CreatedDate = task.Section
+		} else {
+			ts.CreatedDate = today
+		}
 	}
 
 	if task.Completed && ts.CompletedAt.IsZero() {
 		ts.CompletedAt = now
+		ts.CompletedDate = today
 	}
 
 	s.Tasks[task.ID] = ts
@@ -364,13 +385,14 @@ func (s *TodoState) DetectConflicts(dailyChanges, todoChanges []TaskChange) map[
 
 // SyncResult represents the result of a sync operation
 type SyncResult struct {
-	StateUpdated bool
-	DailyChanged bool
-	TodoChanged  bool
-	Conflicts    map[string]string
-	AppliedDaily int
-	AppliedTodo  int
-	Skipped      int
+	StateUpdated   bool
+	DailyChanged   bool
+	TodoChanged    bool
+	Conflicts      map[string]string
+	AppliedDaily   int
+	AppliedTodo    int
+	Skipped        int
+	ChangedTaskIDs []string // Task IDs that changed and may need their source files updated
 }
 
 // BidirectionalSync performs bidirectional sync between daily notes and todo list
@@ -407,6 +429,7 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 			result.AppliedDaily++
 			result.StateUpdated = true
 			result.TodoChanged = true
+			result.ChangedTaskIDs = append(result.ChangedTaskIDs, taskID)
 		} else if dailyChange.ChangeType == Modified && todoChange.ChangeType == Modified {
 			merged := s.smartMerge(dailyChange, todoChange)
 			if merged != nil {
@@ -421,6 +444,7 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 				result.StateUpdated = true
 				result.DailyChanged = true
 				result.TodoChanged = true
+				result.ChangedTaskIDs = append(result.ChangedTaskIDs, taskID)
 			} else {
 				result.Skipped++
 			}
@@ -433,6 +457,7 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 			result.AppliedTodo++
 			result.StateUpdated = true
 			result.DailyChanged = true
+			result.ChangedTaskIDs = append(result.ChangedTaskIDs, taskID)
 		}
 	}
 
@@ -444,8 +469,27 @@ func (s *TodoState) applyChange(change TaskChange) {
 		return
 	}
 
-	s.Tasks[change.TaskID] = *change.NewTask
-	s.LastSync = time.Now()
+	now := time.Now()
+	task := *change.NewTask
+
+	// Preserve fields from existing task
+	if existing, exists := s.Tasks[change.TaskID]; exists {
+		task.CreatedAt = existing.CreatedAt
+		task.CompletedAt = existing.CompletedAt
+		task.CreatedDate = existing.CreatedDate
+		task.CompletedDate = existing.CompletedDate
+	}
+
+	// Set CompletedDate if task transitioned to complete
+	if task.Completed && (change.OldTask == nil || !change.OldTask.Completed) {
+		if task.CompletedDate == "" {
+			task.CompletedDate = now.Format("2006-01-02")
+		}
+	}
+
+	task.LastModified = now
+	s.Tasks[change.TaskID] = task
+	s.LastSync = now
 }
 
 // smartMerge attempts to merge non-conflicting changes from both sources
@@ -465,12 +509,29 @@ func (s *TodoState) smartMerge(dailyChange, todoChange TaskChange) *TaskState {
 		Source:    "merged",
 	}
 
+	var wasCompleted bool
+	var createdDate string
 	if dailyChange.OldTask != nil {
 		merged.CreatedAt = dailyChange.OldTask.CreatedAt
 		merged.CompletedAt = dailyChange.OldTask.CompletedAt
+		wasCompleted = dailyChange.OldTask.Completed
+		createdDate = dailyChange.OldTask.CreatedDate
 	} else if todoChange.OldTask != nil {
 		merged.CreatedAt = todoChange.OldTask.CreatedAt
 		merged.CompletedAt = todoChange.OldTask.CompletedAt
+		wasCompleted = todoChange.OldTask.Completed
+		createdDate = todoChange.OldTask.CreatedDate
+	}
+	merged.CreatedDate = createdDate
+	if merged.Completed && !wasCompleted {
+		merged.CompletedDate = time.Now().Format("2006-01-02")
+	} else if wasCompleted {
+		// Preserve existing CompletedDate if task was already completed
+		if dailyChange.OldTask != nil {
+			merged.CompletedDate = dailyChange.OldTask.CompletedDate
+		} else if todoChange.OldTask != nil {
+			merged.CompletedDate = todoChange.OldTask.CompletedDate
+		}
 	}
 
 	merged.LastModified = time.Now()
@@ -487,6 +548,7 @@ func (s *TodoState) smartMerge(dailyChange, todoChange TaskChange) *TaskState {
 	for tag := range mergedTags {
 		merged.Tags = append(merged.Tags, tag)
 	}
+	sort.Strings(merged.Tags)
 
 	// Priority: daily note takes precedence, fallback to todo if daily has none
 	merged.Priority = dailyChange.NewTask.Priority

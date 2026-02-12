@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/state"
+	"github.com/AnishShah1803/jotr/internal/tasks"
 	"github.com/AnishShah1803/jotr/internal/testhelpers"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
@@ -647,6 +649,277 @@ func TestTaskService_SyncTasks_UserFriendlyErrorMessage(t *testing.T) {
 	wrappedErr := fmt.Errorf("failed to acquire lock on state file: %w", timeoutErr)
 	if !service.isLockTimeoutError(wrappedErr) {
 		t.Error("isLockTimeoutError should detect nested ErrLockTimeout")
+	}
+}
+
+func TestTaskService_WriteTodoFileFromState_CompletedDateSection(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	// Create a state with a task that:
+	// - was created under section "2026-02-01"
+	// - is completed with CompletedDate="2026-02-06"
+	// - should appear under "## 2026-02-06" section in output, not "## 2026-02-01"
+	todoState := state.NewTodoState()
+	todoState.Tasks["task123"] = state.TaskState{
+		ID:            "task123",
+		Text:          "Review project proposal",
+		Section:       "2026-02-01",
+		Completed:     true,
+		CompletedDate: "2026-02-06",
+		CreatedDate:   "2026-02-01",
+		Source:        "diary/2026-02-01.md",
+	}
+
+	// Also add an incomplete task under the same section to verify it stays there
+	todoState.Tasks["task456"] = state.TaskState{
+		ID:          "task456",
+		Text:        "Ongoing task",
+		Section:     "2026-02-01",
+		Completed:   false,
+		CreatedDate: "2026-02-01",
+		Source:      "diary/2026-02-01.md",
+	}
+
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+
+	service := NewTaskService()
+	if err := service.writeTodoFileFromState(todoPath, todoState, true); err != nil {
+		t.Fatalf("writeTodoFileFromState() error = %v", err)
+	}
+
+	// Read the generated file
+	content, err := os.ReadFile(todoPath)
+	if err != nil {
+		t.Fatalf("Failed to read generated todo file: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Verify the completed task appears under "## 2026-02-06" section
+	// Find the section boundaries
+	idx0206 := strings.Index(contentStr, "## 2026-02-06")
+	idx0201 := strings.Index(contentStr, "## 2026-02-01")
+
+	if idx0206 == -1 {
+		t.Error("Expected '## 2026-02-06' section header for completed task, not found")
+	}
+	if idx0201 == -1 {
+		t.Error("Expected '## 2026-02-01' section header for incomplete task, not found")
+	}
+
+	// Find task positions
+	idxCompleted := strings.Index(contentStr, "Review project proposal")
+	idxIncomplete := strings.Index(contentStr, "Ongoing task")
+
+	if idxCompleted == -1 {
+		t.Error("Completed task 'Review project proposal' not found in output")
+	}
+	if idxIncomplete == -1 {
+		t.Error("Incomplete task 'Ongoing task' not found in output")
+	}
+
+	// Verify completed task is in the 2026-02-06 section (after its header but before next section)
+	if idx0206 != -1 && idxCompleted != -1 {
+		if idxCompleted < idx0206 {
+			t.Error("Completed task should appear after '## 2026-02-06' header")
+		}
+		// If there's a section after 2026-02-06, task should be before it
+		if idx0201 > idx0206 && idxCompleted > idx0201 {
+			t.Error("Completed task should be in '## 2026-02-06' section, not after '## 2026-02-01'")
+		}
+	}
+
+	// Verify incomplete task is in the 2026-02-01 section
+	if idx0201 != -1 && idxIncomplete != -1 {
+		if idxIncomplete < idx0201 {
+			t.Error("Incomplete task should appear after '## 2026-02-01' header")
+		}
+	}
+
+	// Verify completed task has [x] checkbox
+	if !strings.Contains(contentStr, "- [x] Review project proposal") {
+		t.Error("Completed task should have [x] checkbox")
+	}
+
+	// Verify incomplete task has [ ] checkbox
+	if !strings.Contains(contentStr, "- [ ] Ongoing task") {
+		t.Error("Incomplete task should have [ ] checkbox")
+	}
+}
+
+func TestTaskService_FormatTaskLine_CompletedWithDate(t *testing.T) {
+	service := NewTaskService()
+
+	tests := []struct {
+		name     string
+		task     state.TaskState
+		expected string
+	}{
+		{
+			name: "completed task with CompletedDate includes @completed tag",
+			task: state.TaskState{
+				ID:            "abc12345",
+				Text:          "Review project proposal",
+				Completed:     true,
+				CompletedDate: "2026-02-06",
+			},
+			expected: "- [x] Review project proposal <!-- id: abc12345 --> @completed(2026-02-06)",
+		},
+		{
+			name: "completed task without CompletedDate has no tag",
+			task: state.TaskState{
+				ID:        "def45678",
+				Text:      "Another task",
+				Completed: true,
+			},
+			expected: "- [x] Another task <!-- id: def45678 -->",
+		},
+		{
+			name: "incomplete task never has @completed tag",
+			task: state.TaskState{
+				ID:            "ghi90123",
+				Text:          "Pending task",
+				Completed:     false,
+				CompletedDate: "2026-02-06", // Should be ignored
+			},
+			expected: "- [ ] Pending task <!-- id: ghi90123 -->",
+		},
+		{
+			name: "task without ID omits ID comment",
+			task: state.TaskState{
+				Text:          "No ID task",
+				Completed:     true,
+				CompletedDate: "2026-02-10",
+			},
+			expected: "- [x] No ID task @completed(2026-02-10)",
+		},
+		{
+			name: "completed task with ID but no CompletedDate has no tag",
+			task: state.TaskState{
+				ID:        "jkl45678",
+				Text:      "Just completed",
+				Completed: true,
+			},
+			expected: "- [x] Just completed <!-- id: jkl45678 -->",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := service.formatTaskLine(tt.task)
+			if result != tt.expected {
+				t.Errorf("formatTaskLine() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestTaskService_WriteTodoFileFromState_RoundTripIDPreservation(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	// Create a state with multiple tasks that have IDs
+	todoState := state.NewTodoState()
+	todoState.Tasks["abc12345"] = state.TaskState{
+		ID:          "abc12345",
+		Text:        "Review project proposal",
+		Section:     "2026-02-01",
+		Completed:   false,
+		CreatedDate: "2026-02-01",
+		Source:      "diary/2026-02-01.md",
+	}
+	todoState.Tasks["def67890"] = state.TaskState{
+		ID:            "def67890",
+		Text:          "Complete documentation",
+		Section:       "2026-02-01",
+		Completed:     true,
+		CompletedDate: "2026-02-06",
+		CreatedDate:   "2026-02-01",
+		Source:        "diary/2026-02-01.md",
+	}
+	todoState.Tasks["cab24680"] = state.TaskState{
+		ID:        "cab24680",
+		Text:      "Write unit tests",
+		Section:   "Tasks",
+		Completed: false,
+		Source:    "todo.md",
+	}
+
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+
+	service := NewTaskService()
+
+	// Write the todo file from state
+	if err := service.writeTodoFileFromState(todoPath, todoState, true); err != nil {
+		t.Fatalf("writeTodoFileFromState() error = %v", err)
+	}
+
+	// Read the file back using tasks.ParseTasks
+	content, err := os.ReadFile(todoPath)
+	if err != nil {
+		t.Fatalf("Failed to read generated todo file: %v", err)
+	}
+
+	parsedTasks := tasks.ParseTasks(string(content))
+
+	// Verify all 3 tasks were parsed
+	if len(parsedTasks) != 3 {
+		t.Errorf("Expected 3 tasks, got %d", len(parsedTasks))
+	}
+
+	// Create a map for easy lookup by ID
+	parsedByIDs := make(map[string]tasks.Task)
+	for _, task := range parsedTasks {
+		if task.ID != "" {
+			parsedByIDs[task.ID] = task
+		}
+	}
+
+	// Verify each task's ID was preserved
+	testCases := []struct {
+		expectedID       string
+		expectedText     string
+		expectedComplete bool
+	}{
+		{"abc12345", "Review project proposal", false},
+		{"def67890", "Complete documentation", true},
+		{"cab24680", "Write unit tests", false},
+	}
+
+	for _, tc := range testCases {
+		task, exists := parsedByIDs[tc.expectedID]
+		if !exists {
+			t.Errorf("Task with ID %s not found in parsed output", tc.expectedID)
+			continue
+		}
+
+		if task.Text != tc.expectedText {
+			t.Errorf("Task %s: expected text %q, got %q", tc.expectedID, tc.expectedText, task.Text)
+		}
+
+		if task.Completed != tc.expectedComplete {
+			t.Errorf("Task %s: expected Completed=%v, got %v", tc.expectedID, tc.expectedComplete, task.Completed)
+		}
+	}
+
+	// Verify the file content actually contains the ID comments
+	contentStr := string(content)
+	expectedIDPatterns := []string{
+		"<!-- id: abc12345 -->",
+		"<!-- id: def67890 -->",
+		"<!-- id: cab24680 -->",
+	}
+
+	for _, pattern := range expectedIDPatterns {
+		if !strings.Contains(contentStr, pattern) {
+			t.Errorf("Expected file to contain %q, but it was not found", pattern)
+		}
+	}
+
+	// Verify completed task has @completed tag
+	if !strings.Contains(contentStr, "@completed(2026-02-06)") {
+		t.Error("Expected completed task to have @completed(2026-02-06) tag")
 	}
 }
 
