@@ -665,6 +665,110 @@ func TestLockTimeoutBehavior(t *testing.T) {
 	}
 }
 
+func TestTaskCompletionViaTodoSetsDates(t *testing.T) {
+	state := NewTodoState()
+
+	initialTask := TaskState{
+		ID:          "abc123",
+		Text:        "Review project proposal",
+		Completed:   false,
+		Source:      "Diary/2026-02-01.md",
+		CreatedDate: "2026-02-01",
+	}
+	state.Tasks["abc123"] = initialTask
+
+	dailyTasks := []tasks.Task{
+		{ID: "abc123", Text: "Review project proposal", Completed: false, Section: "2026-02-01"},
+	}
+
+	todoTasks := []tasks.Task{
+		{ID: "abc123", Text: "Review project proposal", Completed: true, Section: "Tasks"},
+	}
+
+	result := state.BidirectionalSync(dailyTasks, todoTasks, "Diary/2026-02-01.md")
+
+	if !result.StateUpdated {
+		t.Error("Expected StateUpdated=true, got false")
+	}
+	if !result.DailyChanged {
+		t.Error("Expected DailyChanged=true (daily note should be updated with @completed tag)")
+	}
+
+	task, exists := state.Tasks["abc123"]
+	if !exists {
+		t.Fatal("Task abc123 should exist in state")
+	}
+
+	if task.CreatedDate != "2026-02-01" {
+		t.Errorf("Expected CreatedDate='2026-02-01', got '%s'", task.CreatedDate)
+	}
+
+	if task.CompletedDate == "" {
+		t.Error("Expected CompletedDate to be set, got empty string")
+	}
+
+	if len(task.CompletedDate) != 10 {
+		t.Errorf("Expected CompletedDate in YYYY-MM-DD format, got '%s'", task.CompletedDate)
+	}
+
+	if !task.Completed {
+		t.Error("Expected task to be marked complete")
+	}
+}
+
+func TestTaskCompletionViaDailyNoteSetsCompletedDate(t *testing.T) {
+	state := NewTodoState()
+
+	initialTask := TaskState{
+		ID:          "xyz789",
+		Text:        "Complete from daily note",
+		Completed:   false,
+		Source:      "Diary/2026-02-03.md",
+		CreatedDate: "2026-02-03",
+	}
+	state.Tasks["xyz789"] = initialTask
+
+	// Daily note shows task as completed (user marked it done in the daily note)
+	dailyTasks := []tasks.Task{
+		{ID: "xyz789", Text: "Complete from daily note", Completed: true, Section: "2026-02-03"},
+	}
+
+	// Todo list still shows task as incomplete (hasn't been synced yet)
+	todoTasks := []tasks.Task{
+		{ID: "xyz789", Text: "Complete from daily note", Completed: false, Section: "Tasks"},
+	}
+
+	result := state.BidirectionalSync(dailyTasks, todoTasks, "Diary/2026-02-03.md")
+
+	if !result.StateUpdated {
+		t.Error("Expected StateUpdated=true, got false")
+	}
+	if !result.TodoChanged {
+		t.Error("Expected TodoChanged=true (todo should be updated with completion)")
+	}
+
+	task, exists := state.Tasks["xyz789"]
+	if !exists {
+		t.Fatal("Task xyz789 should exist in state")
+	}
+
+	if task.CreatedDate != "2026-02-03" {
+		t.Errorf("Expected CreatedDate='2026-02-03', got '%s'", task.CreatedDate)
+	}
+
+	if task.CompletedDate == "" {
+		t.Error("Expected CompletedDate to be set, got empty string")
+	}
+
+	if len(task.CompletedDate) != 10 {
+		t.Errorf("Expected CompletedDate in YYYY-MM-DD format, got '%s'", task.CompletedDate)
+	}
+
+	if !task.Completed {
+		t.Error("Expected task to be marked complete")
+	}
+}
+
 func TestDeadlockPrevention(t *testing.T) {
 	tempDir := t.TempDir()
 	statePath := tempDir + "/.todo_state.json"

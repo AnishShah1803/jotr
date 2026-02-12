@@ -94,8 +94,8 @@ User completes it in todo.md on 2026-02-06:
 
 ### Phase 7: Tests
 
-- [ ] **7.1** In `internal/state/bidirectional_sync_test.go`, add a test: task created under section `"2026-02-01"`, completed via todo change → verify `CompletedDate` is set, `CreatedDate` is `"2026-02-01"`.
-- [ ] **7.2** Add a test: task completed in daily note → verify `CompletedDate` is set on the state task after `BidirectionalSync`.
+- [x] **7.1** In `internal/state/bidirectional_sync_test.go`, add a test: task created under section `"2026-02-01"`, completed via todo change → verify `CompletedDate` is set, `CreatedDate` is `"2026-02-01"`.
+- [x] **7.2** Add a test: task completed in daily note → verify `CompletedDate` is set on the state task after `BidirectionalSync`.
 - [ ] **7.3** Add a test for `writeTodoFileFromState()`: given a state with a task that has `Section="2026-02-01"` and `CompletedDate="2026-02-06"` and `Completed=true`, verify the output places the task under the `## 2026-02-06` section, not `## 2026-02-01`.
 - [ ] **7.4** Add a test for `formatTaskLine()`: verify completed task with `CompletedDate` produces `@completed(YYYY-MM-DD)` tag.
 - [ ] **7.5** Add a test: round-trip test — write todo file with IDs, read it back, verify IDs are preserved.
