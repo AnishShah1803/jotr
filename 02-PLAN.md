@@ -98,10 +98,10 @@ User completes it in todo.md on 2026-02-06:
 - [x] **7.2** Add a test: task completed in daily note → verify `CompletedDate` is set on the state task after `BidirectionalSync`.
 - [x] **7.3** Add a test for `writeTodoFileFromState()`: given a state with a task that has `Section="2026-02-01"` and `CompletedDate="2026-02-06"` and `Completed=true`, verify the output places the task under the `## 2026-02-06` section, not `## 2026-02-01`.
 - [x] **7.4** Add a test for `formatTaskLine()`: verify completed task with `CompletedDate` produces `@completed(YYYY-MM-DD)` tag.
-- [ ] **7.5** Add a test: round-trip test — write todo file with IDs, read it back, verify IDs are preserved.
-- [ ] **7.6** Run full test suite: `go test ./...` — all tests must pass.
+- [x] **7.5** Add a test: round-trip test — write todo file with IDs, read it back, verify IDs are preserved.
+- [x] **7.6** Run full test suite: `go test ./...` — all tests must pass.
 
 ### Phase 8: Build Verification
 
-- [ ] **8.1** Run `make dev` — must succeed.
+- [x] **8.1** Run `make dev` — must succeed.
 - [ ] **8.2** Manual smoke test: create a daily note with a task, run `jotr sync`, verify task appears in todo.md with ID. Mark it complete in todo.md, run `jotr sync` again, verify it moves to today's date section and the original daily note gets `@completed(date)` tag.

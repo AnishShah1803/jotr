@@ -373,15 +373,7 @@ func (s *TaskService) writeTodoFileFromState(todoPath string, todoState *state.T
 	for _, sectionName := range sectionNames {
 		content.WriteString(fmt.Sprintf("## %s\n\n", sectionName))
 		for _, task := range sections[sectionName] {
-			checkbox := "[ ]"
-			if task.Completed {
-				checkbox = "[x]"
-			}
-			if task.ID != "" {
-				content.WriteString(fmt.Sprintf("- %s %s <!-- id: %s -->\n", checkbox, task.Text, task.ID))
-			} else {
-				content.WriteString(fmt.Sprintf("- %s %s\n", checkbox, task.Text))
-			}
+			content.WriteString(s.formatTaskLine(task) + "\n")
 		}
 		content.WriteString("\n")
 	}

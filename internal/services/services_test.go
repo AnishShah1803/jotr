@@ -13,6 +13,7 @@ import (
 
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/state"
+	"github.com/AnishShah1803/jotr/internal/tasks"
 	"github.com/AnishShah1803/jotr/internal/testhelpers"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
@@ -811,6 +812,114 @@ func TestTaskService_FormatTaskLine_CompletedWithDate(t *testing.T) {
 				t.Errorf("formatTaskLine() = %q, want %q", result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestTaskService_WriteTodoFileFromState_RoundTripIDPreservation(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	// Create a state with multiple tasks that have IDs
+	todoState := state.NewTodoState()
+	todoState.Tasks["abc12345"] = state.TaskState{
+		ID:          "abc12345",
+		Text:        "Review project proposal",
+		Section:     "2026-02-01",
+		Completed:   false,
+		CreatedDate: "2026-02-01",
+		Source:      "diary/2026-02-01.md",
+	}
+	todoState.Tasks["def67890"] = state.TaskState{
+		ID:            "def67890",
+		Text:          "Complete documentation",
+		Section:       "2026-02-01",
+		Completed:     true,
+		CompletedDate: "2026-02-06",
+		CreatedDate:   "2026-02-01",
+		Source:        "diary/2026-02-01.md",
+	}
+	todoState.Tasks["cab24680"] = state.TaskState{
+		ID:        "cab24680",
+		Text:      "Write unit tests",
+		Section:   "Tasks",
+		Completed: false,
+		Source:    "todo.md",
+	}
+
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+
+	service := NewTaskService()
+
+	// Write the todo file from state
+	if err := service.writeTodoFileFromState(todoPath, todoState, true); err != nil {
+		t.Fatalf("writeTodoFileFromState() error = %v", err)
+	}
+
+	// Read the file back using tasks.ParseTasks
+	content, err := os.ReadFile(todoPath)
+	if err != nil {
+		t.Fatalf("Failed to read generated todo file: %v", err)
+	}
+
+	parsedTasks := tasks.ParseTasks(string(content))
+
+	// Verify all 3 tasks were parsed
+	if len(parsedTasks) != 3 {
+		t.Errorf("Expected 3 tasks, got %d", len(parsedTasks))
+	}
+
+	// Create a map for easy lookup by ID
+	parsedByIDs := make(map[string]tasks.Task)
+	for _, task := range parsedTasks {
+		if task.ID != "" {
+			parsedByIDs[task.ID] = task
+		}
+	}
+
+	// Verify each task's ID was preserved
+	testCases := []struct {
+		expectedID       string
+		expectedText     string
+		expectedComplete bool
+	}{
+		{"abc12345", "Review project proposal", false},
+		{"def67890", "Complete documentation", true},
+		{"cab24680", "Write unit tests", false},
+	}
+
+	for _, tc := range testCases {
+		task, exists := parsedByIDs[tc.expectedID]
+		if !exists {
+			t.Errorf("Task with ID %s not found in parsed output", tc.expectedID)
+			continue
+		}
+
+		if task.Text != tc.expectedText {
+			t.Errorf("Task %s: expected text %q, got %q", tc.expectedID, tc.expectedText, task.Text)
+		}
+
+		if task.Completed != tc.expectedComplete {
+			t.Errorf("Task %s: expected Completed=%v, got %v", tc.expectedID, tc.expectedComplete, task.Completed)
+		}
+	}
+
+	// Verify the file content actually contains the ID comments
+	contentStr := string(content)
+	expectedIDPatterns := []string{
+		"<!-- id: abc12345 -->",
+		"<!-- id: def67890 -->",
+		"<!-- id: cab24680 -->",
+	}
+
+	for _, pattern := range expectedIDPatterns {
+		if !strings.Contains(contentStr, pattern) {
+			t.Errorf("Expected file to contain %q, but it was not found", pattern)
+		}
+	}
+
+	// Verify completed task has @completed tag
+	if !strings.Contains(contentStr, "@completed(2026-02-06)") {
+		t.Error("Expected completed task to have @completed(2026-02-06) tag")
 	}
 }
 
