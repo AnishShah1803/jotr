@@ -104,4 +104,4 @@ User completes it in todo.md on 2026-02-06:
 ### Phase 8: Build Verification
 
 - [x] **8.1** Run `make dev` — must succeed.
-- [ ] **8.2** Manual smoke test: create a daily note with a task, run `jotr sync`, verify task appears in todo.md with ID. Mark it complete in todo.md, run `jotr sync` again, verify it moves to today's date section and the original daily note gets `@completed(date)` tag. **(MANUAL - requires interactive CLI)**
+- [ ] **8.2** Manual smoke test: create a daily note with a task, run `jotr sync`, verify task appears in todo.md with ID. Mark it complete in todo.md, run `jotr sync` again, verify it moves to today's date section and the original daily note gets `@completed(date)` tag. **(MANUAL - requires interactive CLI - BLOCKED: Cannot be automated)**
