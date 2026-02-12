@@ -747,6 +747,73 @@ func TestTaskService_WriteTodoFileFromState_CompletedDateSection(t *testing.T) {
 	}
 }
 
+func TestTaskService_FormatTaskLine_CompletedWithDate(t *testing.T) {
+	service := NewTaskService()
+
+	tests := []struct {
+		name     string
+		task     state.TaskState
+		expected string
+	}{
+		{
+			name: "completed task with CompletedDate includes @completed tag",
+			task: state.TaskState{
+				ID:            "abc12345",
+				Text:          "Review project proposal",
+				Completed:     true,
+				CompletedDate: "2026-02-06",
+			},
+			expected: "- [x] Review project proposal <!-- id: abc12345 --> @completed(2026-02-06)",
+		},
+		{
+			name: "completed task without CompletedDate has no tag",
+			task: state.TaskState{
+				ID:        "def45678",
+				Text:      "Another task",
+				Completed: true,
+			},
+			expected: "- [x] Another task <!-- id: def45678 -->",
+		},
+		{
+			name: "incomplete task never has @completed tag",
+			task: state.TaskState{
+				ID:            "ghi90123",
+				Text:          "Pending task",
+				Completed:     false,
+				CompletedDate: "2026-02-06", // Should be ignored
+			},
+			expected: "- [ ] Pending task <!-- id: ghi90123 -->",
+		},
+		{
+			name: "task without ID omits ID comment",
+			task: state.TaskState{
+				Text:          "No ID task",
+				Completed:     true,
+				CompletedDate: "2026-02-10",
+			},
+			expected: "- [x] No ID task @completed(2026-02-10)",
+		},
+		{
+			name: "completed task with ID but no CompletedDate has no tag",
+			task: state.TaskState{
+				ID:        "jkl45678",
+				Text:      "Just completed",
+				Completed: true,
+			},
+			expected: "- [x] Just completed <!-- id: jkl45678 -->",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := service.formatTaskLine(tt.task)
+			if result != tt.expected {
+				t.Errorf("formatTaskLine() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestTaskService_SyncTasks_DeadlockPrevention(t *testing.T) {
 	fs := testhelpers.NewTestFS(t)
 	defer fs.Cleanup()
