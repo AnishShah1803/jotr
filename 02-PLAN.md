@@ -63,8 +63,8 @@ User completes it in todo.md on 2026-02-06:
 
 - [x] **3.1** In `TaskService.formatTaskLine()` (`internal/services/task_service.go` line ~287), if `stateTask.Completed` is true AND `stateTask.CompletedDate` is non-empty, append ` @completed(YYYY-MM-DD)` after the ID comment but before the newline. Example output: `- [x] Review project proposal <!-- id: abc123 --> @completed(2026-02-06)`.
 - [x] **3.2** In `tasks.StripTaskID()` or a new companion function `StripCompletedTag()` in `internal/tasks/tasks.go`, add a function to strip `@completed(YYYY-MM-DD)` from task text for clean display. Pattern: `\s*@completed\(\d{4}-\d{2}-\d{2}\)`.
-- [ ] **3.3** In `tasks.ParseTasks()` (`internal/tasks/tasks.go` line ~31), extract `@completed(date)` tag during parsing so it's not treated as part of the task text. Store it somewhere accessible (either strip it from `Text` or add a field to `Task`).
-- [ ] **3.4** Verify: run `go build ./...` — must compile cleanly.
+- [x] **3.3** In `tasks.ParseTasks()` (`internal/tasks/tasks.go` line ~31), extract `@completed(date)` tag during parsing so it's not treated as part of the task text. Store it somewhere accessible (either strip it from `Text` or add a field to `Task`).
+- [x] **3.4** Verify: run `go build ./...` — must compile cleanly.
 
 ### Phase 4: Handle Completion Detected from Todo List (todo.md → daily note)
 
