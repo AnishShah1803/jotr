@@ -228,6 +228,14 @@ type TaskChangeDetail struct {
 	Details string `json:"details,omitempty"` // "marked complete", "priority changed to P1", etc.
 }
 
+// ConflictDetail represents detailed information about a conflict for reporting
+type ConflictDetail struct {
+	ID        string `json:"id"`
+	TextDaily string `json:"text_daily"`
+	TextTodo  string `json:"text_todo"`
+	Reason    string `json:"reason"`
+}
+
 // CompareWithDailyNotes compares the state with tasks from daily notes
 // Returns a list of changes detected
 func (s *TodoState) CompareWithDailyNotes(dailyTasks []tasks.Task, source string) []TaskChange {

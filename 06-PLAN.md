@@ -66,7 +66,7 @@ Planned Changes:
   }
   ```
 
-- [ ] **1.2** Create new `ConflictDetail` type in `internal/state/state.go`:
+- [x] **1.2** Create new `ConflictDetail` type in `internal/state/state.go`:
   ```go
   type ConflictDetail struct {
       ID        string
