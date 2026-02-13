@@ -1044,3 +1044,199 @@ func TestBidirectionalSyncWithDeletions(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildTaskChangeDetail(t *testing.T) {
+	tests := []struct {
+		name     string
+		change   TaskChange
+		expected TaskChangeDetail
+	}{
+		{
+			name: "new task added",
+			change: TaskChange{
+				TaskID:     "abc123",
+				ChangeType: Added,
+				NewTask: &TaskState{
+					ID:     "abc123",
+					Text:   "New task text",
+					Source: "test.md",
+				},
+			},
+			expected: TaskChangeDetail{
+				ID:      "abc123",
+				Text:    "New task text",
+				Change:  "added",
+				Details: "new task added",
+			},
+		},
+		{
+			name: "task modified",
+			change: TaskChange{
+				TaskID:     "abc123",
+				ChangeType: Modified,
+				OldTask: &TaskState{
+					ID:     "abc123",
+					Text:   "Old text",
+					Source: "test.md",
+				},
+				NewTask: &TaskState{
+					ID:     "abc123",
+					Text:   "New text",
+					Source: "test.md",
+				},
+			},
+			expected: TaskChangeDetail{
+				ID:      "abc123",
+				Text:    "New text",
+				Change:  "updated",
+				From:    "Old text",
+				To:      "New text",
+				Details: "text changed",
+			},
+		},
+		{
+			name: "task deleted",
+			change: TaskChange{
+				TaskID:     "abc123",
+				ChangeType: Deleted,
+				OldTask: &TaskState{
+					ID:     "abc123",
+					Text:   "Deleted task",
+					Source: "test.md",
+				},
+			},
+			expected: TaskChangeDetail{
+				ID:      "abc123",
+				Text:    "",
+				Change:  "deleted",
+				From:    "Deleted task",
+				Details: "task deleted",
+			},
+		},
+		{
+			name: "task completed",
+			change: TaskChange{
+				TaskID:     "abc123",
+				ChangeType: Modified,
+				OldTask: &TaskState{
+					ID:        "abc123",
+					Text:      "Task",
+					Completed: false,
+					Source:    "test.md",
+				},
+				NewTask: &TaskState{
+					ID:        "abc123",
+					Text:      "Task",
+					Completed: true,
+					Source:    "test.md",
+				},
+			},
+			expected: TaskChangeDetail{
+				ID:      "abc123",
+				Text:    "Task",
+				Change:  "updated",
+				From:    "Task",
+				To:      "Task",
+				Details: "marked complete",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := buildTaskChangeDetail(tt.change)
+
+			if result.ID != tt.expected.ID {
+				t.Errorf("Expected ID=%q, got %q", tt.expected.ID, result.ID)
+			}
+			if result.Text != tt.expected.Text {
+				t.Errorf("Expected Text=%q, got %q", tt.expected.Text, result.Text)
+			}
+			if result.Change != tt.expected.Change {
+				t.Errorf("Expected Change=%q, got %q", tt.expected.Change, result.Change)
+			}
+			if result.From != tt.expected.From {
+				t.Errorf("Expected From=%q, got %q", tt.expected.From, result.From)
+			}
+			if result.To != tt.expected.To {
+				t.Errorf("Expected To=%q, got %q", tt.expected.To, result.To)
+			}
+			if result.Details != tt.expected.Details {
+				t.Errorf("Expected Details=%q, got %q", tt.expected.Details, result.Details)
+			}
+		})
+	}
+}
+
+func TestBuildChangeDetails(t *testing.T) {
+	tests := []struct {
+		name     string
+		oldTask  *TaskState
+		newTask  *TaskState
+		expected string
+	}{
+		{
+			name:     "text changed",
+			oldTask:  &TaskState{ID: "abc123", Text: "Old text"},
+			newTask:  &TaskState{ID: "abc123", Text: "New text"},
+			expected: "text changed",
+		},
+		{
+			name:     "nil old task",
+			oldTask:  nil,
+			newTask:  &TaskState{ID: "abc123", Text: "New text"},
+			expected: "",
+		},
+		{
+			name:     "nil new task",
+			oldTask:  &TaskState{ID: "abc123", Text: "Old text"},
+			newTask:  nil,
+			expected: "",
+		},
+		{
+			name:     "both nil",
+			oldTask:  nil,
+			newTask:  nil,
+			expected: "",
+		},
+		{
+			name:     "marked complete",
+			oldTask:  &TaskState{ID: "abc123", Text: "Task", Completed: false},
+			newTask:  &TaskState{ID: "abc123", Text: "Task", Completed: true},
+			expected: "marked complete",
+		},
+		{
+			name:     "marked incomplete",
+			oldTask:  &TaskState{ID: "abc123", Text: "Task", Completed: true},
+			newTask:  &TaskState{ID: "abc123", Text: "Task", Completed: false},
+			expected: "marked incomplete",
+		},
+		{
+			name:     "priority changed",
+			oldTask:  &TaskState{ID: "abc123", Text: "Task", Priority: "P2"},
+			newTask:  &TaskState{ID: "abc123", Text: "Task", Priority: "P1"},
+			expected: "priority changed to P1",
+		},
+		{
+			name:     "no changes",
+			oldTask:  &TaskState{ID: "abc123", Text: "Task", Completed: false, Priority: "P2"},
+			newTask:  &TaskState{ID: "abc123", Text: "Task", Completed: false, Priority: "P2"},
+			expected: "modified",
+		},
+		{
+			name:     "multiple changes",
+			oldTask:  &TaskState{ID: "abc123", Text: "Old", Completed: false, Priority: "P2"},
+			newTask:  &TaskState{ID: "abc123", Text: "New", Completed: true, Priority: "P1"},
+			expected: "text changed, marked complete, priority changed to P1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := buildChangeDetails(tt.oldTask, tt.newTask)
+			if result != tt.expected {
+				t.Errorf("Expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}

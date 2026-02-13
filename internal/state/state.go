@@ -719,12 +719,12 @@ func buildTaskChangeDetail(change TaskChange) TaskChangeDetail {
 
 	if change.NewTask != nil {
 		detail.Text = change.NewTask.Text
-		detail.To = change.NewTask.Text
 	}
 
 	if change.OldTask != nil {
 		detail.From = change.OldTask.Text
 		if change.NewTask != nil {
+			detail.To = change.NewTask.Text
 			// Both old and new present -> describe what changed
 			detail.Details = buildChangeDetails(change.OldTask, change.NewTask)
 		} else if change.ChangeType == Deleted {
