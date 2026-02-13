@@ -218,6 +218,16 @@ type TaskChange struct {
 	Source     string     // Where the change was detected (e.g., "daily-note", "todo-list")
 }
 
+// TaskChangeDetail represents detailed information about a task change for reporting
+type TaskChangeDetail struct {
+	ID      string `json:"id"`
+	Text    string `json:"text"`
+	Change  string `json:"change"`            // "added", "updated", "deleted"
+	From    string `json:"from,omitempty"`    // previous value (for updates)
+	To      string `json:"to,omitempty"`      // new value (for updates)
+	Details string `json:"details,omitempty"` // "marked complete", "priority changed to P1", etc.
+}
+
 // CompareWithDailyNotes compares the state with tasks from daily notes
 // Returns a list of changes detected
 func (s *TodoState) CompareWithDailyNotes(dailyTasks []tasks.Task, source string) []TaskChange {
