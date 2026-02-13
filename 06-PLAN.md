@@ -103,7 +103,7 @@ Planned Changes:
   - Track deleted tasks → add to `DeletedTasks`
   - Populate `ConflictsDetail` with full conflict information
 
-- [ ] **2.2** Update `TaskService.SyncTasks()` (line 111 in `internal/services/task_service.go`) to map detailed fields from state result to service result
+- [x] **2.2** Update `TaskService.SyncTasks()` (line 111 in `internal/services/task_service.go`) to map detailed fields from state result to service result
 
 ### Phase 3: CLI Flags
 

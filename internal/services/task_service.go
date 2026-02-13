@@ -245,6 +245,13 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 	result.DeletedTasks = syncResult.Deleted
 	result.DeletedTaskIDs = syncResult.DeletedTaskIDs
 
+	result.AddedFromDaily = syncResult.AddedFromDaily
+	result.UpdatedFromDaily = syncResult.UpdatedFromDaily
+	result.AddedFromTodo = syncResult.AddedFromTodo
+	result.UpdatedFromTodo = syncResult.UpdatedFromTodo
+	result.DeletedTasksDetail = syncResult.DeletedTasks
+	result.ConflictsDetail = syncResult.ConflictsDetail
+
 	return result, nil
 }
 
