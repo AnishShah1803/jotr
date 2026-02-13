@@ -530,8 +530,9 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 					NewTask:    merged,
 					Source:     "merged",
 				})
+				// For merged changes, add to the 'UpdatedFromDaily' slice and mark source as merged
+				// to avoid duplicate entries appearing in both daily and todo sections.
 				result.UpdatedFromDaily = append(result.UpdatedFromDaily, detail)
-				result.UpdatedFromTodo = append(result.UpdatedFromTodo, detail)
 			} else {
 				result.Skipped++
 			}

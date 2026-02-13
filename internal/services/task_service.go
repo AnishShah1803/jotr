@@ -33,9 +33,6 @@ type SyncOptions struct {
 	TaskSection string
 	LockTimeout time.Duration
 	DryRun      bool
-	Quiet       bool
-	JSON        bool
-	Verbose     bool
 }
 
 // SyncResult contains the result of a sync operation.
@@ -49,6 +46,7 @@ type SyncResult struct {
 	DeletedTasks   int
 	DeletedTaskIDs []string
 	Conflicts      map[string]string
+	ChangedTaskIDs []string
 
 	// Detailed change tracking for CLI reporting
 	AddedFromDaily     []state.TaskChangeDetail
