@@ -220,7 +220,7 @@ func GenerateTaskID(text string) string {
 
 // ExtractTaskID extracts task ID from task text.
 func ExtractTaskID(text string) string {
-	// Look for <!-- id: abc12345 --> pattern
+	// Look for <!-- id: abc12345 --> pattern (8 hex chars)
 	idRe := regexp.MustCompile(`<!-- id: ([a-f0-9]{8}) -->`)
 	if match := idRe.FindStringSubmatch(text); len(match) > 1 {
 		return match[1]
