@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/output"
 	"github.com/AnishShah1803/jotr/internal/services"
 )
 
@@ -21,12 +22,12 @@ var (
 	syncNoColor bool
 )
 
-// Color definitions for sync output
+// Color configuration now centralized in internal/output
 var (
-	successColor = lipgloss.Color("42")
-	warningColor = lipgloss.Color("214")
-	errorColor   = lipgloss.Color("203")
-	mutedColor   = lipgloss.Color("240")
+	successColor = output.SuccessColor
+	warningColor = output.WarningColor
+	errorColor   = output.ErrorColor
+	mutedColor   = output.MutedColor
 )
 
 func isColorEnabled() bool {
@@ -48,10 +49,7 @@ func isColorEnabled() bool {
 }
 
 func colorize(text string, color lipgloss.Color) string {
-	if !isColorEnabled() {
-		return text
-	}
-	return lipgloss.NewStyle().Foreground(color).Render(text)
+	return output.Colorize(text, color, isColorEnabled())
 }
 
 func formatPrefix(prefix string) string {
@@ -151,7 +149,7 @@ func outputSyncQuiet(result *services.SyncResult) error {
 
 	totalChanges := result.TasksFromDaily + result.TasksFromTodo
 	if totalChanges == 0 && result.DeletedTasks == 0 {
-		fmt.Println("0")
+		fmt.Println("No changes")
 		return nil
 	}
 

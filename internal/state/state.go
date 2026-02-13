@@ -713,6 +713,11 @@ func buildTaskChangeDetail(change TaskChange) TaskChangeDetail {
 		Change: changeTypeToString(change.ChangeType),
 	}
 
+	if change.TaskID == "" {
+		// Ensure the detail has a non-empty ID for reporting
+		detail.ID = "<unknown>"
+	}
+
 	if change.NewTask != nil {
 		detail.Text = change.NewTask.Text
 		detail.To = change.NewTask.Text
@@ -720,7 +725,13 @@ func buildTaskChangeDetail(change TaskChange) TaskChangeDetail {
 
 	if change.OldTask != nil {
 		detail.From = change.OldTask.Text
-		detail.Details = buildChangeDetails(change.OldTask, change.NewTask)
+		if change.NewTask != nil {
+			// Both old and new present -> describe what changed
+			detail.Details = buildChangeDetails(change.OldTask, change.NewTask)
+		} else if change.ChangeType == Deleted {
+			// Explicitly mark deletions
+			detail.Details = "task deleted"
+		}
 	} else if change.ChangeType == Added && change.NewTask != nil {
 		detail.Details = "new task added"
 	}
