@@ -107,44 +107,46 @@ Planned Changes:
 
 ### Phase 3: CLI Flags
 
-- [ ] **3.1** Wire up `--dry-run` flag to sync command in `cmd/task/sync.go`:
-  - Add `AddDryRunFlag(SyncCmd)` in init function
-  - Retrieve flag in `syncTasks()` function
-  - Pass dry-run option to `TaskService.SyncTasks()` (may need to add to `SyncOptions`)
+- [x] **3.1** Wire up `--dry-run` flag to sync command in `cmd/task/sync.go`:
+  - Added to init function
+  - Retrieved in `syncTasks()` function
+  - Passed to `TaskService.SyncTasks()` via SyncOptions
+  - Implemented dry-run logic to skip file writes when enabled
 
-- [ ] **3.2** Add `--quiet` flag to sync command (use existing `OutputOption` pattern from `internal/options/options.go` or add directly):
-  ```go
-  syncCmd.Flags().Bool("quiet", false, "Suppress normal output")
-  ```
+- [x] **3.2** Add `--quiet` flag to sync command:
+  - Implemented in init function
+  - Added outputSyncQuiet() function for quiet mode output
 
-- [ ] **3.3** Add `--json` flag to sync command:
-  ```go
-  syncCmd.Flags().Bool("json", false, "Output in JSON format")
-  ```
+- [x] **3.3** Add `--json` flag to sync command:
+  - Implemented in init function
+  - Added outputSyncJSON() function for JSON output
 
-- [ ] **3.4** Add `--verbose` flag support (may already exist via AddVerboseFlag):
-  - Add `AddVerboseFlag(SyncCmd)` if needed for verbose sync output
+- [x] **3.4** Add `--verbose` flag support:
+  - Implemented in init function
+  - Added to outputSyncDefault() for potential verbose reporting
 
-- [ ] **3.5** Update `services.SyncOptions` to include dry-run, quiet, json, verbose fields if needed
+- [x] **3.5** Update `services.SyncOptions` to include dry-run, quiet, json, verbose fields
 
 ### Phase 4: Report Formatter
 
-- [ ] **4.1** Create `FormatSyncReport()` function in `cmd/task/sync.go` or new file:
-  - Takes `services.SyncResult` and output options
-  - Returns formatted string based on output mode (default, quiet, json, verbose)
+- [x] **4.1** Create output functions in `cmd/task/sync.go`:
+  - `outputSyncDefault()` - default formatted output
+  - `outputSyncQuiet()` - quiet mode output
+  - `outputSyncJSON()` - JSON output
+  - All functions take `services.SyncResult` and format appropriately
 
-- [ ] **4.2** Implement default output format with:
+- [x] **4.2** Implement default output format with:
   - Task additions (prefix `+`)
   - Task updates with details (prefix `~`)
   - Task deletions (prefix `-`)
   - Conflicts (prefix `!`)
   - Summary section with counts
 
-- [ ] **4.3** Implement quiet mode: show only summary counts
+- [x] **4.3** Implement quiet mode: show only summary counts
 
-- [ ] **4.4** Implement JSON mode: output complete result as JSON using `json.MarshalIndent(result, "", "  ")`
+- [x] **4.4** Implement JSON mode: output complete result as JSON using `json.MarshalIndent(result, "", "  ")`
 
-- [ ] **4.5** Implement verbose mode: include unchanged tasks in output
+- [ ] **4.5** Implement verbose mode: include unchanged tasks in output (deferred - not critical)
 
 ### Phase 5: Color-Coded Output
 
@@ -162,11 +164,11 @@ Planned Changes:
 
 ### Phase 6: Dry-Run Implementation
 
-- [ ] **6.1** Implement dry-run logic in `TaskService.SyncTasks()`:
+- [x] **6.1** Implement dry-run logic in `TaskService.SyncTasks()`:
   - When dry-run is true, run sync but don't write any files
   - Return same result structure with all planned changes
 
-- [ ] **6.2** Add dry-run header to output:
+- [x] **6.2** Add dry-run header to output:
   ```
   ⚠ DRY RUN - No changes made
   ```

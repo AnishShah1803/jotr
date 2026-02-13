@@ -31,7 +31,11 @@ type SyncOptions struct {
 	TodoPath    string
 	StatePath   string
 	TaskSection string
-	LockTimeout time.Duration // Timeout for acquiring file locks (default: 10s)
+	LockTimeout time.Duration
+	DryRun      bool
+	Quiet       bool
+	JSON        bool
+	Verbose     bool
 }
 
 // SyncResult contains the result of a sync operation.
@@ -201,41 +205,42 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 		return result, nil
 	}
 
-	if syncResult.StateUpdated {
-		if opts.StatePath != "" {
-			if err := todoState.Write(opts.StatePath); err != nil {
-				return nil, fmt.Errorf("failed to write state file: %w", err)
-			}
-		}
-	}
-
-	if syncResult.TodoChanged {
-		if err := s.writeTodoFileFromState(opts.TodoPath, todoState, true); err != nil {
-			return nil, fmt.Errorf("failed to write todo file: %w", err)
-		}
-	}
-
-	if syncResult.DailyChanged {
-		sourceFiles := make(map[string]bool)
-		for _, taskID := range syncResult.ChangedTaskIDs {
-			if taskState, exists := todoState.Tasks[taskID]; exists && taskState.Source != "" {
-				// Skip non-file sources like "merged"
-				if taskState.Source != "merged" && taskState.Source != "deletion-detected" {
-					sourceFiles[taskState.Source] = true
+	if !opts.DryRun {
+		if syncResult.StateUpdated {
+			if opts.StatePath != "" {
+				if err := todoState.Write(opts.StatePath); err != nil {
+					return nil, fmt.Errorf("failed to write state file: %w", err)
 				}
-			} else if exists && taskState.Source == "" {
-				utils.VerboseLogWithContext(ctx, "task %s has no source file, skipping daily note update", taskID)
 			}
 		}
 
-		for sourceFile := range sourceFiles {
-			sourceTasks, err := tasks.ReadTasks(ctx, sourceFile)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read source file %s: %w", sourceFile, err)
+		if syncResult.TodoChanged {
+			if err := s.writeTodoFileFromState(opts.TodoPath, todoState, true); err != nil {
+				return nil, fmt.Errorf("failed to write todo file: %w", err)
+			}
+		}
+
+		if syncResult.DailyChanged {
+			sourceFiles := make(map[string]bool)
+			for _, taskID := range syncResult.ChangedTaskIDs {
+				if taskState, exists := todoState.Tasks[taskID]; exists && taskState.Source != "" {
+					if taskState.Source != "merged" && taskState.Source != "deletion-detected" {
+						sourceFiles[taskState.Source] = true
+					}
+				} else if exists && taskState.Source == "" {
+					utils.VerboseLogWithContext(ctx, "task %s has no source file, skipping daily note update", taskID)
+				}
 			}
 
-			if err := s.updateDailyNoteFromState(sourceFile, sourceTasks, todoState, opts.TaskSection); err != nil {
-				return nil, fmt.Errorf("failed to update daily note %s: %w", sourceFile, err)
+			for sourceFile := range sourceFiles {
+				sourceTasks, err := tasks.ReadTasks(ctx, sourceFile)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read source file %s: %w", sourceFile, err)
+				}
+
+				if err := s.updateDailyNoteFromState(sourceFile, sourceTasks, todoState, opts.TaskSection); err != nil {
+					return nil, fmt.Errorf("failed to update daily note %s: %w", sourceFile, err)
+				}
 			}
 		}
 	}
