@@ -714,8 +714,7 @@ func buildTaskChangeDetail(change TaskChange) TaskChangeDetail {
 	}
 
 	if change.TaskID == "" {
-		// Ensure the detail has a non-empty ID for reporting
-		detail.ID = "<unknown>"
+		fmt.Fprintf(os.Stderr, "warning: task change has empty ID (type: %s)\n", changeTypeToString(change.ChangeType))
 	}
 
 	if change.NewTask != nil {

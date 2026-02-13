@@ -37,24 +37,24 @@ type SyncOptions struct {
 
 // SyncResult contains the result of a sync operation.
 type SyncResult struct {
-	StatePath      string
-	DailyPath      string
-	TodoPath       string
-	TasksRead      int
-	TasksFromDaily int
-	TasksFromTodo  int
-	DeletedTasks   int
-	DeletedTaskIDs []string
-	Conflicts      map[string]string
-	ChangedTaskIDs []string
+	StatePath      string            `json:"state_path"`
+	DailyPath      string            `json:"daily_path"`
+	TodoPath       string            `json:"todo_path"`
+	TasksRead      int               `json:"tasks_read"`
+	TasksFromDaily int               `json:"tasks_from_daily"`
+	TasksFromTodo  int               `json:"tasks_from_todo"`
+	DeletedTasks   int               `json:"deleted_tasks"`
+	DeletedTaskIDs []string          `json:"deleted_task_ids,omitempty"`
+	Conflicts      map[string]string `json:"conflicts,omitempty"`
+	ChangedTaskIDs []string          `json:"changed_task_ids,omitempty"`
 
 	// Detailed change tracking for CLI reporting
-	AddedFromDaily     []state.TaskChangeDetail
-	UpdatedFromDaily   []state.TaskChangeDetail
-	AddedFromTodo      []state.TaskChangeDetail
-	UpdatedFromTodo    []state.TaskChangeDetail
-	DeletedTasksDetail []state.TaskChangeDetail
-	ConflictsDetail    []state.ConflictDetail
+	AddedFromDaily     []state.TaskChangeDetail `json:"added_from_daily,omitempty"`
+	UpdatedFromDaily   []state.TaskChangeDetail `json:"updated_from_daily,omitempty"`
+	AddedFromTodo      []state.TaskChangeDetail `json:"added_from_todo,omitempty"`
+	UpdatedFromTodo    []state.TaskChangeDetail `json:"updated_from_todo,omitempty"`
+	DeletedTasksDetail []state.TaskChangeDetail `json:"deleted_tasks_detail,omitempty"`
+	ConflictsDetail    []state.ConflictDetail   `json:"conflicts_detail,omitempty"`
 }
 
 // acquireSyncLocks acquires locks on state, todo, and daily note files in the correct order.
@@ -165,8 +165,6 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 		tasks.EnsureTaskID(&dailyTasks[i])
 	}
 
-	result.TasksRead = len(dailyTasks)
-
 	taskSection := opts.TaskSection
 	if taskSection == "" {
 		taskSection = "Tasks"
@@ -196,9 +194,12 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 		todoTasks, _ = tasks.ReadTasks(ctx, opts.TodoPath)
 	}
 
+	result.TasksRead = len(dailyTasks) + len(todoTasks)
+
 	syncResult := todoState.BidirectionalSync(activeDailyTasks, todoTasks, notePath)
 
 	result.Conflicts = syncResult.Conflicts
+	result.ConflictsDetail = syncResult.ConflictsDetail
 	if len(syncResult.Conflicts) > 0 {
 		return result, nil
 	}
@@ -247,13 +248,13 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 	result.TasksFromTodo = syncResult.AppliedTodo
 	result.DeletedTasks = syncResult.Deleted
 	result.DeletedTaskIDs = syncResult.DeletedTaskIDs
+	result.ChangedTaskIDs = syncResult.ChangedTaskIDs
 
 	result.AddedFromDaily = syncResult.AddedFromDaily
 	result.UpdatedFromDaily = syncResult.UpdatedFromDaily
 	result.AddedFromTodo = syncResult.AddedFromTodo
 	result.UpdatedFromTodo = syncResult.UpdatedFromTodo
 	result.DeletedTasksDetail = syncResult.DeletedTasks
-	result.ConflictsDetail = syncResult.ConflictsDetail
 
 	return result, nil
 }

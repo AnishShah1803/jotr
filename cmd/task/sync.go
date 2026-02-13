@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/output"
 	"github.com/AnishShah1803/jotr/internal/services"
+	"github.com/AnishShah1803/jotr/internal/state"
 )
 
 var (
@@ -20,14 +20,6 @@ var (
 	syncJSON    bool
 	syncVerbose bool
 	syncNoColor bool
-)
-
-// Color configuration now centralized in internal/output
-var (
-	successColor = output.SuccessColor
-	warningColor = output.WarningColor
-	errorColor   = output.ErrorColor
-	mutedColor   = output.MutedColor
 )
 
 func isColorEnabled() bool {
@@ -39,33 +31,26 @@ func isColorEnabled() bool {
 	}
 	fileInfo, err := os.Stdout.Stat()
 	if err != nil {
-		// Log the error to stderr so users can notice issues with output redirection
-		// This is important when stdout is redirected to a file or a pipe which
-		// may cause Stat() to return an error. The warning is non-fatal.
 		fmt.Fprintf(os.Stderr, "warning: failed to stat stdout: %v\n", err)
 		return false
 	}
 	return (fileInfo.Mode() & os.ModeCharDevice) == os.ModeCharDevice
 }
 
-func colorize(text string, color lipgloss.Color) string {
-	return output.Colorize(text, color, isColorEnabled())
-}
-
-func formatPrefix(prefix string) string {
+func formatPrefix(prefix string, colorOn bool) string {
 	switch prefix {
 	case "+":
-		return colorize("+", successColor)
+		return output.Colorize("+", output.SuccessColor, colorOn)
 	case "~":
-		return colorize("~", warningColor)
+		return output.Colorize("~", output.WarningColor, colorOn)
 	case "!":
-		return colorize("!", errorColor)
+		return output.Colorize("!", output.ErrorColor, colorOn)
 	case "-":
-		return colorize("-", mutedColor)
+		return output.Colorize("-", output.MutedColor, colorOn)
 	case "✓":
-		return colorize("✓", successColor)
+		return output.Colorize("✓", output.SuccessColor, colorOn)
 	case "⚠":
-		return colorize("⚠", warningColor)
+		return output.Colorize("⚠", output.WarningColor, colorOn)
 	default:
 		return prefix
 	}
@@ -158,15 +143,17 @@ func outputSyncQuiet(result *services.SyncResult) error {
 }
 
 func outputSyncDefault(result *services.SyncResult, verbose bool) error {
+	c := isColorEnabled()
+
 	if syncDryRun {
-		fmt.Printf("%s DRY RUN - No changes made\n", formatPrefix("⚠"))
+		fmt.Printf("%s DRY RUN - No changes made\n", formatPrefix("⚠", c))
 		fmt.Println()
 	}
 
 	if len(result.Conflicts) > 0 {
-		fmt.Printf("%s Conflicts detected:\n", formatPrefix("⚠"))
+		fmt.Printf("%s Conflicts detected:\n", formatPrefix("⚠", c))
 		for _, conflict := range result.ConflictsDetail {
-			fmt.Printf("  %s \"%s\" - %s\n", formatPrefix("!"), conflict.TextDaily, conflict.Reason)
+			fmt.Printf("  %s \"%s\" - %s\n", formatPrefix("!", c), conflict.TextDaily, conflict.Reason)
 			if conflict.TextDaily != conflict.TextTodo {
 				fmt.Printf("      Daily: \"%s\"\n", conflict.TextDaily)
 				fmt.Printf("      Todo:  \"%s\"\n", conflict.TextTodo)
@@ -178,99 +165,35 @@ func outputSyncDefault(result *services.SyncResult, verbose bool) error {
 
 	totalChanges := result.TasksFromDaily + result.TasksFromTodo
 	if totalChanges == 0 && result.DeletedTasks == 0 {
-		fmt.Printf("%s Everything is in sync\n", formatPrefix("✓"))
+		fmt.Printf("%s Everything is in sync\n", formatPrefix("✓", c))
 		return nil
 	}
 
 	if len(result.AddedFromDaily) > 0 || len(result.UpdatedFromDaily) > 0 {
 		fmt.Println("From Daily Notes:")
-		for _, task := range result.AddedFromDaily {
-			if verbose {
-				fmt.Printf("  %s Added: \"%s\" (id: %s)\n", formatPrefix("+"), task.Text, task.ID)
-				if task.To != "" && task.To != task.Text {
-					fmt.Printf("      To: \"%s\"\n", task.To)
-				}
-				if task.Details != "" {
-					fmt.Printf("      Details: %s\n", task.Details)
-				}
-			} else {
-				fmt.Printf("  %s Added: \"%s\" (id: %s)\n", formatPrefix("+"), task.Text, task.ID)
-			}
-		}
-		for _, task := range result.UpdatedFromDaily {
-			if verbose {
-				fmt.Printf("  %s Updated: (id: %s)\n", formatPrefix("~"), task.ID)
-				if task.From != "" {
-					fmt.Printf("      From: \"%s\"\n", task.From)
-				}
-				if task.To != "" {
-					fmt.Printf("      To:   \"%s\"\n", task.To)
-				}
-				if task.Details != "" {
-					fmt.Printf("      Details: %s\n", task.Details)
-				}
-			} else {
-				if task.Details != "" {
-					fmt.Printf("  %s Updated: \"%s\" - %s (id: %s)\n", formatPrefix("~"), task.Text, task.Details, task.ID)
-				} else {
-					fmt.Printf("  %s Updated: \"%s\" (id: %s)\n", formatPrefix("~"), task.Text, task.ID)
-				}
-			}
-		}
+		printAddedTasks(result.AddedFromDaily, verbose, c)
+		printUpdatedTasks(result.UpdatedFromDaily, verbose, c)
 		fmt.Println()
 	}
 
 	if len(result.AddedFromTodo) > 0 || len(result.UpdatedFromTodo) > 0 {
 		fmt.Println("From Todo List:")
-		for _, task := range result.AddedFromTodo {
-			if verbose {
-				fmt.Printf("  %s Added: \"%s\" (id: %s)\n", formatPrefix("+"), task.Text, task.ID)
-				if task.To != "" && task.To != task.Text {
-					fmt.Printf("      To: \"%s\"\n", task.To)
-				}
-				if task.Details != "" {
-					fmt.Printf("      Details: %s\n", task.Details)
-				}
-			} else {
-				fmt.Printf("  %s Added: \"%s\" (id: %s)\n", formatPrefix("+"), task.Text, task.ID)
-			}
-		}
-		for _, task := range result.UpdatedFromTodo {
-			if verbose {
-				fmt.Printf("  %s Updated: (id: %s)\n", formatPrefix("~"), task.ID)
-				if task.From != "" {
-					fmt.Printf("      From: \"%s\"\n", task.From)
-				}
-				if task.To != "" {
-					fmt.Printf("      To:   \"%s\"\n", task.To)
-				}
-				if task.Details != "" {
-					fmt.Printf("      Details: %s\n", task.Details)
-				}
-			} else {
-				if task.Details != "" {
-					fmt.Printf("  %s Updated: \"%s\" - %s (id: %s)\n", formatPrefix("~"), task.Text, task.Details, task.ID)
-				} else {
-					fmt.Printf("  %s Updated: \"%s\" (id: %s)\n", formatPrefix("~"), task.Text, task.ID)
-				}
-			}
-		}
+		printAddedTasks(result.AddedFromTodo, verbose, c)
+		printUpdatedTasks(result.UpdatedFromTodo, verbose, c)
 		fmt.Println()
 	}
 
 	if len(result.DeletedTasksDetail) > 0 {
 		fmt.Println("Deleted:")
 		for _, task := range result.DeletedTasksDetail {
+			fmt.Printf("  %s \"%s\" (id: %s)\n", formatPrefix("-", c), task.Text, task.ID)
 			if verbose {
-				fmt.Printf("  %s \"%s\" (id: %s)\n", formatPrefix("-"), task.Text, task.ID)
 				if task.From != "" {
 					fmt.Printf("      From: \"%s\"\n", task.From)
 				}
 				if task.Details != "" {
 					fmt.Printf("      Details: %s\n", task.Details)
 				}
-			} else {
-				fmt.Printf("  %s \"%s\" (id: %s)\n", formatPrefix("-"), task.Text, task.ID)
 			}
 		}
 		fmt.Println()
@@ -309,4 +232,41 @@ func outputSyncDefault(result *services.SyncResult, verbose bool) error {
 	}
 
 	return nil
+}
+
+func printAddedTasks(tasks []state.TaskChangeDetail, verbose bool, colorOn bool) {
+	for _, task := range tasks {
+		fmt.Printf("  %s Added: \"%s\" (id: %s)\n", formatPrefix("+", colorOn), task.Text, task.ID)
+		if verbose {
+			if task.To != "" && task.To != task.Text {
+				fmt.Printf("      To: \"%s\"\n", task.To)
+			}
+			if task.Details != "" {
+				fmt.Printf("      Details: %s\n", task.Details)
+			}
+		}
+	}
+}
+
+func printUpdatedTasks(tasks []state.TaskChangeDetail, verbose bool, colorOn bool) {
+	for _, task := range tasks {
+		if verbose {
+			fmt.Printf("  %s Updated: (id: %s)\n", formatPrefix("~", colorOn), task.ID)
+			if task.From != "" {
+				fmt.Printf("      From: \"%s\"\n", task.From)
+			}
+			if task.To != "" {
+				fmt.Printf("      To:   \"%s\"\n", task.To)
+			}
+			if task.Details != "" {
+				fmt.Printf("      Details: %s\n", task.Details)
+			}
+		} else {
+			if task.Details != "" {
+				fmt.Printf("  %s Updated: \"%s\" - %s (id: %s)\n", formatPrefix("~", colorOn), task.Text, task.Details, task.ID)
+			} else {
+				fmt.Printf("  %s Updated: \"%s\" (id: %s)\n", formatPrefix("~", colorOn), task.Text, task.ID)
+			}
+		}
+	}
 }

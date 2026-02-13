@@ -13,7 +13,7 @@ import (
 
 var (
 	// Colors.
-	primaryColor   = lipgloss.Color("86")
+	primaryColor   = output.PrimaryColor
 	secondaryColor = output.SecondaryColor
 	accentColor    = output.AccentColor
 	successColor   = output.SuccessColor
