@@ -150,17 +150,20 @@ Planned Changes:
 
 ### Phase 5: Color-Coded Output
 
-- [ ] **5.1** Add color support (check if already exists in codebase):
-  - Search for existing color library usage (e.g., "github.com/fatih/color" or similar)
-  - If not exists, add dependency or use existing formatting
+- [x] **5.1** Add color support using existing `lipgloss` library (already used in TUI)
 
-- [ ] **5.2** Apply colors:
+- [x] **5.2** Apply colors in `cmd/task/sync.go`:
   - Green (`+`) for added tasks
-  - Yellow/Blue (`~`) for updated tasks
+  - Yellow/Orange (`~`) for updated tasks
   - Red (`!`) for conflicts
-  - Gray for deleted tasks
+  - Gray (`-`) for deleted tasks
+  - Green (`✓`) for success messages
+  - Yellow/Orange (`⚠`) for warnings
 
-- [ ] **5.3** Make colors respect `--no-color` flag or auto-detect terminal (check existing pattern in codebase)
+- [x] **5.3** Add `--no-color` flag and respect `NO_COLOR` environment variable:
+  - Auto-detect if stdout is a terminal
+  - Disable colors when `--no-color` flag is set
+  - Disable colors when `NO_COLOR` environment variable is set
 
 ### Phase 6: Dry-Run Implementation
 

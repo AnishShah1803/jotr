@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
@@ -16,7 +18,53 @@ var (
 	syncQuiet   bool
 	syncJSON    bool
 	syncVerbose bool
+	syncNoColor bool
 )
+
+// Color definitions for sync output
+var (
+	successColor = lipgloss.Color("42")
+	warningColor = lipgloss.Color("214")
+	errorColor   = lipgloss.Color("203")
+	mutedColor   = lipgloss.Color("240")
+)
+
+func isColorEnabled() bool {
+	if syncNoColor {
+		return false
+	}
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	fileInfo, _ := os.Stdout.Stat()
+	return (fileInfo.Mode() & os.ModeCharDevice) == os.ModeCharDevice
+}
+
+func colorize(text string, color lipgloss.Color) string {
+	if !isColorEnabled() {
+		return text
+	}
+	return lipgloss.NewStyle().Foreground(color).Render(text)
+}
+
+func formatPrefix(prefix string) string {
+	switch prefix {
+	case "+":
+		return colorize("+", successColor)
+	case "~":
+		return colorize("~", warningColor)
+	case "!":
+		return colorize("!", errorColor)
+	case "-":
+		return colorize("-", mutedColor)
+	case "✓":
+		return colorize("✓", successColor)
+	case "⚠":
+		return colorize("⚠", warningColor)
+	default:
+		return prefix
+	}
+}
 
 var SyncCmd = &cobra.Command{
 	Use:   "sync",
@@ -49,6 +97,7 @@ func init() {
 	SyncCmd.Flags().BoolVar(&syncQuiet, "quiet", false, "Suppress normal output, show only summary")
 	SyncCmd.Flags().BoolVar(&syncJSON, "json", false, "Output in JSON format")
 	SyncCmd.Flags().BoolVar(&syncVerbose, "verbose", false, "Enable verbose output with detailed task information")
+	SyncCmd.Flags().BoolVar(&syncNoColor, "no-color", false, "Disable colored output")
 }
 
 func syncTasks(ctx context.Context, cfg *config.LoadedConfig) error {
@@ -108,14 +157,14 @@ func outputSyncQuiet(result *services.SyncResult) error {
 
 func outputSyncDefault(result *services.SyncResult, verbose bool) error {
 	if syncDryRun {
-		fmt.Println("⚠ DRY RUN - No changes made")
+		fmt.Printf("%s DRY RUN - No changes made\n", formatPrefix("⚠"))
 		fmt.Println()
 	}
 
 	if len(result.Conflicts) > 0 {
-		fmt.Println("⚠ Conflicts detected:")
+		fmt.Printf("%s Conflicts detected:\n", formatPrefix("⚠"))
 		for _, conflict := range result.ConflictsDetail {
-			fmt.Printf("  ! \"%s\" - %s\n", conflict.TextDaily, conflict.Reason)
+			fmt.Printf("  %s \"%s\" - %s\n", formatPrefix("!"), conflict.TextDaily, conflict.Reason)
 			if conflict.TextDaily != conflict.TextTodo {
 				fmt.Printf("      Daily: \"%s\"\n", conflict.TextDaily)
 				fmt.Printf("      Todo:  \"%s\"\n", conflict.TextTodo)
@@ -127,20 +176,20 @@ func outputSyncDefault(result *services.SyncResult, verbose bool) error {
 
 	totalChanges := result.TasksFromDaily + result.TasksFromTodo
 	if totalChanges == 0 && result.DeletedTasks == 0 {
-		fmt.Println("✓ Everything is in sync")
+		fmt.Printf("%s Everything is in sync\n", formatPrefix("✓"))
 		return nil
 	}
 
 	if len(result.AddedFromDaily) > 0 || len(result.UpdatedFromDaily) > 0 {
 		fmt.Println("From Daily Notes:")
 		for _, task := range result.AddedFromDaily {
-			fmt.Printf("  + Added: \"%s\" (id: %s)\n", task.Text, task.ID)
+			fmt.Printf("  %s Added: \"%s\" (id: %s)\n", formatPrefix("+"), task.Text, task.ID)
 		}
 		for _, task := range result.UpdatedFromDaily {
 			if task.Details != "" {
-				fmt.Printf("  ~ Updated: \"%s\" - %s (id: %s)\n", task.Text, task.Details, task.ID)
+				fmt.Printf("  %s Updated: \"%s\" - %s (id: %s)\n", formatPrefix("~"), task.Text, task.Details, task.ID)
 			} else {
-				fmt.Printf("  ~ Updated: \"%s\" (id: %s)\n", task.Text, task.ID)
+				fmt.Printf("  %s Updated: \"%s\" (id: %s)\n", formatPrefix("~"), task.Text, task.ID)
 			}
 		}
 		fmt.Println()
@@ -149,13 +198,13 @@ func outputSyncDefault(result *services.SyncResult, verbose bool) error {
 	if len(result.AddedFromTodo) > 0 || len(result.UpdatedFromTodo) > 0 {
 		fmt.Println("From Todo List:")
 		for _, task := range result.AddedFromTodo {
-			fmt.Printf("  + Added: \"%s\" (id: %s)\n", task.Text, task.ID)
+			fmt.Printf("  %s Added: \"%s\" (id: %s)\n", formatPrefix("+"), task.Text, task.ID)
 		}
 		for _, task := range result.UpdatedFromTodo {
 			if task.Details != "" {
-				fmt.Printf("  ~ Updated: \"%s\" - %s (id: %s)\n", task.Text, task.Details, task.ID)
+				fmt.Printf("  %s Updated: \"%s\" - %s (id: %s)\n", formatPrefix("~"), task.Text, task.Details, task.ID)
 			} else {
-				fmt.Printf("  ~ Updated: \"%s\" (id: %s)\n", task.Text, task.ID)
+				fmt.Printf("  %s Updated: \"%s\" (id: %s)\n", formatPrefix("~"), task.Text, task.ID)
 			}
 		}
 		fmt.Println()
@@ -164,7 +213,7 @@ func outputSyncDefault(result *services.SyncResult, verbose bool) error {
 	if len(result.DeletedTasksDetail) > 0 {
 		fmt.Println("Deleted:")
 		for _, task := range result.DeletedTasksDetail {
-			fmt.Printf("  - \"%s\" (id: %s)\n", task.Text, task.ID)
+			fmt.Printf("  %s \"%s\" (id: %s)\n", formatPrefix("-"), task.Text, task.ID)
 		}
 		fmt.Println()
 	}
