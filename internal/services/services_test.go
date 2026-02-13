@@ -521,10 +521,12 @@ func TestTaskService_SyncTasks_ConcurrentFileLocking(t *testing.T) {
 	statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
 	todoPath := filepath.Join(fs.BaseDir, "todo.md")
 
+	dailyNotePath := filepath.Join(fs.BaseDir, "diary", year, monthDir, dayFile)
+
 	initialState := state.NewTodoState()
 	initialState.Tasks = map[string]state.TaskState{
-		"task1": {ID: "task1", Text: "Task one", Completed: false, Source: "daily.md"},
-		"task2": {ID: "task2", Text: "Task two", Completed: false, Source: "daily.md"},
+		"task1": {ID: "task1", Text: "Task one", Completed: false, Source: dailyNotePath},
+		"task2": {ID: "task2", Text: "Task two", Completed: false, Source: dailyNotePath},
 	}
 	if err := initialState.Write(statePath); err != nil {
 		t.Fatalf("Failed to write initial state: %v", err)
@@ -534,8 +536,8 @@ func TestTaskService_SyncTasks_ConcurrentFileLocking(t *testing.T) {
 
 ## Tasks
 
-- [ ] Task one
-- [ ] Task two
+- [ ] Task one <!-- id: task1 -->
+- [ ] Task two <!-- id: task2 -->
 `
 	fs.WriteFile(t, "todo.md", todoContent)
 
@@ -942,7 +944,7 @@ func TestTaskService_SyncTasks_DeadlockPrevention(t *testing.T) {
 
 ## Tasks
 
-- [ ] Task one <!-- id: task1 -->
+- [ ] Task one <!-- id: abc12345 -->
 `
 	fs.WriteFile(t, filepath.Join("diary", year, monthDir, dayFile), dailyNoteContent)
 
@@ -951,7 +953,7 @@ func TestTaskService_SyncTasks_DeadlockPrevention(t *testing.T) {
 
 	initialState := state.NewTodoState()
 	initialState.Tasks = map[string]state.TaskState{
-		"task1": {ID: "task1", Text: "Task one", Completed: false, Source: "daily.md"},
+		"abc12345": {ID: "abc12345", Text: "Task one", Completed: false, Source: "daily.md"},
 	}
 	if err := initialState.Write(statePath); err != nil {
 		t.Fatalf("Failed to write initial state: %v", err)
@@ -961,7 +963,7 @@ func TestTaskService_SyncTasks_DeadlockPrevention(t *testing.T) {
 
 ## Tasks
 
-- [ ] Task one
+- [ ] Task one <!-- id: abc12345 -->
 `
 	fs.WriteFile(t, "todo.md", todoContent)
 
@@ -1007,10 +1009,10 @@ func TestTaskService_SyncTasks_DeadlockPrevention(t *testing.T) {
 
 	finalState, err := state.Read(statePath)
 	if err != nil {
-		t.Fatalf("Failed to read final state: %v", err)
+		t.Fatalf("Failed to read state: %v", err)
 	}
 
-	if _, exists := finalState.Tasks["task1"]; !exists {
-		t.Error("Task1 should still exist after concurrent syncs")
+	if _, exists := finalState.Tasks["abc12345"]; !exists {
+		t.Error("Task abc12345 should still exist after concurrent syncs")
 	}
 }

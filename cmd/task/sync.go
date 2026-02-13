@@ -56,7 +56,7 @@ func syncTasks(ctx context.Context, cfg *config.LoadedConfig) error {
 	}
 
 	totalChanges := result.TasksFromDaily + result.TasksFromTodo
-	if totalChanges == 0 {
+	if totalChanges == 0 && result.DeletedTasks == 0 {
 		fmt.Println("✓ Everything is in sync")
 		return nil
 	}
@@ -66,6 +66,9 @@ func syncTasks(ctx context.Context, cfg *config.LoadedConfig) error {
 	}
 	if result.TasksFromTodo > 0 {
 		fmt.Printf("✓ Synced %d task(s) from todo list to daily notes\n", result.TasksFromTodo)
+	}
+	if result.DeletedTasks > 0 {
+		fmt.Printf("✓ Removed %d deleted task(s) from state\n", result.DeletedTasks)
 	}
 
 	return nil

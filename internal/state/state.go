@@ -161,6 +161,12 @@ func (s *TodoState) MarkArchived() {
 	s.LastArchive = time.Now()
 }
 
+// RemoveTask removes a task from state by ID
+func (s *TodoState) RemoveTask(taskID string) {
+	delete(s.Tasks, taskID)
+	s.LastSync = time.Now()
+}
+
 // ToTasks converts state tasks to tasks.Task slice
 func (s *TodoState) ToTasks() []tasks.Task {
 	var result []tasks.Task
@@ -312,6 +318,43 @@ func (s *TodoState) CompareWithTodoList(todoTasks []tasks.Task) []TaskChange {
 	return changes
 }
 
+// DetectDeletions finds tasks that exist in state but are missing from sources.
+// Returns TaskChange entries for tasks that should be deleted.
+// A task is considered deleted if it exists in state but is missing from BOTH sources.
+func (s *TodoState) DetectDeletions(dailyTasks, todoTasks []tasks.Task) []TaskChange {
+	deletions := []TaskChange{}
+
+	dailyTaskMap := make(map[string]tasks.Task)
+	for _, task := range dailyTasks {
+		if task.ID != "" {
+			dailyTaskMap[task.ID] = task
+		}
+	}
+
+	todoTaskMap := make(map[string]tasks.Task)
+	for _, task := range todoTasks {
+		if task.ID != "" {
+			todoTaskMap[task.ID] = task
+		}
+	}
+
+	for id, stateTask := range s.Tasks {
+		_, inDaily := dailyTaskMap[id]
+		_, inTodo := todoTaskMap[id]
+
+		if !inDaily && !inTodo {
+			deletions = append(deletions, TaskChange{
+				TaskID:     id,
+				ChangeType: Deleted,
+				OldTask:    &stateTask,
+				Source:     "deletion-detected",
+			})
+		}
+	}
+
+	return deletions
+}
+
 func (s *TodoState) isTaskModified(stateTask TaskState, sourceTask tasks.Task) bool {
 	if stateTask.Text != sourceTask.Text {
 		return true
@@ -391,8 +434,10 @@ type SyncResult struct {
 	Conflicts      map[string]string
 	AppliedDaily   int
 	AppliedTodo    int
+	Deleted        int // Number of tasks deleted during sync
 	Skipped        int
 	ChangedTaskIDs []string // Task IDs that changed and may need their source files updated
+	DeletedTaskIDs []string // Task IDs that were deleted
 }
 
 // BidirectionalSync performs bidirectional sync between daily notes and todo list
@@ -459,6 +504,17 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 			result.DailyChanged = true
 			result.ChangedTaskIDs = append(result.ChangedTaskIDs, taskID)
 		}
+	}
+
+	deletions := s.DetectDeletions(dailyTasks, todoTasks)
+	for _, deletion := range deletions {
+		if deletion.OldTask != nil && deletion.OldTask.Completed {
+			continue
+		}
+		s.RemoveTask(deletion.TaskID)
+		result.Deleted++
+		result.StateUpdated = true
+		result.DeletedTaskIDs = append(result.DeletedTaskIDs, deletion.TaskID)
 	}
 
 	return result

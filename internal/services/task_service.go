@@ -42,6 +42,8 @@ type SyncResult struct {
 	TasksRead      int
 	TasksFromDaily int
 	TasksFromTodo  int
+	DeletedTasks   int
+	DeletedTaskIDs []string
 	Conflicts      map[string]string
 }
 
@@ -209,7 +211,10 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 		sourceFiles := make(map[string]bool)
 		for _, taskID := range syncResult.ChangedTaskIDs {
 			if taskState, exists := todoState.Tasks[taskID]; exists && taskState.Source != "" {
-				sourceFiles[taskState.Source] = true
+				// Skip non-file sources like "merged"
+				if taskState.Source != "merged" && taskState.Source != "deletion-detected" {
+					sourceFiles[taskState.Source] = true
+				}
 			} else if exists && taskState.Source == "" {
 				utils.VerboseLogWithContext(ctx, "task %s has no source file, skipping daily note update", taskID)
 			}
@@ -229,6 +234,8 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 
 	result.TasksFromDaily = syncResult.AppliedDaily
 	result.TasksFromTodo = syncResult.AppliedTodo
+	result.DeletedTasks = syncResult.Deleted
+	result.DeletedTaskIDs = syncResult.DeletedTaskIDs
 
 	return result, nil
 }
@@ -309,7 +316,9 @@ func (s *TaskService) formatTaskLine(stateTask state.TaskState) string {
 		sb.WriteString("- [ ] ")
 	}
 
-	sb.WriteString(stateTask.Text)
+	// Strip any existing ID comments and @completed tags from text to avoid duplication
+	text := tasks.StripCompletedTag(tasks.StripTaskID(stateTask.Text))
+	sb.WriteString(text)
 
 	if stateTask.ID != "" {
 		sb.WriteString(fmt.Sprintf(" <!-- id: %s -->", stateTask.ID))

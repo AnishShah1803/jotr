@@ -862,3 +862,185 @@ func TestDeadlockPrevention(t *testing.T) {
 		taskIDs[id] = true
 	}
 }
+
+func TestDetectDeletions(t *testing.T) {
+	tests := []struct {
+		name            string
+		state           *TodoState
+		dailyTasks      []tasks.Task
+		todoTasks       []tasks.Task
+		expectedDeletes int
+		expectedTaskIDs []string
+	}{
+		{
+			name: "no deletions - task exists in daily",
+			state: &TodoState{
+				Tasks: map[string]TaskState{
+					"abc123": {ID: "abc123", Text: "Task", Source: "test.md"},
+				},
+			},
+			dailyTasks: []tasks.Task{
+				{ID: "abc123", Text: "Task"},
+			},
+			todoTasks:       []tasks.Task{},
+			expectedDeletes: 0,
+		},
+		{
+			name: "no deletions - task exists in todo",
+			state: &TodoState{
+				Tasks: map[string]TaskState{
+					"abc123": {ID: "abc123", Text: "Task", Source: "test.md"},
+				},
+			},
+			dailyTasks: []tasks.Task{},
+			todoTasks: []tasks.Task{
+				{ID: "abc123", Text: "Task"},
+			},
+			expectedDeletes: 0,
+		},
+		{
+			name: "deletion - task missing from both sources",
+			state: &TodoState{
+				Tasks: map[string]TaskState{
+					"abc123": {ID: "abc123", Text: "Deleted task", Source: "test.md"},
+				},
+			},
+			dailyTasks:      []tasks.Task{},
+			todoTasks:       []tasks.Task{},
+			expectedDeletes: 1,
+			expectedTaskIDs: []string{"abc123"},
+		},
+		{
+			name: "multiple deletions",
+			state: &TodoState{
+				Tasks: map[string]TaskState{
+					"abc123": {ID: "abc123", Text: "Task 1", Source: "test.md"},
+					"def456": {ID: "def456", Text: "Task 2", Source: "test.md"},
+					"ghi789": {ID: "ghi789", Text: "Task 3", Source: "test.md"},
+				},
+			},
+			dailyTasks: []tasks.Task{
+				{ID: "ghi789", Text: "Task 3"},
+			},
+			todoTasks:       []tasks.Task{},
+			expectedDeletes: 2,
+			expectedTaskIDs: []string{"abc123", "def456"},
+		},
+		{
+			name: "empty state - no deletions",
+			state: &TodoState{
+				Tasks: map[string]TaskState{},
+			},
+			dailyTasks:      []tasks.Task{},
+			todoTasks:       []tasks.Task{},
+			expectedDeletes: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			deletions := tt.state.DetectDeletions(tt.dailyTasks, tt.todoTasks)
+
+			if len(deletions) != tt.expectedDeletes {
+				t.Errorf("Expected %d deletions, got %d", tt.expectedDeletes, len(deletions))
+			}
+
+			if len(tt.expectedTaskIDs) > 0 {
+				foundIDs := make(map[string]bool)
+				for _, del := range deletions {
+					foundIDs[del.TaskID] = true
+				}
+				for _, expectedID := range tt.expectedTaskIDs {
+					if !foundIDs[expectedID] {
+						t.Errorf("Expected deletion of task %s not found", expectedID)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestBidirectionalSyncWithDeletions(t *testing.T) {
+	tests := []struct {
+		name                 string
+		initialState         *TodoState
+		dailyTasks           []tasks.Task
+		todoTasks            []tasks.Task
+		expectDeleted        int
+		stateUpdated         bool
+		expectTaskInState    []string
+		expectTaskNotInState []string
+	}{
+		{
+			name: "deletion propagates - task removed from both sources",
+			initialState: &TodoState{
+				Tasks: map[string]TaskState{
+					"abc123": {ID: "abc123", Text: "Deleted task", Source: "test.md"},
+				},
+			},
+			dailyTasks:           []tasks.Task{},
+			todoTasks:            []tasks.Task{},
+			expectDeleted:        1,
+			stateUpdated:         true,
+			expectTaskNotInState: []string{"abc123"},
+		},
+		{
+			name: "completed tasks are NOT deleted",
+			initialState: &TodoState{
+				Tasks: map[string]TaskState{
+					"abc123": {ID: "abc123", Text: "Completed task", Completed: true, Source: "test.md"},
+				},
+			},
+			dailyTasks:        []tasks.Task{},
+			todoTasks:         []tasks.Task{},
+			expectDeleted:     0,
+			stateUpdated:      false,
+			expectTaskInState: []string{"abc123"},
+		},
+		{
+			name: "partial deletion - other tasks remain",
+			initialState: &TodoState{
+				Tasks: map[string]TaskState{
+					"abc123": {ID: "abc123", Text: "Keep this", Source: "test.md"},
+					"def456": {ID: "def456", Text: "Delete this", Source: "test.md"},
+				},
+			},
+			dailyTasks: []tasks.Task{
+				{ID: "abc123", Text: "Keep this"},
+			},
+			todoTasks: []tasks.Task{
+				{ID: "abc123", Text: "Keep this"},
+			},
+			expectDeleted:        1,
+			stateUpdated:         true,
+			expectTaskInState:    []string{"abc123"},
+			expectTaskNotInState: []string{"def456"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.initialState.BidirectionalSync(tt.dailyTasks, tt.todoTasks, "test.md")
+
+			if result.Deleted != tt.expectDeleted {
+				t.Errorf("Expected %d deletions, got %d", tt.expectDeleted, result.Deleted)
+			}
+
+			if result.StateUpdated != tt.stateUpdated {
+				t.Errorf("Expected StateUpdated=%v, got %v", tt.stateUpdated, result.StateUpdated)
+			}
+
+			for _, taskID := range tt.expectTaskInState {
+				if _, exists := tt.initialState.Tasks[taskID]; !exists {
+					t.Errorf("Expected task %s to exist in state", taskID)
+				}
+			}
+
+			for _, taskID := range tt.expectTaskNotInState {
+				if _, exists := tt.initialState.Tasks[taskID]; exists {
+					t.Errorf("Expected task %s to NOT exist in state", taskID)
+				}
+			}
+		})
+	}
+}
