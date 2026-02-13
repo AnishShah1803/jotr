@@ -7,17 +7,18 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/AnishShah1803/jotr/internal/output"
 	"github.com/AnishShah1803/jotr/internal/version"
 )
 
 var (
 	// Colors.
-	primaryColor   = lipgloss.Color("86")
-	secondaryColor = lipgloss.Color("240")
-	accentColor    = lipgloss.Color("205")
-	successColor   = lipgloss.Color("42")
-	warningColor   = lipgloss.Color("214")
-	errorColor     = lipgloss.Color("203")
+	primaryColor   = output.PrimaryColor
+	secondaryColor = output.SecondaryColor
+	accentColor    = output.AccentColor
+	successColor   = output.SuccessColor
+	warningColor   = output.WarningColor
+	errorColor     = output.ErrorColor
 
 	iconStreak = "🔥"
 	iconEmpty  = "○"

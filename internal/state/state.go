@@ -218,6 +218,24 @@ type TaskChange struct {
 	Source     string     // Where the change was detected (e.g., "daily-note", "todo-list")
 }
 
+// TaskChangeDetail represents detailed information about a task change for reporting
+type TaskChangeDetail struct {
+	ID      string `json:"id"`
+	Text    string `json:"text"`
+	Change  string `json:"change"`            // "added", "updated", "deleted"
+	From    string `json:"from,omitempty"`    // previous value (for updates)
+	To      string `json:"to,omitempty"`      // new value (for updates)
+	Details string `json:"details,omitempty"` // "marked complete", "priority changed to P1", etc.
+}
+
+// ConflictDetail represents detailed information about a conflict for reporting
+type ConflictDetail struct {
+	ID        string `json:"id"`
+	TextDaily string `json:"text_daily"`
+	TextTodo  string `json:"text_todo"`
+	Reason    string `json:"reason"`
+}
+
 // CompareWithDailyNotes compares the state with tasks from daily notes
 // Returns a list of changes detected
 func (s *TodoState) CompareWithDailyNotes(dailyTasks []tasks.Task, source string) []TaskChange {
@@ -428,16 +446,22 @@ func (s *TodoState) DetectConflicts(dailyChanges, todoChanges []TaskChange) map[
 
 // SyncResult represents the result of a sync operation
 type SyncResult struct {
-	StateUpdated   bool
-	DailyChanged   bool
-	TodoChanged    bool
-	Conflicts      map[string]string
-	AppliedDaily   int
-	AppliedTodo    int
-	Deleted        int // Number of tasks deleted during sync
-	Skipped        int
-	ChangedTaskIDs []string // Task IDs that changed and may need their source files updated
-	DeletedTaskIDs []string // Task IDs that were deleted
+	StateUpdated     bool
+	DailyChanged     bool
+	TodoChanged      bool
+	Conflicts        map[string]string
+	AppliedDaily     int
+	AppliedTodo      int
+	Deleted          int // Number of tasks deleted during sync
+	Skipped          int
+	ChangedTaskIDs   []string // Task IDs that changed and may need their source files updated
+	DeletedTaskIDs   []string // Task IDs that were deleted
+	AddedFromDaily   []TaskChangeDetail
+	UpdatedFromDaily []TaskChangeDetail
+	AddedFromTodo    []TaskChangeDetail
+	UpdatedFromTodo  []TaskChangeDetail
+	DeletedTasks     []TaskChangeDetail
+	ConflictsDetail  []ConflictDetail
 }
 
 // BidirectionalSync performs bidirectional sync between daily notes and todo list
@@ -453,6 +477,7 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 	conflicts := s.DetectConflicts(dailyChanges, todoChanges)
 	if len(conflicts) > 0 {
 		result.Conflicts = conflicts
+		result.ConflictsDetail = s.buildConflictDetails(dailyChanges, todoChanges, conflicts)
 		return result
 	}
 
@@ -475,6 +500,13 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 			result.StateUpdated = true
 			result.TodoChanged = true
 			result.ChangedTaskIDs = append(result.ChangedTaskIDs, taskID)
+
+			detail := buildTaskChangeDetail(dailyChange)
+			if dailyChange.ChangeType == Added {
+				result.AddedFromDaily = append(result.AddedFromDaily, detail)
+			} else if dailyChange.ChangeType == Modified {
+				result.UpdatedFromDaily = append(result.UpdatedFromDaily, detail)
+			}
 		} else if dailyChange.ChangeType == Modified && todoChange.ChangeType == Modified {
 			merged := s.smartMerge(dailyChange, todoChange)
 			if merged != nil {
@@ -490,6 +522,17 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 				result.DailyChanged = true
 				result.TodoChanged = true
 				result.ChangedTaskIDs = append(result.ChangedTaskIDs, taskID)
+
+				detail := buildTaskChangeDetail(TaskChange{
+					TaskID:     taskID,
+					ChangeType: Modified,
+					OldTask:    dailyChange.OldTask,
+					NewTask:    merged,
+					Source:     "merged",
+				})
+				// For merged changes, add to the 'UpdatedFromDaily' slice and mark source as merged
+				// to avoid duplicate entries appearing in both daily and todo sections.
+				result.UpdatedFromDaily = append(result.UpdatedFromDaily, detail)
 			} else {
 				result.Skipped++
 			}
@@ -503,6 +546,13 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 			result.StateUpdated = true
 			result.DailyChanged = true
 			result.ChangedTaskIDs = append(result.ChangedTaskIDs, taskID)
+
+			detail := buildTaskChangeDetail(todoChange)
+			if todoChange.ChangeType == Added {
+				result.AddedFromTodo = append(result.AddedFromTodo, detail)
+			} else if todoChange.ChangeType == Modified {
+				result.UpdatedFromTodo = append(result.UpdatedFromTodo, detail)
+			}
 		}
 	}
 
@@ -515,6 +565,8 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 		result.Deleted++
 		result.StateUpdated = true
 		result.DeletedTaskIDs = append(result.DeletedTaskIDs, deletion.TaskID)
+
+		result.DeletedTasks = append(result.DeletedTasks, buildTaskChangeDetail(deletion))
 	}
 
 	return result
@@ -620,4 +672,115 @@ func (s *TodoState) smartMerge(dailyChange, todoChange TaskChange) *TaskState {
 
 	// Real conflict - return nil to indicate merge not possible
 	return nil
+}
+
+func (s *TodoState) buildConflictDetails(dailyChanges, todoChanges []TaskChange, conflicts map[string]string) []ConflictDetail {
+	var details []ConflictDetail
+
+	dailyChangeMap := make(map[string]TaskChange)
+	for _, change := range dailyChanges {
+		dailyChangeMap[change.TaskID] = change
+	}
+
+	todoChangeMap := make(map[string]TaskChange)
+	for _, change := range todoChanges {
+		todoChangeMap[change.TaskID] = change
+	}
+
+	for id, reason := range conflicts {
+		detail := ConflictDetail{
+			ID:     id,
+			Reason: reason,
+		}
+
+		if dailyChange, exists := dailyChangeMap[id]; exists && dailyChange.NewTask != nil {
+			detail.TextDaily = dailyChange.NewTask.Text
+		}
+
+		if todoChange, exists := todoChangeMap[id]; exists && todoChange.NewTask != nil {
+			detail.TextTodo = todoChange.NewTask.Text
+		}
+
+		details = append(details, detail)
+	}
+
+	return details
+}
+
+func buildTaskChangeDetail(change TaskChange) TaskChangeDetail {
+	detail := TaskChangeDetail{
+		ID:     change.TaskID,
+		Change: changeTypeToString(change.ChangeType),
+	}
+
+	if change.TaskID == "" {
+		fmt.Fprintf(os.Stderr, "warning: task change has empty ID (type: %s)\n", changeTypeToString(change.ChangeType))
+	}
+
+	if change.NewTask != nil {
+		detail.Text = change.NewTask.Text
+	}
+
+	if change.OldTask != nil {
+		detail.From = change.OldTask.Text
+		if change.NewTask != nil {
+			detail.To = change.NewTask.Text
+			// Both old and new present -> describe what changed
+			detail.Details = buildChangeDetails(change.OldTask, change.NewTask)
+		} else if change.ChangeType == Deleted {
+			// Explicitly mark deletions
+			detail.Details = "task deleted"
+		}
+	} else if change.ChangeType == Added && change.NewTask != nil {
+		detail.Details = "new task added"
+	}
+
+	return detail
+}
+
+func changeTypeToString(ct ChangeType) string {
+	switch ct {
+	case Added:
+		return "added"
+	case Modified:
+		return "updated"
+	case Deleted:
+		return "deleted"
+	default:
+		return "unchanged"
+	}
+}
+
+func buildChangeDetails(oldTask, newTask *TaskState) string {
+	if oldTask == nil || newTask == nil {
+		return ""
+	}
+
+	var changes []string
+
+	if oldTask.Text != newTask.Text {
+		changes = append(changes, "text changed")
+	}
+
+	if oldTask.Completed != newTask.Completed {
+		if newTask.Completed {
+			changes = append(changes, "marked complete")
+		} else {
+			changes = append(changes, "marked incomplete")
+		}
+	}
+
+	if oldTask.Priority != newTask.Priority {
+		if newTask.Priority != "" {
+			changes = append(changes, fmt.Sprintf("priority changed to %s", newTask.Priority))
+		} else {
+			changes = append(changes, "priority removed")
+		}
+	}
+
+	if len(changes) == 0 {
+		return "modified"
+	}
+
+	return strings.Join(changes, ", ")
 }

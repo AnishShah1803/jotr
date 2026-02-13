@@ -13,6 +13,7 @@ import (
 
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/notes"
+	"github.com/AnishShah1803/jotr/internal/output"
 	"github.com/AnishShah1803/jotr/internal/tasks"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
@@ -500,7 +501,7 @@ func (m *Model) updateStatsViewport() {
 
 	// Streak with visual indicator
 	streakIcon := iconStreak
-	streakColor := successColor
+	streakColor := output.SuccessColor
 
 	if m.streak == 0 {
 		streakIcon = iconEmpty
@@ -543,11 +544,11 @@ func (m *Model) updateStatsViewport() {
 
 		var barColor lipgloss.Color
 		if completion >= 80 {
-			barColor = successColor
+			barColor = output.SuccessColor
 		} else if completion >= 50 {
-			barColor = warningColor
+			barColor = output.WarningColor
 		} else {
-			barColor = secondaryColor
+			barColor = output.SecondaryColor
 		}
 
 		barStyle := lipgloss.NewStyle().Foreground(barColor)

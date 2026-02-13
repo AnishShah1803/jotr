@@ -2,13 +2,59 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/output"
 	"github.com/AnishShah1803/jotr/internal/services"
+	"github.com/AnishShah1803/jotr/internal/state"
 )
+
+var (
+	syncDryRun  bool
+	syncQuiet   bool
+	syncJSON    bool
+	syncVerbose bool
+	syncNoColor bool
+)
+
+func isColorEnabled() bool {
+	if syncNoColor {
+		return false
+	}
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	fileInfo, err := os.Stdout.Stat()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to stat stdout: %v\n", err)
+		return false
+	}
+	return (fileInfo.Mode() & os.ModeCharDevice) == os.ModeCharDevice
+}
+
+func formatPrefix(prefix string, colorOn bool) string {
+	switch prefix {
+	case "+":
+		return output.Colorize("+", output.SuccessColor, colorOn)
+	case "~":
+		return output.Colorize("~", output.WarningColor, colorOn)
+	case "!":
+		return output.Colorize("!", output.ErrorColor, colorOn)
+	case "-":
+		return output.Colorize("-", output.MutedColor, colorOn)
+	case "✓":
+		return output.Colorize("✓", output.SuccessColor, colorOn)
+	case "⚠":
+		return output.Colorize("⚠", output.WarningColor, colorOn)
+	default:
+		return prefix
+	}
+}
 
 var SyncCmd = &cobra.Command{
 	Use:   "sync",
@@ -21,7 +67,10 @@ Conflicts are detected and reported.
 
 Examples:
   jotr sync                    # Sync tasks bidirectionally
-  jotr s                       # Using alias`,
+  jotr s                       # Using alias
+  jotr sync --dry-run          # Preview changes without applying
+  jotr sync --json             # Output in JSON format
+  jotr sync --quiet            # Show only summary counts`,
 	Aliases: []string{"s"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
@@ -33,23 +82,82 @@ Examples:
 	},
 }
 
+func init() {
+	SyncCmd.Flags().BoolVar(&syncDryRun, "dry-run", false, "Show what would be done without making changes")
+	SyncCmd.Flags().BoolVar(&syncQuiet, "quiet", false, "Suppress normal output, show only summary")
+	SyncCmd.Flags().BoolVar(&syncJSON, "json", false, "Output in JSON format")
+	SyncCmd.Flags().BoolVar(&syncVerbose, "verbose", false, "Enable verbose output with detailed task information")
+	SyncCmd.Flags().BoolVar(&syncNoColor, "no-color", false, "Disable colored output")
+}
+
 func syncTasks(ctx context.Context, cfg *config.LoadedConfig) error {
 	taskService := services.NewTaskService()
 
-	result, err := taskService.SyncTasks(ctx, services.SyncOptions{
+	opts := services.SyncOptions{
 		DiaryPath:   cfg.DiaryPath,
 		TodoPath:    cfg.TodoPath,
 		StatePath:   cfg.StatePath,
 		TaskSection: cfg.Format.TaskSection,
-	})
+		DryRun:      syncDryRun,
+	}
+
+	result, err := taskService.SyncTasks(ctx, opts)
 	if err != nil {
 		return err
 	}
 
+	if syncJSON {
+		return outputSyncJSON(result)
+	}
+
+	if syncQuiet {
+		return outputSyncQuiet(result)
+	}
+
+	return outputSyncDefault(result, syncVerbose)
+}
+
+func outputSyncJSON(result *services.SyncResult) error {
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal result to JSON: %w", err)
+	}
+	fmt.Println(string(data))
+	return nil
+}
+
+func outputSyncQuiet(result *services.SyncResult) error {
 	if len(result.Conflicts) > 0 {
-		fmt.Println("⚠ Conflicts detected:")
-		for taskID, conflict := range result.Conflicts {
-			fmt.Printf("  - Task %s: %s\n", taskID, conflict)
+		fmt.Printf("Conflicts: %d\n", len(result.Conflicts))
+		return nil
+	}
+
+	totalChanges := result.TasksFromDaily + result.TasksFromTodo
+	if totalChanges == 0 && result.DeletedTasks == 0 {
+		fmt.Println("No changes")
+		return nil
+	}
+
+	fmt.Printf("Daily: %d, Todo: %d, Deleted: %d\n", result.TasksFromDaily, result.TasksFromTodo, result.DeletedTasks)
+	return nil
+}
+
+func outputSyncDefault(result *services.SyncResult, verbose bool) error {
+	c := isColorEnabled()
+
+	if syncDryRun {
+		fmt.Printf("%s DRY RUN - No changes made\n", formatPrefix("⚠", c))
+		fmt.Println()
+	}
+
+	if len(result.Conflicts) > 0 {
+		fmt.Printf("%s Conflicts detected:\n", formatPrefix("⚠", c))
+		for _, conflict := range result.ConflictsDetail {
+			fmt.Printf("  %s \"%s\" - %s\n", formatPrefix("!", c), conflict.TextDaily, conflict.Reason)
+			if conflict.TextDaily != conflict.TextTodo {
+				fmt.Printf("      Daily: \"%s\"\n", conflict.TextDaily)
+				fmt.Printf("      Todo:  \"%s\"\n", conflict.TextTodo)
+			}
 		}
 		fmt.Println("\nResolve conflicts manually and run sync again.")
 		return nil
@@ -57,19 +165,108 @@ func syncTasks(ctx context.Context, cfg *config.LoadedConfig) error {
 
 	totalChanges := result.TasksFromDaily + result.TasksFromTodo
 	if totalChanges == 0 && result.DeletedTasks == 0 {
-		fmt.Println("✓ Everything is in sync")
+		fmt.Printf("%s Everything is in sync\n", formatPrefix("✓", c))
 		return nil
 	}
 
+	if len(result.AddedFromDaily) > 0 || len(result.UpdatedFromDaily) > 0 {
+		fmt.Println("From Daily Notes:")
+		printAddedTasks(result.AddedFromDaily, verbose, c)
+		printUpdatedTasks(result.UpdatedFromDaily, verbose, c)
+		fmt.Println()
+	}
+
+	if len(result.AddedFromTodo) > 0 || len(result.UpdatedFromTodo) > 0 {
+		fmt.Println("From Todo List:")
+		printAddedTasks(result.AddedFromTodo, verbose, c)
+		printUpdatedTasks(result.UpdatedFromTodo, verbose, c)
+		fmt.Println()
+	}
+
+	if len(result.DeletedTasksDetail) > 0 {
+		fmt.Println("Deleted:")
+		for _, task := range result.DeletedTasksDetail {
+			fmt.Printf("  %s \"%s\" (id: %s)\n", formatPrefix("-", c), task.Text, task.ID)
+			if verbose {
+				if task.From != "" {
+					fmt.Printf("      From: \"%s\"\n", task.From)
+				}
+				if task.Details != "" {
+					fmt.Printf("      Details: %s\n", task.Details)
+				}
+			}
+		}
+		fmt.Println()
+	}
+
+	fmt.Println("Summary:")
+	fmt.Printf("  %d tasks checked\n", result.TasksRead)
 	if result.TasksFromDaily > 0 {
-		fmt.Printf("✓ Synced %d task(s) from daily notes to todo list\n", result.TasksFromDaily)
+		fmt.Printf("  %d task(s) added/updated from daily notes\n", result.TasksFromDaily)
 	}
 	if result.TasksFromTodo > 0 {
-		fmt.Printf("✓ Synced %d task(s) from todo list to daily notes\n", result.TasksFromTodo)
+		fmt.Printf("  %d task(s) added/updated from todo list\n", result.TasksFromTodo)
 	}
 	if result.DeletedTasks > 0 {
-		fmt.Printf("✓ Removed %d deleted task(s) from state\n", result.DeletedTasks)
+		fmt.Printf("  %d task(s) deleted\n", result.DeletedTasks)
+	}
+
+	if verbose {
+		if len(result.ChangedTaskIDs) > 0 {
+			fmt.Println()
+			fmt.Println("Changed task IDs:")
+			for _, id := range result.ChangedTaskIDs {
+				fmt.Printf("  - %s\n", id)
+			}
+		}
+		if len(result.DeletedTaskIDs) > 0 {
+			fmt.Println()
+			fmt.Println("Deleted task IDs:")
+			for _, id := range result.DeletedTaskIDs {
+				fmt.Printf("  - %s\n", id)
+			}
+		}
+	}
+	if syncDryRun {
+		fmt.Println("\n(No changes were made - dry run mode)")
 	}
 
 	return nil
+}
+
+func printAddedTasks(tasks []state.TaskChangeDetail, verbose bool, colorOn bool) {
+	for _, task := range tasks {
+		fmt.Printf("  %s Added: \"%s\" (id: %s)\n", formatPrefix("+", colorOn), task.Text, task.ID)
+		if verbose {
+			if task.To != "" && task.To != task.Text {
+				fmt.Printf("      To: \"%s\"\n", task.To)
+			}
+			if task.Details != "" {
+				fmt.Printf("      Details: %s\n", task.Details)
+			}
+		}
+	}
+}
+
+func printUpdatedTasks(tasks []state.TaskChangeDetail, verbose bool, colorOn bool) {
+	for _, task := range tasks {
+		if verbose {
+			fmt.Printf("  %s Updated: (id: %s)\n", formatPrefix("~", colorOn), task.ID)
+			if task.From != "" {
+				fmt.Printf("      From: \"%s\"\n", task.From)
+			}
+			if task.To != "" {
+				fmt.Printf("      To:   \"%s\"\n", task.To)
+			}
+			if task.Details != "" {
+				fmt.Printf("      Details: %s\n", task.Details)
+			}
+		} else {
+			if task.Details != "" {
+				fmt.Printf("  %s Updated: \"%s\" - %s (id: %s)\n", formatPrefix("~", colorOn), task.Text, task.Details, task.ID)
+			} else {
+				fmt.Printf("  %s Updated: \"%s\" (id: %s)\n", formatPrefix("~", colorOn), task.Text, task.ID)
+			}
+		}
+	}
 }
