@@ -95,7 +95,7 @@ Planned Changes:
 
 ### Phase 2: BidirectionalSync Implementation
 
-- [ ] **2.1** Update `TodoState.BidirectionalSync()` (line 445 in `internal/state/state.go`) to populate the new detailed tracking fields:
+- [x] **2.1** Update `TodoState.BidirectionalSync()` (line 445 in `internal/state/state.go`) to populate the new detailed tracking fields:
   - Track when tasks are added from daily notes → add to `AddedFromDaily`
   - Track when tasks are updated from daily notes → add to `UpdatedFromDaily`
   - Track when tasks are added from todo list → add to `AddedFromTodo`
