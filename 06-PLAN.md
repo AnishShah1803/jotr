@@ -76,12 +76,12 @@ Planned Changes:
   }
   ```
 
-- [ ] **1.3** Extend `state.SyncResult` (line 430 in `internal/state/state.go`) with detailed tracking fields:
+- [x] **1.3** Extend `state.SyncResult` (line 430 in `internal/state/state.go`) with detailed tracking fields:
   ```go
   type SyncResult struct {
       // ... existing fields ...
       
-      // NEW: Detailed change tracking
+      // Detailed change tracking
       AddedFromDaily   []TaskChangeDetail
       UpdatedFromDaily []TaskChangeDetail
       AddedFromTodo    []TaskChangeDetail
@@ -91,7 +91,7 @@ Planned Changes:
   }
   ```
 
-- [ ] **1.4** Extend `services.SyncResult` (line 38 in `internal/services/task_service.go`) with same detailed fields to expose to CLI layer
+- [x] **1.4** Extend `services.SyncResult` (line 38 in `internal/services/task_service.go`) with same detailed fields to expose to CLI layer (renamed `DeletedTasks` to `DeletedTasksDetail` to avoid conflict with existing int field)
 
 ### Phase 2: BidirectionalSync Implementation
 

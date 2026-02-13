@@ -45,6 +45,14 @@ type SyncResult struct {
 	DeletedTasks   int
 	DeletedTaskIDs []string
 	Conflicts      map[string]string
+
+	// Detailed change tracking for CLI reporting
+	AddedFromDaily     []state.TaskChangeDetail
+	UpdatedFromDaily   []state.TaskChangeDetail
+	AddedFromTodo      []state.TaskChangeDetail
+	UpdatedFromTodo    []state.TaskChangeDetail
+	DeletedTasksDetail []state.TaskChangeDetail
+	ConflictsDetail    []state.ConflictDetail
 }
 
 // acquireSyncLocks acquires locks on state, todo, and daily note files in the correct order.
