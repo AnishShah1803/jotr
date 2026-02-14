@@ -68,9 +68,9 @@ var (
 	// Error style - base style without width (applied dynamically)
 	errorStyleBase = lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("196")).
+			BorderForeground(errorColor).
 			Padding(1, 2).
-			Foreground(lipgloss.Color("196"))
+			Foreground(errorColor)
 
 	// Margin styles for small and large terminals
 	marginStyleSmall = lipgloss.NewStyle().
@@ -93,7 +93,11 @@ var (
 )
 
 func (m Model) errorStyle() lipgloss.Style {
-	return errorStyleBase.Width(m.width - 8)
+	width := m.width - 8
+	if width < 1 {
+		width = 1
+	}
+	return errorStyleBase.Width(width)
 }
 
 func (m Model) marginStyle() lipgloss.Style {
@@ -104,15 +108,27 @@ func (m Model) marginStyle() lipgloss.Style {
 }
 
 func (m Model) asciiArtStyle() lipgloss.Style {
-	return asciiArtStyleBase.Width(m.width)
+	width := m.width
+	if width < 1 {
+		width = 1
+	}
+	return asciiArtStyleBase.Width(width)
 }
 
 func (m Model) statusStyle(color lipgloss.AdaptiveColor) lipgloss.Style {
-	return statusStyleBase.Width(m.width).Foreground(color)
+	width := m.width
+	if width < 1 {
+		width = 1
+	}
+	return statusStyleBase.Width(width).Foreground(color)
 }
 
 func (m Model) versionStyle() lipgloss.Style {
-	return versionStyleBase.Width(m.width)
+	width := m.width
+	if width < 1 {
+		width = 1
+	}
+	return versionStyleBase.Width(width)
 }
 
 func (m Model) View() string {
