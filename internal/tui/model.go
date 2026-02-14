@@ -4,14 +4,90 @@ import (
 	"context"
 	"time"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/output"
 	"github.com/AnishShah1803/jotr/internal/tasks"
 	"github.com/AnishShah1803/jotr/internal/updater"
 	"github.com/AnishShah1803/jotr/internal/version"
 )
+
+type keyMap struct {
+	Quit        key.Binding
+	Tab         key.Binding
+	TabReverse  key.Binding
+	Up          key.Binding
+	Down        key.Binding
+	Enter       key.Binding
+	NewTaskFile key.Binding
+	Refresh     key.Binding
+	Update      key.Binding
+}
+
+func (k keyMap) ShortHelp() []key.Binding {
+	return []key.Binding{k.Quit, k.Refresh, k.Enter, k.Update}
+}
+
+func (k keyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{k.Up, k.Down, k.Tab, k.TabReverse},
+		{k.Enter, k.NewTaskFile, k.Refresh, k.Update, k.Quit},
+	}
+}
+
+var defaultKeyMap = keyMap{
+	Quit: key.NewBinding(
+		key.WithKeys("q", "ctrl+c"),
+		key.WithHelp("q", "quit"),
+	),
+	Tab: key.NewBinding(
+		key.WithKeys("tab"),
+		key.WithHelp("tab", "switch panel"),
+	),
+	TabReverse: key.NewBinding(
+		key.WithKeys("shift+tab"),
+		key.WithHelp("shift+tab", "switch panel"),
+	),
+	Up: key.NewBinding(
+		key.WithKeys("up", "k"),
+		key.WithHelp("↑/k", "navigate"),
+	),
+	Down: key.NewBinding(
+		key.WithKeys("down", "j"),
+		key.WithHelp("↓/j", "navigate"),
+	),
+	Enter: key.NewBinding(
+		key.WithKeys("enter"),
+		key.WithHelp("enter", "open"),
+	),
+	NewTaskFile: key.NewBinding(
+		key.WithKeys("n"),
+		key.WithHelp("n", "create todo file"),
+	),
+	Refresh: key.NewBinding(
+		key.WithKeys("r"),
+		key.WithHelp("r", "refresh"),
+	),
+	Update: key.NewBinding(
+		key.WithKeys("u"),
+		key.WithHelp("u", "check updates"),
+	),
+}
+
+func (m *Model) updateCachedKeyMap() {
+	keys := m.keys
+
+	enterEnabled := m.focusedPanel == panelNotes || m.focusedPanel == panelTasks
+	keys.Enter.SetEnabled(enterEnabled)
+
+	keys.NewTaskFile.SetEnabled(m.err != nil && m.errorRetryable)
+
+	m.cachedKeyMap = keys
+}
 
 // updateChecker is the interface for update checking.
 // This allows for easier testing and decoupling from concrete implementation.
@@ -54,6 +130,9 @@ type Model struct {
 	tasksViewport    viewport.Model
 	notesViewport    viewport.Model
 	previewViewport  viewport.Model
+	helpModel        help.Model
+	keys             keyMap
+	cachedKeyMap     keyMap
 	completedTasks   int
 	selectedNote     int
 	streak           int
@@ -139,7 +218,12 @@ func checkForUpdatesFromTUI() (bool, string, error) {
 }
 
 func NewModel(ctx context.Context, cfg *config.LoadedConfig) Model {
-	return Model{
+	helpModel := help.New()
+	helpModel.Styles.ShortKey = helpModel.Styles.ShortKey.Foreground(output.SecondaryColor)
+	helpModel.Styles.ShortDesc = helpModel.Styles.ShortDesc.Foreground(output.SecondaryColor)
+	helpModel.Styles.ShortSeparator = helpModel.Styles.ShortSeparator.Foreground(output.SecondaryColor)
+
+	m := Model{
 		ctx:             ctx,
 		config:          cfg,
 		focusedPanel:    panelNotes,
@@ -149,11 +233,15 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig) Model {
 		previewViewport: viewport.New(0, 0),
 		tasksViewport:   viewport.New(0, 0),
 		statsViewport:   viewport.New(0, 0),
+		helpModel:       helpModel,
+		keys:            defaultKeyMap,
 		width:           80, // Default width
 		height:          24, // Default height (will be updated by WindowSizeMsg)
 		statusLevel:     "",
 		statusDuration:  0,
 	}
+	m.updateCachedKeyMap()
+	return m
 }
 
 func (m Model) Init() tea.Cmd {

@@ -1029,3 +1029,169 @@ func TestAutoExpiry_ContinuousTicks(t *testing.T) {
 		t.Errorf("Second tick should still return tickCmd")
 	}
 }
+
+// TestUpdateCachedKeyMap_EnterDisabledOnPreviewPanel tests that Enter is disabled on preview panel.
+func TestUpdateCachedKeyMap_EnterDisabledOnPreviewPanel(t *testing.T) {
+	cfg := &config.LoadedConfig{
+		Config: config.Config{},
+	}
+	cfg.Paths.BaseDir = "/tmp/test"
+	cfg.DiaryPath = "/tmp/test/diary"
+	cfg.TodoPath = "/tmp/test/todo.md"
+
+	model := NewModel(context.Background(), cfg)
+	model.focusedPanel = panelPreview
+	model.updateCachedKeyMap()
+
+	if model.cachedKeyMap.Enter.Enabled() {
+		t.Errorf("Enter should be disabled on panelPreview")
+	}
+}
+
+// TestUpdateCachedKeyMap_EnterDisabledOnStatsPanel tests that Enter is disabled on stats panel.
+func TestUpdateCachedKeyMap_EnterDisabledOnStatsPanel(t *testing.T) {
+	cfg := &config.LoadedConfig{
+		Config: config.Config{},
+	}
+	cfg.Paths.BaseDir = "/tmp/test"
+	cfg.DiaryPath = "/tmp/test/diary"
+	cfg.TodoPath = "/tmp/test/todo.md"
+
+	model := NewModel(context.Background(), cfg)
+	model.focusedPanel = panelStats
+	model.updateCachedKeyMap()
+
+	if model.cachedKeyMap.Enter.Enabled() {
+		t.Errorf("Enter should be disabled on panelStats")
+	}
+}
+
+// TestUpdateCachedKeyMap_EnterEnabledOnNotesPanel tests that Enter is enabled on notes panel.
+func TestUpdateCachedKeyMap_EnterEnabledOnNotesPanel(t *testing.T) {
+	cfg := &config.LoadedConfig{
+		Config: config.Config{},
+	}
+	cfg.Paths.BaseDir = "/tmp/test"
+	cfg.DiaryPath = "/tmp/test/diary"
+	cfg.TodoPath = "/tmp/test/todo.md"
+
+	model := NewModel(context.Background(), cfg)
+	model.focusedPanel = panelNotes
+	model.updateCachedKeyMap()
+
+	if !model.cachedKeyMap.Enter.Enabled() {
+		t.Errorf("Enter should be enabled on panelNotes")
+	}
+}
+
+// TestUpdateCachedKeyMap_EnterEnabledOnTasksPanel tests that Enter is enabled on tasks panel.
+func TestUpdateCachedKeyMap_EnterEnabledOnTasksPanel(t *testing.T) {
+	cfg := &config.LoadedConfig{
+		Config: config.Config{},
+	}
+	cfg.Paths.BaseDir = "/tmp/test"
+	cfg.DiaryPath = "/tmp/test/diary"
+	cfg.TodoPath = "/tmp/test/todo.md"
+
+	model := NewModel(context.Background(), cfg)
+	model.focusedPanel = panelTasks
+	model.updateCachedKeyMap()
+
+	if !model.cachedKeyMap.Enter.Enabled() {
+		t.Errorf("Enter should be enabled on panelTasks")
+	}
+}
+
+// TestUpdateCachedKeyMap_NewTaskFileDisabledByDefault tests that NewTaskFile is disabled when no error.
+func TestUpdateCachedKeyMap_NewTaskFileDisabledByDefault(t *testing.T) {
+	cfg := &config.LoadedConfig{
+		Config: config.Config{},
+	}
+	cfg.Paths.BaseDir = "/tmp/test"
+	cfg.DiaryPath = "/tmp/test/diary"
+	cfg.TodoPath = "/tmp/test/todo.md"
+
+	model := NewModel(context.Background(), cfg)
+	model.updateCachedKeyMap()
+
+	if model.cachedKeyMap.NewTaskFile.Enabled() {
+		t.Errorf("NewTaskFile should be disabled when there is no error")
+	}
+}
+
+// TestUpdateCachedKeyMap_NewTaskFileEnabledOnRetryableError tests that NewTaskFile is enabled on retryable error.
+func TestUpdateCachedKeyMap_NewTaskFileEnabledOnRetryableError(t *testing.T) {
+	cfg := &config.LoadedConfig{
+		Config: config.Config{},
+	}
+	cfg.Paths.BaseDir = "/tmp/test"
+	cfg.DiaryPath = "/tmp/test/diary"
+	cfg.TodoPath = "/tmp/test/todo.md"
+
+	model := NewModel(context.Background(), cfg)
+	model.err = fmt.Errorf("todo file not found")
+	model.errorRetryable = true
+	model.updateCachedKeyMap()
+
+	if !model.cachedKeyMap.NewTaskFile.Enabled() {
+		t.Errorf("NewTaskFile should be enabled when there is a retryable error")
+	}
+}
+
+// TestUpdateCachedKeyMap_NewTaskFileDisabledOnNonRetryableError tests that NewTaskFile stays disabled on non-retryable error.
+func TestUpdateCachedKeyMap_NewTaskFileDisabledOnNonRetryableError(t *testing.T) {
+	cfg := &config.LoadedConfig{
+		Config: config.Config{},
+	}
+	cfg.Paths.BaseDir = "/tmp/test"
+	cfg.DiaryPath = "/tmp/test/diary"
+	cfg.TodoPath = "/tmp/test/todo.md"
+
+	model := NewModel(context.Background(), cfg)
+	model.err = fmt.Errorf("fatal error")
+	model.errorRetryable = false
+	model.updateCachedKeyMap()
+
+	if model.cachedKeyMap.NewTaskFile.Enabled() {
+		t.Errorf("NewTaskFile should be disabled when error is not retryable")
+	}
+}
+
+// TestUpdateCachedKeyMap_CacheUpdatedByTabSwitch tests that cachedKeyMap is updated when switching panels via Tab.
+func TestUpdateCachedKeyMap_CacheUpdatedByTabSwitch(t *testing.T) {
+	cfg := &config.LoadedConfig{
+		Config: config.Config{},
+	}
+	cfg.Paths.BaseDir = "/tmp/test"
+	cfg.DiaryPath = "/tmp/test/diary"
+	cfg.TodoPath = "/tmp/test/todo.md"
+
+	model := NewModel(context.Background(), cfg)
+	model.ready = true
+
+	// Initially on panelNotes — Enter should be enabled
+	if !model.cachedKeyMap.Enter.Enabled() {
+		t.Errorf("Enter should be enabled on initial panelNotes")
+	}
+
+	// Tab to panelPreview — Enter should be disabled
+	updatedModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model = updatedModel.(Model)
+	if model.cachedKeyMap.Enter.Enabled() {
+		t.Errorf("Enter should be disabled after tabbing to panelPreview")
+	}
+
+	// Tab to panelTasks — Enter should be enabled again
+	updatedModel, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model = updatedModel.(Model)
+	if !model.cachedKeyMap.Enter.Enabled() {
+		t.Errorf("Enter should be enabled after tabbing to panelTasks")
+	}
+
+	// Tab to panelStats — Enter should be disabled
+	updatedModel, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model = updatedModel.(Model)
+	if model.cachedKeyMap.Enter.Enabled() {
+		t.Errorf("Enter should be disabled after tabbing to panelStats")
+	}
+}
