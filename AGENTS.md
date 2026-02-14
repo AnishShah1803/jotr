@@ -8,18 +8,28 @@
 jotr/
 ├── main.go           # Thin entry → cmd.Execute()
 ├── cmd/              # CLI commands (cobra)
-│   ├── root.go       # 27 subcommands, global flags
+│   ├── root.go       # 30 subcommands, global flags
 │   ├── note/         # daily, create, open, list
 │   ├── task/         # sync, summary, archive
 │   ├── search/       # search, tags, links
-│   └── system/       # configure, update, version
+│   ├── system/       # configure, update, version
+│   ├── templatecmd/  # template operations
+│   ├── util/         # utility commands
+│   └── visual/       # visualization commands
 ├── internal/
 │   ├── tui/          # Bubble Tea dashboard
 │   ├── config/       # Config loading + migration
 │   ├── tasks/        # Task parsing, sync logic
 │   ├── templates/    # Template rendering
 │   ├── services/     # Business logic
-│   └── utils/        # Shared utilities
+│   ├── utils/        # Shared utilities
+│   ├── notes/        # Note operations
+│   ├── options/      # CLI option handling
+│   ├── output/       # Output formatting
+│   ├── state/        # Application state
+│   ├── updater/      # Self-update logic
+│   ├── version/      # Version info
+│   └── testhelpers/  # Test utilities
 └── test/             # Integration tests
 ```
 
