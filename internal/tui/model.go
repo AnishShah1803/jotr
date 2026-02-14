@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -12,6 +14,65 @@ import (
 	"github.com/AnishShah1803/jotr/internal/updater"
 	"github.com/AnishShah1803/jotr/internal/version"
 )
+
+type keyMap struct {
+	Quit       key.Binding
+	Tab        key.Binding
+	TabReverse key.Binding
+	Up         key.Binding
+	Down       key.Binding
+	Enter      key.Binding
+	Refresh    key.Binding
+	Update     key.Binding
+}
+
+func (k keyMap) ShortHelp() []key.Binding {
+	return []key.Binding{k.Quit, k.Refresh, k.Update}
+}
+
+func (k keyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{k.Up, k.Down, k.Tab, k.TabReverse},
+		{k.Enter, k.Refresh, k.Update, k.Quit},
+	}
+}
+
+func newKeyMap() keyMap {
+	return keyMap{
+		Quit: key.NewBinding(
+			key.WithKeys("q", "ctrl+c"),
+			key.WithHelp("q", "quit"),
+		),
+		Tab: key.NewBinding(
+			key.WithKeys("tab"),
+			key.WithHelp("tab", "switch panel"),
+		),
+		TabReverse: key.NewBinding(
+			key.WithKeys("shift+tab"),
+			key.WithHelp("shift+tab", "switch panel"),
+		),
+		Up: key.NewBinding(
+			key.WithKeys("up", "k"),
+			key.WithHelp("↑/k", "navigate"),
+		),
+		Down: key.NewBinding(
+			key.WithKeys("down", "j"),
+			key.WithHelp("↓/j", "navigate"),
+		),
+		Enter: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "open"),
+		),
+		Refresh: key.NewBinding(
+			key.WithKeys("r"),
+			key.WithHelp("r", "refresh"),
+		),
+		Update: key.NewBinding(
+			key.WithKeys("u"),
+			key.WithHelp("u", "check updates"),
+		),
+	}
+}
 
 // updateChecker is the interface for update checking.
 // This allows for easier testing and decoupling from concrete implementation.
@@ -54,6 +115,8 @@ type Model struct {
 	tasksViewport    viewport.Model
 	notesViewport    viewport.Model
 	previewViewport  viewport.Model
+	helpModel        help.Model
+	keys             keyMap
 	completedTasks   int
 	selectedNote     int
 	streak           int
@@ -149,6 +212,8 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig) Model {
 		previewViewport: viewport.New(0, 0),
 		tasksViewport:   viewport.New(0, 0),
 		statsViewport:   viewport.New(0, 0),
+		helpModel:       help.New(),
+		keys:            newKeyMap(),
 		width:           80, // Default width
 		height:          24, // Default height (will be updated by WindowSizeMsg)
 		statusLevel:     "",

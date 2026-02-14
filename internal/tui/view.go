@@ -12,7 +12,6 @@ import (
 )
 
 var (
-	// Colors.
 	primaryColor   = output.PrimaryColor
 	secondaryColor = output.SecondaryColor
 	accentColor    = output.AccentColor
@@ -53,9 +52,6 @@ var (
 	selectedItemStyle = lipgloss.NewStyle().
 				Foreground(accentColor).
 				Bold(true)
-
-	helpStyle = lipgloss.NewStyle().
-			Foreground(secondaryColor)
 
 	// ASCII Art - Only used for large terminals (40+ lines, 50+ width).
 	asciiArtLarge = `     ██╗ ██████╗ ████████╗██████╗
@@ -266,22 +262,7 @@ func (m Model) renderHeader() string {
 }
 
 func (m Model) renderFooter() string {
-	var helpText string
-
-	switch m.focusedPanel {
-	case panelNotes:
-		helpText = "q: quit | tab: switch panel | ↑↓/jk: navigate | enter: open note | r: refresh | u: update"
-	case panelPreview:
-		helpText = "q: quit | tab: switch panel | ↑↓/jk: scroll | r: refresh | u: update"
-	case panelTasks:
-		helpText = "q: quit | tab: switch panel | ↑↓/jk: scroll | enter: open todo list | r: refresh | u: update"
-	case panelStats:
-		helpText = "q: quit | tab: switch panel | ↑↓/jk: scroll | r: refresh | u: update"
-	default:
-		helpText = "q: quit | tab: switch panel | r: refresh | u: update"
-	}
-
-	help := helpStyle.Render(helpText)
+	help := m.helpModel.View(m.keys)
 
 	return "\n" + help
 }
