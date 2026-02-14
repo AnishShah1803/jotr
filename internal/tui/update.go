@@ -68,6 +68,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.Update):
 			m = setStatus(m, "Checking for updates...", "info")
 			return m, checkForUpdatesCmd()
+
+		case key.Matches(msg, m.keys.NewTaskFile):
+			if m.err != nil && m.errorRetryable {
+				err := createTodoFile(m.config.TodoPath)
+				if err != nil {
+					m = setStatus(m, "Failed to create file: "+err.Error(), "error")
+				} else {
+					m = setStatus(m, "Todo file created successfully", "success")
+					m.err = nil
+					m.errorRetryable = false
+					return m, m.loadData()
+				}
+				return m, nil
+			}
 		}
 
 		// If there's a retryable error, allow 'r' to retry

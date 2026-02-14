@@ -17,24 +17,25 @@ import (
 )
 
 type keyMap struct {
-	Quit       key.Binding
-	Tab        key.Binding
-	TabReverse key.Binding
-	Up         key.Binding
-	Down       key.Binding
-	Enter      key.Binding
-	Refresh    key.Binding
-	Update     key.Binding
+	Quit        key.Binding
+	Tab         key.Binding
+	TabReverse  key.Binding
+	Up          key.Binding
+	Down        key.Binding
+	Enter       key.Binding
+	NewTaskFile key.Binding
+	Refresh     key.Binding
+	Update      key.Binding
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Quit, k.Refresh, k.Update}
+	return []key.Binding{k.Quit, k.Refresh, k.NewTaskFile, k.Update}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Tab, k.TabReverse},
-		{k.Enter, k.Refresh, k.Update, k.Quit},
+		{k.Enter, k.NewTaskFile, k.Refresh, k.Update, k.Quit},
 	}
 }
 
@@ -64,6 +65,10 @@ func newKeyMap() keyMap {
 			key.WithKeys("enter"),
 			key.WithHelp("enter", "open"),
 		),
+		NewTaskFile: key.NewBinding(
+			key.WithKeys("n"),
+			key.WithHelp("n", "create file"),
+		),
 		Refresh: key.NewBinding(
 			key.WithKeys("r"),
 			key.WithHelp("r", "refresh"),
@@ -78,57 +83,8 @@ func newKeyMap() keyMap {
 func (m Model) getKeyMap() keyMap {
 	keys := m.keys
 
-	switch m.focusedPanel {
-	case panelNotes:
-		keys.Up.SetEnabled(true)
-		keys.Down.SetEnabled(true)
-		keys.Enter.SetEnabled(true)
-		keys.Tab.SetEnabled(true)
-		keys.TabReverse.SetEnabled(true)
-		keys.Refresh.SetEnabled(true)
-		keys.Update.SetEnabled(true)
-		keys.Quit.SetEnabled(true)
-
-	case panelPreview:
-		keys.Up.SetEnabled(true)
-		keys.Down.SetEnabled(true)
-		keys.Enter.SetEnabled(false)
-		keys.Tab.SetEnabled(true)
-		keys.TabReverse.SetEnabled(true)
-		keys.Refresh.SetEnabled(true)
-		keys.Update.SetEnabled(true)
-		keys.Quit.SetEnabled(true)
-
-	case panelTasks:
-		keys.Up.SetEnabled(true)
-		keys.Down.SetEnabled(true)
-		keys.Enter.SetEnabled(true)
-		keys.Tab.SetEnabled(true)
-		keys.TabReverse.SetEnabled(true)
-		keys.Refresh.SetEnabled(true)
-		keys.Update.SetEnabled(true)
-		keys.Quit.SetEnabled(true)
-
-	case panelStats:
-		keys.Up.SetEnabled(true)
-		keys.Down.SetEnabled(true)
-		keys.Enter.SetEnabled(false)
-		keys.Tab.SetEnabled(true)
-		keys.TabReverse.SetEnabled(true)
-		keys.Refresh.SetEnabled(true)
-		keys.Update.SetEnabled(true)
-		keys.Quit.SetEnabled(true)
-
-	default:
-		keys.Up.SetEnabled(false)
-		keys.Down.SetEnabled(false)
-		keys.Enter.SetEnabled(false)
-		keys.Tab.SetEnabled(true)
-		keys.TabReverse.SetEnabled(true)
-		keys.Refresh.SetEnabled(true)
-		keys.Update.SetEnabled(true)
-		keys.Quit.SetEnabled(true)
-	}
+	enterEnabled := m.focusedPanel == panelNotes || m.focusedPanel == panelTasks
+	keys.Enter.SetEnabled(enterEnabled)
 
 	return keys
 }
