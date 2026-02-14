@@ -110,6 +110,12 @@ const (
 	panelPreview
 	panelTasks
 	panelStats
+	numPanels = 4
+)
+
+const (
+	minWidthForAscii  = 50
+	minHeightForAscii = 40
 )
 
 // Model represents the TUI state for the dashboard.

@@ -399,9 +399,6 @@ func calculateStreak(cfg *config.LoadedConfig) int {
 
 // updateViewportSizes updates all viewport dimensions based on current window size.
 func (m *Model) updateViewportSizes() {
-	minWidthForAscii := 50
-	minHeightForAscii := 40
-
 	var headerFooterHeight int
 
 	if m.height >= minHeightForAscii && m.width >= minWidthForAscii {
