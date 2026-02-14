@@ -127,12 +127,8 @@ func (m Model) versionStyle() lipgloss.Style {
 	return versionStyleBase.Width(width)
 }
 
-func calculateLayoutHeight(header, main, footer string) (headerH, mainH, footerH, used int) {
-	headerH = lipgloss.Height(header)
-	mainH = lipgloss.Height(main)
-	footerH = lipgloss.Height(footer)
-	used = headerH + mainH + footerH
-	return
+func calculateLayoutHeight(header, main, footer string) int {
+	return lipgloss.Height(header) + lipgloss.Height(main) + lipgloss.Height(footer)
 }
 
 func (m Model) View() string {
@@ -210,7 +206,7 @@ func (m Model) View() string {
 	header := m.renderHeader()
 	footer := m.renderFooter()
 
-	_, _, _, usedHeight := calculateLayoutHeight(header, mainWithMargin, footer)
+	usedHeight := calculateLayoutHeight(header, mainWithMargin, footer)
 
 	// Add padding to push footer to bottom
 	paddingNeeded := m.height - usedHeight
