@@ -29,7 +29,7 @@ type keyMap struct {
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Quit, k.Refresh, k.NewTaskFile, k.Update}
+	return []key.Binding{k.Quit, k.Refresh, k.Enter, k.Update}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
@@ -39,54 +39,54 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	}
 }
 
-func newKeyMap() keyMap {
-	return keyMap{
-		Quit: key.NewBinding(
-			key.WithKeys("q", "ctrl+c"),
-			key.WithHelp("q", "quit"),
-		),
-		Tab: key.NewBinding(
-			key.WithKeys("tab"),
-			key.WithHelp("tab", "switch panel"),
-		),
-		TabReverse: key.NewBinding(
-			key.WithKeys("shift+tab"),
-			key.WithHelp("shift+tab", "switch panel"),
-		),
-		Up: key.NewBinding(
-			key.WithKeys("up", "k"),
-			key.WithHelp("↑/k", "navigate"),
-		),
-		Down: key.NewBinding(
-			key.WithKeys("down", "j"),
-			key.WithHelp("↓/j", "navigate"),
-		),
-		Enter: key.NewBinding(
-			key.WithKeys("enter"),
-			key.WithHelp("enter", "open"),
-		),
-		NewTaskFile: key.NewBinding(
-			key.WithKeys("n"),
-			key.WithHelp("n", "create file"),
-		),
-		Refresh: key.NewBinding(
-			key.WithKeys("r"),
-			key.WithHelp("r", "refresh"),
-		),
-		Update: key.NewBinding(
-			key.WithKeys("u"),
-			key.WithHelp("u", "check updates"),
-		),
-	}
+var defaultKeyMap = keyMap{
+	Quit: key.NewBinding(
+		key.WithKeys("q", "ctrl+c"),
+		key.WithHelp("q", "quit"),
+	),
+	Tab: key.NewBinding(
+		key.WithKeys("tab"),
+		key.WithHelp("tab", "switch panel"),
+	),
+	TabReverse: key.NewBinding(
+		key.WithKeys("shift+tab"),
+		key.WithHelp("shift+tab", "switch panel"),
+	),
+	Up: key.NewBinding(
+		key.WithKeys("up", "k"),
+		key.WithHelp("↑/k", "navigate"),
+	),
+	Down: key.NewBinding(
+		key.WithKeys("down", "j"),
+		key.WithHelp("↓/j", "navigate"),
+	),
+	Enter: key.NewBinding(
+		key.WithKeys("enter"),
+		key.WithHelp("enter", "open"),
+	),
+	NewTaskFile: key.NewBinding(
+		key.WithKeys("n"),
+		key.WithHelp("n", "create todo file"),
+	),
+	Refresh: key.NewBinding(
+		key.WithKeys("r"),
+		key.WithHelp("r", "refresh"),
+	),
+	Update: key.NewBinding(
+		key.WithKeys("u"),
+		key.WithHelp("u", "check updates"),
+	),
 }
 
-func (m Model) getKeyMap() keyMap {
+func (m *Model) updateCachedKeyMap() {
 	keys := m.keys
 
 	enterEnabled := m.focusedPanel == panelNotes || m.focusedPanel == panelTasks
 	keys.Enter.SetEnabled(enterEnabled)
 
-	return keys
+	keys.NewTaskFile.SetEnabled(m.err != nil && m.errorRetryable)
+
+	m.cachedKeyMap = keys
 }
 
 // updateChecker is the interface for update checking.
@@ -132,6 +132,7 @@ type Model struct {
 	previewViewport  viewport.Model
 	helpModel        help.Model
 	keys             keyMap
+	cachedKeyMap     keyMap
 	completedTasks   int
 	selectedNote     int
 	streak           int
@@ -220,8 +221,9 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig) Model {
 	helpModel := help.New()
 	helpModel.Styles.ShortKey = helpModel.Styles.ShortKey.Foreground(output.SecondaryColor)
 	helpModel.Styles.ShortDesc = helpModel.Styles.ShortDesc.Foreground(output.SecondaryColor)
+	helpModel.Styles.ShortSeparator = helpModel.Styles.ShortSeparator.Foreground(output.SecondaryColor)
 
-	return Model{
+	m := Model{
 		ctx:             ctx,
 		config:          cfg,
 		focusedPanel:    panelNotes,
@@ -232,12 +234,14 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig) Model {
 		tasksViewport:   viewport.New(0, 0),
 		statsViewport:   viewport.New(0, 0),
 		helpModel:       helpModel,
-		keys:            newKeyMap(),
+		keys:            defaultKeyMap,
 		width:           80, // Default width
 		height:          24, // Default height (will be updated by WindowSizeMsg)
 		statusLevel:     "",
 		statusDuration:  0,
 	}
+	m.updateCachedKeyMap()
+	return m
 }
 
 func (m Model) Init() tea.Cmd {

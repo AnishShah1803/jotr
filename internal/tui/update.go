@@ -43,10 +43,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msg, m.keys.Tab):
 			m.focusedPanel = (m.focusedPanel + 1) % 4
+			m.updateCachedKeyMap()
 			return m, nil
 
 		case key.Matches(msg, m.keys.TabReverse):
 			m.focusedPanel = (m.focusedPanel + 3) % 4
+			m.updateCachedKeyMap()
 			return m, nil
 
 		case key.Matches(msg, m.keys.Up):
@@ -62,6 +64,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = nil
 			m.errorRetryable = false
 			m = setStatus(m, "Refreshing...", "info")
+			m.updateCachedKeyMap()
 
 			return m, m.loadData()
 
@@ -78,18 +81,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m = setStatus(m, "Todo file created successfully", "success")
 					m.err = nil
 					m.errorRetryable = false
+					m.updateCachedKeyMap()
 					return m, m.loadData()
 				}
 				return m, nil
 			}
-		}
-
-		// If there's a retryable error, allow 'r' to retry
-		if m.err != nil && m.errorRetryable && key.Matches(msg, m.keys.Refresh) {
-			m.err = nil
-			m.errorRetryable = false
-			m = setStatus(m, "Retrying...", "info")
-			return m, m.loadData()
 		}
 
 	case tickMsg:
@@ -129,6 +125,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.err = msg.err
 			m.errorRetryable = true
+			m.updateCachedKeyMap()
 		}
 
 		return m, m.loadData()
@@ -163,6 +160,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case errorMsg:
 		m.err = msg.err
 		m.errorRetryable = msg.retryable
+		m.updateCachedKeyMap()
 
 		return m, nil
 	}
@@ -561,19 +559,6 @@ func (m *Model) updateStatsViewport() {
 
 func createTodoFile(path string) error {
 	return os.WriteFile(path, []byte("# Todo\n\n## Tasks\n\n\n\n"), 0644)
-}
-
-func isEditorAvailable(ctx context.Context) bool {
-	editor := config.GetEditorWithContext(ctx)
-	if editor == "" {
-		return false
-	}
-
-	if err := utils.ValidateEditor(editor); err != nil {
-		return false
-	}
-
-	return true
 }
 
 func isAnyEditorAvailable(ctx context.Context, cfg *config.LoadedConfig) bool {
