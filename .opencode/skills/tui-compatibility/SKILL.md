@@ -1,6 +1,8 @@
 ---
 name: tui-compatibility
 description: Handling cross-terminal differences, color profiles, and non-TTY environments.
+license: MIT
+compatibility: opencode
 ---
 
 ## Best Practices

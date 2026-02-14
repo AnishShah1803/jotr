@@ -1,6 +1,8 @@
 ---
 name: tui-concurrency
 description: Rules for handling asynchronous I/O and preventing race conditions in Bubble Tea.
+license: MIT
+compatibility: opencode
 ---
 
 ## Best Practices

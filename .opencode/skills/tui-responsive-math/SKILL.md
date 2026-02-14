@@ -1,6 +1,8 @@
 ---
 name: tui-responsive-math
 description: Best practices for calculating dynamic terminal dimensions and avoiding layout overflows.
+license: MIT
+compatibility: opencode
 ---
 
 ## Rules of Arithmetic
@@ -12,9 +14,6 @@ description: Best practices for calculating dynamic terminal dimensions and avoi
 ```go
 func (m *model) setDimensions(w, h int) {
     borderSize := 2
-    m.contentWidth = w - borderSize
-    m.contentHeight = h - borderSize - footerHeight
-    
-    // Always validate to prevent panics
-    if m.contentHeight < 0 { m.contentHeight = 0 }
+    m.contentWidth = max(0, w-borderSize)
+    m.contentHeight = max(0, h-borderSize-footerHeight)
 }

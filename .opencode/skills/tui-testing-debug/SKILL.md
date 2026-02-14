@@ -18,6 +18,9 @@ compatibility: opencode
 ## Example: File Logging
 ```go
 if len(os.Getenv("DEBUG")) > 0 {
-    f, _ := tea.LogToFile("debug.log", "debug")
+    f, err := tea.LogToFile("debug.log", "debug")
+    if err != nil {
+        log.Fatal(err)
+    }
     defer f.Close()
 }

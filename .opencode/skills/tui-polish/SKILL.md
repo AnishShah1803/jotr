@@ -1,6 +1,8 @@
 ---
 name: tui-polish
 description: Final polish for TUIs, including alt-screen management and Unicode safety.
+license: MIT
+compatibility: opencode
 ---
 
 ## Best Practices

@@ -21,7 +21,10 @@ compatibility: opencode
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     switch msg := msg.(type) {
     case tea.WindowSizeMsg:
-        m.width, m.height = msg.Width, msg.Height
+        // Validate that dimensions are positive before assigning
+        if msg.Width > 0 && msg.Height > 0 {
+            m.width, m.height = msg.Width, msg.Height
+        }
     }
     // Delegate to active component
     switch m.state {
