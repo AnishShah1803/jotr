@@ -127,6 +127,10 @@ func (m Model) versionStyle() lipgloss.Style {
 	return versionStyleBase.Width(width)
 }
 
+func calculateLayoutHeight(header, main, footer string) int {
+	return lipgloss.Height(header) + lipgloss.Height(main) + lipgloss.Height(footer)
+}
+
 func (m Model) View() string {
 	if !m.ready {
 		return "\n  Loading jotr dashboard...\n\n"
@@ -202,11 +206,7 @@ func (m Model) View() string {
 	header := m.renderHeader()
 	footer := m.renderFooter()
 
-	// Calculate how much vertical space we have
-	headerHeight := lipgloss.Height(header)
-	mainHeight := lipgloss.Height(mainWithMargin)
-	footerHeight := lipgloss.Height(footer)
-	usedHeight := headerHeight + mainHeight + footerHeight
+	usedHeight := calculateLayoutHeight(header, mainWithMargin, footer)
 
 	// Add padding to push footer to bottom
 	paddingNeeded := m.height - usedHeight
