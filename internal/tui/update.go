@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -35,56 +36,42 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
+		switch {
+		case key.Matches(msg, m.keys.Quit):
 			m.quitting = true
 			return m, tea.Sequence(tea.ExitAltScreen, tea.Quit)
 
-		case "tab":
+		case key.Matches(msg, m.keys.Tab):
 			m.focusedPanel = (m.focusedPanel + 1) % 4
 			return m, nil
 
-		case "shift+tab":
+		case key.Matches(msg, m.keys.TabReverse):
 			m.focusedPanel = (m.focusedPanel + 3) % 4
 			return m, nil
 
-		case "up", "k":
+		case key.Matches(msg, m.keys.Up):
 			return m.handleUp()
 
-		case "down", "j":
+		case key.Matches(msg, m.keys.Down):
 			return m.handleDown()
 
-		case "enter":
+		case key.Matches(msg, m.keys.Enter):
 			return m.handleEnter()
 
-		case "r":
+		case key.Matches(msg, m.keys.Refresh):
 			m.err = nil
 			m.errorRetryable = false
 			m = setStatus(m, "Refreshing...", "info")
 
 			return m, m.loadData()
 
-		case "u":
-			m = setStatus(m, "🔍 Checking for updates...", "info")
+		case key.Matches(msg, m.keys.Update):
+			m = setStatus(m, "Checking for updates...", "info")
 			return m, checkForUpdatesCmd()
-
-		case "n":
-			if m.err != nil && m.errorRetryable {
-				err := createTodoFile(m.config.TodoPath)
-				if err != nil {
-					m = setStatus(m, "Failed to create file: "+err.Error(), "error")
-				} else {
-					m = setStatus(m, "Todo file created successfully", "success")
-					m.err = nil
-					m.errorRetryable = false
-					return m, m.loadData()
-				}
-				return m, nil
-			}
 		}
 
 		// If there's a retryable error, allow 'r' to retry
-		if m.err != nil && m.errorRetryable && msg.String() == "r" {
+		if m.err != nil && m.errorRetryable && key.Matches(msg, m.keys.Refresh) {
 			m.err = nil
 			m.errorRetryable = false
 			m = setStatus(m, "Retrying...", "info")

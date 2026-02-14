@@ -262,7 +262,7 @@ func (m Model) renderHeader() string {
 }
 
 func (m Model) renderFooter() string {
-	help := m.helpModel.View(m.keys)
+	help := m.helpModel.View(m.getKeyMap())
 
 	return "\n" + help
 }

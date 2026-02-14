@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/output"
 	"github.com/AnishShah1803/jotr/internal/tasks"
 	"github.com/AnishShah1803/jotr/internal/updater"
 	"github.com/AnishShah1803/jotr/internal/version"
@@ -72,6 +73,64 @@ func newKeyMap() keyMap {
 			key.WithHelp("u", "check updates"),
 		),
 	}
+}
+
+func (m Model) getKeyMap() keyMap {
+	keys := m.keys
+
+	switch m.focusedPanel {
+	case panelNotes:
+		keys.Up.SetEnabled(true)
+		keys.Down.SetEnabled(true)
+		keys.Enter.SetEnabled(true)
+		keys.Tab.SetEnabled(true)
+		keys.TabReverse.SetEnabled(true)
+		keys.Refresh.SetEnabled(true)
+		keys.Update.SetEnabled(true)
+		keys.Quit.SetEnabled(true)
+
+	case panelPreview:
+		keys.Up.SetEnabled(true)
+		keys.Down.SetEnabled(true)
+		keys.Enter.SetEnabled(false)
+		keys.Tab.SetEnabled(true)
+		keys.TabReverse.SetEnabled(true)
+		keys.Refresh.SetEnabled(true)
+		keys.Update.SetEnabled(true)
+		keys.Quit.SetEnabled(true)
+
+	case panelTasks:
+		keys.Up.SetEnabled(true)
+		keys.Down.SetEnabled(true)
+		keys.Enter.SetEnabled(true)
+		keys.Tab.SetEnabled(true)
+		keys.TabReverse.SetEnabled(true)
+		keys.Refresh.SetEnabled(true)
+		keys.Update.SetEnabled(true)
+		keys.Quit.SetEnabled(true)
+
+	case panelStats:
+		keys.Up.SetEnabled(true)
+		keys.Down.SetEnabled(true)
+		keys.Enter.SetEnabled(false)
+		keys.Tab.SetEnabled(true)
+		keys.TabReverse.SetEnabled(true)
+		keys.Refresh.SetEnabled(true)
+		keys.Update.SetEnabled(true)
+		keys.Quit.SetEnabled(true)
+
+	default:
+		keys.Up.SetEnabled(false)
+		keys.Down.SetEnabled(false)
+		keys.Enter.SetEnabled(false)
+		keys.Tab.SetEnabled(true)
+		keys.TabReverse.SetEnabled(true)
+		keys.Refresh.SetEnabled(true)
+		keys.Update.SetEnabled(true)
+		keys.Quit.SetEnabled(true)
+	}
+
+	return keys
 }
 
 // updateChecker is the interface for update checking.
@@ -202,6 +261,10 @@ func checkForUpdatesFromTUI() (bool, string, error) {
 }
 
 func NewModel(ctx context.Context, cfg *config.LoadedConfig) Model {
+	helpModel := help.New()
+	helpModel.Styles.ShortKey = helpModel.Styles.ShortKey.Foreground(output.SecondaryColor)
+	helpModel.Styles.ShortDesc = helpModel.Styles.ShortDesc.Foreground(output.SecondaryColor)
+
 	return Model{
 		ctx:             ctx,
 		config:          cfg,
@@ -212,7 +275,7 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig) Model {
 		previewViewport: viewport.New(0, 0),
 		tasksViewport:   viewport.New(0, 0),
 		statsViewport:   viewport.New(0, 0),
-		helpModel:       help.New(),
+		helpModel:       helpModel,
 		keys:            newKeyMap(),
 		width:           80, // Default width
 		height:          24, // Default height (will be updated by WindowSizeMsg)
