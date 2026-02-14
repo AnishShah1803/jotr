@@ -155,11 +155,6 @@ func (m Model) View() string {
 	// Note: lipgloss .Width() and .Height() include borders in the dimension
 	// So if we set Width(50) with a border, the content area is 50 - 2 = 48
 
-	// Calculate panel dimensions
-	// Only show ASCII art for large terminals
-	minWidthForAscii := 50
-	minHeightForAscii := 40
-
 	var headerFooterHeight int
 
 	if m.height >= minHeightForAscii && m.width >= minWidthForAscii {
@@ -226,9 +221,6 @@ func (m Model) View() string {
 }
 
 func (m Model) renderHeader() string {
-	minWidthForAscii := 50
-	minHeightForAscii := 40
-
 	var header string
 
 	if m.height >= minHeightForAscii && m.width >= minWidthForAscii {
