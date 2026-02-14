@@ -64,7 +64,72 @@ var (
 ██   ██║██║   ██║   ██║   ██╔══██╗
 ╚█████╔╝╚██████╔╝   ██║   ██║  ██║
  ╚════╝  ╚═════╝    ╚═╝   ╚═╝  ╚═╝`
+
+	// Error style - base style without width (applied dynamically)
+	errorStyleBase = lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(errorColor).
+			Padding(1, 2).
+			Foreground(errorColor)
+
+	// Margin styles for small and large terminals
+	marginStyleSmall = lipgloss.NewStyle().
+				MarginTop(1).MarginBottom(0).MarginLeft(2).MarginRight(2)
+
+	marginStyleLarge = lipgloss.NewStyle().
+				Margin(1, 2)
+
+	// Header styles
+	asciiArtStyleBase = lipgloss.NewStyle().
+				Align(lipgloss.Center).
+				Foreground(primaryColor)
+
+	statusStyleBase = lipgloss.NewStyle().
+			Align(lipgloss.Center)
+
+	versionStyleBase = lipgloss.NewStyle().
+				Align(lipgloss.Center).
+				Foreground(secondaryColor)
 )
+
+func (m Model) errorStyle() lipgloss.Style {
+	width := m.width - 8
+	if width < 1 {
+		width = 1
+	}
+	return errorStyleBase.Width(width)
+}
+
+func (m Model) marginStyle() lipgloss.Style {
+	if m.height < 40 {
+		return marginStyleSmall
+	}
+	return marginStyleLarge
+}
+
+func (m Model) asciiArtStyle() lipgloss.Style {
+	width := m.width
+	if width < 1 {
+		width = 1
+	}
+	return asciiArtStyleBase.Width(width)
+}
+
+func (m Model) statusStyle(color lipgloss.AdaptiveColor) lipgloss.Style {
+	width := m.width
+	if width < 1 {
+		width = 1
+	}
+	return statusStyleBase.Width(width).Foreground(color)
+}
+
+func (m Model) versionStyle() lipgloss.Style {
+	width := m.width
+	if width < 1 {
+		width = 1
+	}
+	return versionStyleBase.Width(width)
+}
 
 func (m Model) View() string {
 	if !m.ready {
@@ -86,15 +151,7 @@ func (m Model) View() string {
 		errorTitle := "❌ Error"
 		errorContent := fmt.Sprintf("%v\n\n%s", m.err, helpText)
 
-		// Create a bordered error display
-		errorStyle := lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("196")).
-			Padding(1, 2).
-			Width(m.width - 8).
-			Foreground(lipgloss.Color("196"))
-
-		return "\n" + errorStyle.Render(errorTitle+"\n\n"+errorContent) + "\n"
+		return "\n" + m.errorStyle().Render(errorTitle+"\n\n"+errorContent) + "\n"
 	}
 
 	// Calculate panel dimensions
@@ -147,12 +204,7 @@ func (m Model) View() string {
 	mainContent := lipgloss.JoinVertical(lipgloss.Left, topRow, "", bottomRow)
 
 	// Add margin - always have top margin
-	var mainWithMargin string
-	if m.height < 40 {
-		mainWithMargin = lipgloss.NewStyle().MarginTop(1).MarginBottom(0).MarginLeft(2).MarginRight(2).Render(mainContent)
-	} else {
-		mainWithMargin = lipgloss.NewStyle().Margin(1, 2).Render(mainContent)
-	}
+	mainWithMargin := m.marginStyle().Render(mainContent)
 
 	// Add header and footer
 	header := m.renderHeader()
@@ -183,11 +235,7 @@ func (m Model) renderHeader() string {
 	var header string
 
 	if m.height >= minHeightForAscii && m.width >= minWidthForAscii {
-		centeredArt := lipgloss.NewStyle().
-			Width(m.width).
-			Align(lipgloss.Center).
-			Foreground(primaryColor).
-			Render(asciiArtLarge)
+		centeredArt := m.asciiArtStyle().Render(asciiArtLarge)
 
 		header = "\n\n" + centeredArt + "\n"
 	} else {
@@ -206,19 +254,11 @@ func (m Model) renderHeader() string {
 		default:
 			statusColor = warningColor
 		}
-		status := lipgloss.NewStyle().
-			Width(m.width).
-			Align(lipgloss.Center).
-			Foreground(statusColor).
-			Render(m.statusMsg)
+		status := m.statusStyle(statusColor).Render(m.statusMsg)
 		header += status + "\n"
 	} else if !m.updateAvailable {
 		versionInfo := version.GetVersion()
-		version := lipgloss.NewStyle().
-			Width(m.width).
-			Align(lipgloss.Center).
-			Foreground(secondaryColor).
-			Render(versionInfo)
+		version := m.versionStyle().Render(versionInfo)
 		header += version + "\n"
 	}
 
