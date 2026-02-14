@@ -2,10 +2,15 @@ name: Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, reopened]
+  issue_comment:
+    types: [created]
 
 jobs:
   review:
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event.comment && contains(github.event.comment.body, 'opencode review'))
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -21,7 +26,7 @@ jobs:
           NANO_GPT_API_KEY: ${{ secrets.NANO_GPT_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: nano-gpt/zai-org/glm-4.7
+          model: nano-gpt/zai-org/glm-5:thinking
           use_github_token: true
           prompt: |
             Review this pull request:

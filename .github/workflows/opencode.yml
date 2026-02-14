@@ -30,4 +30,4 @@ jobs:
         env:
           NANO_GPT_API_KEY: ${{ secrets.NANO_GPT_API_KEY }}
         with:
-          model: nano-gpt/zai-org/glm-4.7:thinking
+          model: nano-gpt/zai-org/glm-5:thinking
