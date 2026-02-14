@@ -542,7 +542,7 @@ func (m *Model) updateStatsViewport() {
 		filled := int(float64(barWidth) * completion / 100)
 		bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
 
-		var barColor lipgloss.Color
+		var barColor lipgloss.AdaptiveColor
 		if completion >= 80 {
 			barColor = output.SuccessColor
 		} else if completion >= 50 {

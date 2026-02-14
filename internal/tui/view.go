@@ -195,7 +195,7 @@ func (m Model) renderHeader() string {
 	}
 
 	if m.statusMsg != "" {
-		var statusColor lipgloss.Color
+		var statusColor lipgloss.AdaptiveColor
 		switch m.statusLevel {
 		case "error":
 			statusColor = errorColor
