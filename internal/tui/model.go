@@ -7,8 +7,10 @@ import (
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-isatty"
 
 	"github.com/AnishShah1803/jotr/internal/config"
@@ -139,6 +141,7 @@ type Model struct {
 	notesViewport    viewport.Model
 	previewViewport  viewport.Model
 	helpModel        help.Model
+	spinner          spinner.Model
 	keys             keyMap
 	cachedKeyMap     keyMap
 	completedTasks   int
@@ -156,6 +159,7 @@ type Model struct {
 	updateAvailable  bool
 	editorConfigured bool
 	editorFallback   bool
+	isLoading        bool
 	isNonInteractive bool
 }
 
@@ -232,6 +236,10 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig) Model {
 	helpModel.Styles.ShortDesc = helpModel.Styles.ShortDesc.Foreground(output.SecondaryColor)
 	helpModel.Styles.ShortSeparator = helpModel.Styles.ShortSeparator.Foreground(output.SecondaryColor)
 
+	s := spinner.New()
+	s.Spinner = spinner.Line
+	s.Style = lipgloss.NewStyle().Foreground(secondaryColor)
+
 	m := Model{
 		ctx:              ctx,
 		config:           cfg,
@@ -243,11 +251,13 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig) Model {
 		tasksViewport:    viewport.New(0, 0),
 		statsViewport:    viewport.New(0, 0),
 		helpModel:        helpModel,
+		spinner:          s,
 		keys:             defaultKeyMap,
 		width:            80, // Default width
 		height:           24, // Default height (will be updated by WindowSizeMsg)
 		statusLevel:      "",
 		statusDuration:   0,
+		isLoading:        true,
 		isNonInteractive: !isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()),
 	}
 	m.updateCachedKeyMap()
@@ -255,5 +265,5 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tickCmd()
+	return tea.Batch(tickCmd(), m.spinner.Tick)
 }
