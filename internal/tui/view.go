@@ -133,7 +133,7 @@ func calculateLayoutHeight(header, main, footer string) int {
 
 func (m Model) View() string {
 	if !m.ready {
-		return "\n  Loading jotr dashboard...\n\n"
+		return fmt.Sprintf("\n  %s Loading jotr dashboard...\n\n", m.spinner.View())
 	}
 
 	if m.quitting {
