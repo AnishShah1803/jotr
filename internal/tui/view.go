@@ -140,11 +140,11 @@ func (m Model) View() string {
 		return ""
 	}
 
-	if m.isNonInteractive {
-		return m.renderNonInteractive()
-	}
-
 	if m.err != nil {
+		if m.isNonInteractive {
+			return fmt.Sprintf("Error: %v\n", m.err)
+		}
+
 		var helpText string
 		if m.errorRetryable {
 			helpText = fmt.Sprintf("Press '%s' to create the file, '%s' to retry, or '%s' to quit",
@@ -157,6 +157,10 @@ func (m Model) View() string {
 		errorContent := fmt.Sprintf("%v\n\n%s", m.err, helpText)
 
 		return "\n" + m.errorStyle().Render(errorTitle+"\n\n"+errorContent) + "\n"
+	}
+
+	if m.isNonInteractive {
+		return m.renderNonInteractive()
 	}
 
 	// Calculate panel dimensions
