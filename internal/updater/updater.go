@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/version"
 )
 
@@ -131,7 +132,7 @@ func validateBeforeUpdate() error {
 	testFile := filepath.Join(exeDir, ".jotr-update-test")
 	defer os.Remove(testFile)
 
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), constants.FilePerm0644); err != nil {
 		return fmt.Errorf("insufficient permissions to update binary: %w", err)
 	}
 

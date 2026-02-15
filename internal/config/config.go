@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
@@ -482,7 +483,7 @@ func Save(cfg *Config) error {
 	}
 
 	// Write config file atomically
-	if err := utils.AtomicWriteFile(configPath, data, 0644); err != nil {
+	if err := utils.AtomicWriteFile(configPath, data, constants.FilePerm0644); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/notes"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
@@ -173,7 +174,7 @@ func TestDailyNoteExists(t *testing.T) {
 	}
 
 	// Create note file
-	if err := os.WriteFile(path, []byte("# Test\n"), 0600); err != nil {
+	if err := os.WriteFile(path, []byte("# Test\n"), constants.FilePerm0600); err != nil {
 		t.Fatalf("Failed to create note: %v", err)
 	}
 
@@ -284,7 +285,7 @@ func TestDailyNoteOpening(t *testing.T) {
 	}
 
 	// Create the note
-	if err := os.WriteFile(path, []byte("# 2025-01-15-Wed\n\n## Notes\n\n## Tasks\n"), 0600); err != nil {
+	if err := os.WriteFile(path, []byte("# 2025-01-15-Wed\n\n## Notes\n\n## Tasks\n"), constants.FilePerm0600); err != nil {
 		t.Fatalf("Failed to create note: %v", err)
 	}
 

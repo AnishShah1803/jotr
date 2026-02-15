@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/notes"
 	"github.com/AnishShah1803/jotr/internal/tasks"
 	"github.com/AnishShah1803/jotr/internal/utils"
@@ -119,7 +120,7 @@ func generateMonthlySummary(ctx context.Context, cfg *config.LoadedConfig) error
 	}
 
 	// Write summary
-	if err := os.WriteFile(summaryPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(summaryPath, []byte(content), constants.FilePerm0644); err != nil {
 		return fmt.Errorf("failed to write summary: %w", err)
 	}
 

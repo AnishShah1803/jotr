@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/notes"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
@@ -136,10 +137,10 @@ func TestCaptureText_AppendsToExistingSection(t *testing.T) {
 	// Create note with existing Captured section
 	notePath := getDailyNotePath(cfg)
 	initialContent := fmt.Sprintf("# %s\n\n## Captured\n\n- First entry\n", time.Now().Format("2006-01-02-Mon"))
-	if err := os.WriteFile(notePath, []byte(initialContent), 0644); err != nil {
+	if err := os.WriteFile(notePath, []byte(initialContent), constants.FilePerm0644); err != nil {
 		// Create directory structure if needed
 		os.MkdirAll(filepath.Dir(notePath), 0755)
-		os.WriteFile(notePath, []byte(initialContent), 0644)
+		os.WriteFile(notePath, []byte(initialContent), constants.FilePerm0644)
 	}
 
 	// Capture another entry
@@ -183,7 +184,7 @@ func TestCaptureText_CreatesMissingSection(t *testing.T) {
 
 	// Create directory structure if needed
 	os.MkdirAll(filepath.Dir(notePath), 0755)
-	if err := os.WriteFile(notePath, []byte(initialContent), 0644); err != nil {
+	if err := os.WriteFile(notePath, []byte(initialContent), constants.FilePerm0644); err != nil {
 		t.Fatalf("Failed to create initial note: %v", err)
 	}
 
@@ -297,7 +298,7 @@ func TestCaptureText_PreservesOtherSections(t *testing.T) {
 
 	// Create directory structure if needed
 	os.MkdirAll(filepath.Dir(notePath), 0755)
-	if err := os.WriteFile(notePath, []byte(initialContent), 0644); err != nil {
+	if err := os.WriteFile(notePath, []byte(initialContent), constants.FilePerm0644); err != nil {
 		t.Fatalf("Failed to create initial note: %v", err)
 	}
 

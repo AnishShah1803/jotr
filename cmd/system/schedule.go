@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
@@ -25,7 +26,6 @@ const (
 	scheduleArgMinAdd    = 3 // minimum args for "add" command (action, date, text).
 	scheduleArgMinDelete = 2 // minimum args for "delete" command (action, id).
 	hoursPerDay          = 24
-	filePerm0600         = 0600
 )
 
 // ScheduleCmd manages scheduling notes for future dates.
@@ -106,7 +106,7 @@ func saveScheduledNotes(cfg *config.LoadedConfig, scheduled []ScheduledNote) err
 		return err
 	}
 
-	return os.WriteFile(scheduleFile, data, filePerm0600)
+	return os.WriteFile(scheduleFile, data, constants.FilePerm0600)
 }
 
 func addScheduledNote(cfg *config.LoadedConfig, dateStr, text string) error {

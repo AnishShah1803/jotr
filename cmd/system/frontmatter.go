@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/notes"
 )
 
@@ -164,7 +165,7 @@ func setFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName stri
 	}
 
 	newContent := strings.Join(newLines, "\n")
-	if err := os.WriteFile(targetNote, []byte(newContent), 0644); err != nil {
+	if err := os.WriteFile(targetNote, []byte(newContent), constants.FilePerm0644); err != nil {
 		return err
 	}
 

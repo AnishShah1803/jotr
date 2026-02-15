@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/notes"
 )
 
@@ -71,7 +72,7 @@ func bulkRename(ctx context.Context, cfg *config.LoadedConfig, oldText, newText 
 		contentStr := string(content)
 		if strings.Contains(contentStr, oldText) {
 			newContent := strings.ReplaceAll(contentStr, oldText, newText)
-			if err := os.WriteFile(notePath, []byte(newContent), 0644); err != nil {
+			if err := os.WriteFile(notePath, []byte(newContent), constants.FilePerm0644); err != nil {
 				fmt.Printf("⚠️  Failed to update: %s\n", notePath)
 				continue
 			}

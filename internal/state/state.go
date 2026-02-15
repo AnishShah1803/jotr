@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/tasks"
 )
 
@@ -73,7 +74,7 @@ func (s *TodoState) Write(statePath string) error {
 		return fmt.Errorf("failed to marshal state: %w", err)
 	}
 
-	if err := os.WriteFile(statePath, data, 0644); err != nil {
+	if err := os.WriteFile(statePath, data, constants.FilePerm0644); err != nil {
 		return fmt.Errorf("failed to write state file: %w", err)
 	}
 

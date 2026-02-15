@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
@@ -70,7 +71,7 @@ func TestListTemplates_WithTemplates(t *testing.T) {
 		templatePath := filepath.Join(templateDir, name+".md")
 		content := "# " + name + " Template\n\n## Section 1\n\n## Section 2\n\n"
 
-		if err := os.WriteFile(templatePath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(templatePath, []byte(content), constants.FilePerm0644); err != nil {
 			t.Fatalf("Failed to create template %s: %v", name, err)
 		}
 	}
@@ -120,7 +121,7 @@ func TestListTemplates_NonMDFilesIgnored(t *testing.T) {
 
 	for name, content := range files {
 		path := filepath.Join(templateDir, name)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(path, []byte(content), constants.FilePerm0644); err != nil {
 			t.Fatalf("Failed to create file %s: %v", name, err)
 		}
 	}
@@ -165,7 +166,7 @@ func TestCreateTemplate_Success(t *testing.T) {
 
 	// Create template content
 	content := "# meeting Template\n\n## Section 1\n\n## Section 2\n\n"
-	if err := os.WriteFile(templatePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(templatePath, []byte(content), constants.FilePerm0644); err != nil {
 		t.Fatalf("Failed to create template: %v", err)
 	}
 
@@ -204,7 +205,7 @@ func TestCreateTemplate_AlreadyExists(t *testing.T) {
 	templateName := "existing"
 
 	templatePath := filepath.Join(templateDir, templateName+".md")
-	if err := os.WriteFile(templatePath, []byte("# Existing\n"), 0644); err != nil {
+	if err := os.WriteFile(templatePath, []byte("# Existing\n"), constants.FilePerm0644); err != nil {
 		t.Fatalf("Failed to create existing template: %v", err)
 	}
 
@@ -250,7 +251,7 @@ func TestDeleteTemplate_Success(t *testing.T) {
 	templateName := "delete-me"
 
 	templatePath := filepath.Join(templateDir, templateName+".md")
-	if err := os.WriteFile(templatePath, []byte("# Delete Me\n"), 0644); err != nil {
+	if err := os.WriteFile(templatePath, []byte("# Delete Me\n"), constants.FilePerm0644); err != nil {
 		t.Fatalf("Failed to create template: %v", err)
 	}
 

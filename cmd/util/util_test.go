@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/notes"
 )
 
@@ -174,7 +175,7 @@ func TestGitCmd_GitHistory(t *testing.T) {
 	}
 
 	testFile := filepath.Join(tmpDir, "test.txt")
-	if err := os.WriteFile(testFile, []byte("test"), 0600); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), constants.FilePerm0600); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -238,7 +239,7 @@ func TestGitCmd_GitCommit(t *testing.T) {
 	}
 
 	filePath := filepath.Join(tmpDir, "test.txt")
-	if err := os.WriteFile(filePath, []byte("test"), 0600); err != nil {
+	if err := os.WriteFile(filePath, []byte("test"), constants.FilePerm0600); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -274,7 +275,7 @@ func TestRunValidation_ValidConfig(t *testing.T) {
 	}`
 
 	configPath := filepath.Join(configDir, "config.json")
-	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), constants.FilePerm0600); err != nil {
 		t.Fatalf("Failed to write config: %v", err)
 	}
 

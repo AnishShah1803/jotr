@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/AnishShah1803/jotr/internal/constants"
 )
 
 func TestLoadConfig_Valid(t *testing.T) {
@@ -42,7 +44,7 @@ func TestLoadConfig_Valid(t *testing.T) {
 		t.Fatalf("Failed to marshal config: %v", err)
 	}
 
-	err = os.WriteFile(configFile, data, 0644)
+	err = os.WriteFile(configFile, data, constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -92,7 +94,7 @@ func TestLoadConfig_InvalidJSON(t *testing.T) {
 	configFile := filepath.Join(configDir, "config.json")
 
 	// Write invalid JSON
-	err = os.WriteFile(configFile, []byte("{invalid json}"), 0644)
+	err = os.WriteFile(configFile, []byte("{invalid json}"), constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to write invalid config: %v", err)
 	}
@@ -153,7 +155,7 @@ func TestLoadConfig_MissingBaseDir(t *testing.T) {
 		t.Fatalf("Failed to marshal config: %v", err)
 	}
 
-	err = os.WriteFile(configFile, data, 0644)
+	err = os.WriteFile(configFile, data, constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to write config: %v", err)
 	}
@@ -260,7 +262,7 @@ func TestSaveConfig_CreatesBackup(t *testing.T) {
 		t.Fatalf("Failed to marshal initial config: %v", err)
 	}
 
-	err = os.WriteFile(configFile, data, 0644)
+	err = os.WriteFile(configFile, data, constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to write initial config: %v", err)
 	}
