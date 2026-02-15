@@ -15,6 +15,7 @@ This document describes the release process for jotr with automated workflows, s
 ### Build Types
 
 **⚠️ Important: Release builds are always PRODUCTION builds**
+
 - `make build-all` → Production binaries only (no dev features)
 - `make dev` → Development builds (includes dev mode)
 - Build tags enforce separation at compile time
@@ -76,6 +77,7 @@ Use the safe, interactive release script:
 ```
 
 **Safety Features:**
+
 - ✅ Automatic backup and rollback
 - ✅ Working directory validation
 - ✅ Interactive confirmation prompts
@@ -87,6 +89,7 @@ Use the safe, interactive release script:
 #### 1. Update Version
 
 The release script automatically handles version updates using CalVer format:
+
 - `v1.2.0` → `v1.2.1` (patch)
 - `v1.2.0` → `v1.3.0` (minor)  
 - `v1.2.0` → `v2.1.0` (major)
@@ -94,6 +97,7 @@ The release script automatically handles version updates using CalVer format:
 #### 2. Safety Checks
 
 The release script performs these validations:
+
 - Clean working directory
 - Valid git commit
 - No uncommitted changes
@@ -132,7 +136,7 @@ gh release create v1.0.0 \
 
 #### Using GitHub Web UI
 
-1. Go to https://github.com/AnishShah1803/jotr/releases/new
+1. Go to <https://github.com/AnishShah1803/jotr/releases/new>
 2. Choose tag: `v1.0.0`
 3. Release title: `jotr v1.0.0`
 4. Add release notes
@@ -142,6 +146,7 @@ gh release create v1.0.0 \
 ### 5. Update Homebrew Formula
 
 Update `jotr.rb` with:
+
 - New version number
 - New download URLs
 - New SHA256 checksums
@@ -249,4 +254,3 @@ Before publishing, test each binary:
 3. Update any package managers (Homebrew, etc.)
 4. Close milestone on GitHub
 5. Start planning next release!
-

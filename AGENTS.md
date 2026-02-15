@@ -4,6 +4,7 @@
 **Stack:** Go 1.21+, Cobra CLI, Bubble Tea TUI
 
 ## STRUCTURE
+
 ```
 jotr/
 ├── main.go           # Thin entry → cmd.Execute()
@@ -48,20 +49,24 @@ jotr/
 ## CONVENTIONS
 
 **Build:**
+
 - `make dev` for testing (NOT `make install`)
 - Version: `YEAR_IN_DEV.MONTH.0` (year - 2025)
 
 **Code Style:**
+
 - 40+ linters via golangci-lint (complexity ≤15)
 - `go fmt` required before commit
 - Pre-commit hooks enforce linting
 
 **Commands:**
+
 - Export `var Cmd = &cobra.Command{}` from sub-package
 - Import + add in `cmd/root.go` init()
 - Flags: use helpers from `cmd/options.go`
 
 **Testing:**
+
 - `testhelpers.NewTestFS(t)` for file setup
 - `testhelpers.ExecuteCommand()` for CLI tests
 - Table-driven tests preferred
@@ -75,6 +80,7 @@ jotr/
 - **DO NOT** use `filepath.Walk` (use `filepath.WalkDir`)
 
 ## COMMANDS
+
 ```bash
 make dev           # Development build
 make test          # Run tests

@@ -31,6 +31,7 @@ Model (state) ──► Update(msg) ──► Model' ──► View() ──► 
 ## VIEW RENDERING
 
 **Layout (view.go):**
+
 ```
 ┌─────────────────────────────────┐
 │ Header (ASCII art + status)     │
