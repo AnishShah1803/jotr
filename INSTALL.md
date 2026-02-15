@@ -29,14 +29,17 @@ move jotr.exe C:\Windows\System32\
 ### Method 1: Using Make
 
 **🚀 For Users (Recommended):**
+
 ```bash
 git clone https://github.com/AnishShah1803/jotr
 cd jotr
 make install    # Production build with automatic installation
 ```
+
 ⚠️ **This will overwrite any existing jotr installation at `/usr/local/bin/jotr`**
 
 **🛠️ For Developers:**
+
 ```bash
 git clone https://github.com/AnishShah1803/jotr
 cd jotr
@@ -44,6 +47,7 @@ make dev        # Development build with dev mode
 ```
 
 **⚠️ Production Build (Advanced):**
+
 ```bash
 make build       # Production only, requires confirmation
 ```
@@ -77,6 +81,7 @@ make uninstall   # Remove installed binary
 ```
 
 **⚠️ Important:**
+
 - Use `make dev` for development work
 - `make install` overwrites system binary (with confirmation)
 - `make build` creates local binary (no system changes)
@@ -97,6 +102,7 @@ chmod +x install.sh
 ```
 
 The install script will:
+
 1. Detect your OS and architecture
 2. Build from source (if Go is installed) or download pre-built binary
 3. Install to `/usr/local/bin/jotr`
@@ -109,6 +115,7 @@ The install script will:
 Download the appropriate binary for your platform:
 
 **macOS:**
+
 ```bash
 # Intel
 curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-darwin-amd64 -o jotr
@@ -122,6 +129,7 @@ sudo mv jotr /usr/local/bin/
 ```
 
 **Linux:**
+
 ```bash
 # x86_64
 curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-linux-amd64 -o jotr
@@ -135,6 +143,7 @@ sudo mv jotr /usr/local/bin/
 ```
 
 **Windows:**
+
 ```bash
 # Download
 curl -L https://github.com/AnishShah1803/jotr/releases/latest/download/jotr-windows-amd64.exe -o jotr.exe
@@ -210,6 +219,7 @@ jotr version
 ```
 
 You should see:
+
 ```
 jotr version 1.0.0
 ```
@@ -221,6 +231,7 @@ jotr configure
 ```
 
 This will guide you through setting up:
+
 - Base directory (where your notes are)
 - Diary directory (for daily notes)
 - Todo file path
@@ -231,12 +242,14 @@ This will guide you through setting up:
 jotr requires an editor to be configured before opening files:
 
 **Option 1: Set EDITOR environment variable (Recommended)**
+
 ```bash
 # Add to your shell profile (~/.bashrc, ~/.zshrc, etc.)
 export EDITOR="nvim"
 ```
 
 **Option 2: Configure in jotr config**
+
 ```bash
 jotr configure
 # Or edit ~/.config/jotr/config.json and add:
@@ -256,6 +269,7 @@ jotr check
 ```
 
 This verifies:
+
 - Config file exists
 - Directories are accessible
 - Editor is configured
@@ -268,6 +282,7 @@ jotr check
 ```
 
 This verifies:
+
 - Config file exists
 - Directories are accessible
 - Editor is configured
@@ -388,10 +403,10 @@ which nvim  # Should show /usr/bin/nvim or similar
 ### Health Check Failures
 
 Running `jotr check` will identify common issues:
+
 - Missing config file → Run `jotr configure`
 - Inaccessible directories → Check permissions and paths
 - Editor not configured → See step 4 above
 - Editor not found → Install editor and verify PATH
 
 For more troubleshooting tips, see the [Wiki](https://github.com/AnishShah1803/jotr/wiki).
-

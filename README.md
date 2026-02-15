@@ -301,4 +301,3 @@ MIT License - see [LICENSE](LICENSE) for details.
 ---
 
 **Made for developers and power users**
-

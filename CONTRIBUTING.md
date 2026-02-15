@@ -50,24 +50,32 @@ jotr/
 
 1. **Fork the repository**
 2. **Create a feature branch**
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
+
 3. **Make your changes**
 4. **Test your changes**
+
    ```bash
    make test
    make build
    ./jotr <your-command>
    ```
+
 5. **Commit with clear messages**
+
    ```bash
    git commit -m "Add: description of your change"
    ```
+
 6. **Push to your fork**
+
    ```bash
    git push origin feature/your-feature-name
    ```
+
 7. **Create a Pull Request**
 
 ## Code Style
@@ -87,6 +95,7 @@ jotr/
 5. Update documentation
 
 Example:
+
 ```go
 package cmd
 
@@ -139,6 +148,7 @@ The `jotr.rb` file in the root is a Homebrew formula for package installation.
 **Note:** This is written in Ruby (Homebrew's DSL), but jotr itself is Go.
 
 To update after a release:
+
 1. Build binaries for all platforms
 2. Calculate SHA256 checksums
 3. Update URLs and checksums in `jotr.rb`
@@ -163,4 +173,3 @@ Be respectful, inclusive, and constructive in all interactions.
 ---
 
 Thank you for contributing!
-
