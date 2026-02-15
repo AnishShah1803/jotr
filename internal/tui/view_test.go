@@ -262,6 +262,7 @@ func TestModel_StatusFlow(t *testing.T) {
 	model.width = 80
 	model.height = 50
 	model.ready = true
+	model.isNonInteractive = false
 
 	// Initial state - no status, should show version
 	view1 := model.View()

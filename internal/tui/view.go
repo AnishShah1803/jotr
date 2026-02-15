@@ -141,6 +141,10 @@ func (m Model) View() string {
 	}
 
 	if m.err != nil {
+		if m.isNonInteractive {
+			return fmt.Sprintf("Error: %v\n", m.err)
+		}
+
 		var helpText string
 		if m.errorRetryable {
 			helpText = fmt.Sprintf("Press '%s' to create the file, '%s' to retry, or '%s' to quit",
@@ -153,6 +157,10 @@ func (m Model) View() string {
 		errorContent := fmt.Sprintf("%v\n\n%s", m.err, helpText)
 
 		return "\n" + m.errorStyle().Render(errorTitle+"\n\n"+errorContent) + "\n"
+	}
+
+	if m.isNonInteractive {
+		return m.renderNonInteractive()
 	}
 
 	// Calculate panel dimensions
@@ -429,4 +437,38 @@ func (m Model) renderStatsPanel(width, height int) string {
 
 	// Render with border and exact width/height
 	return style.Width(width).Height(height).Render(panel)
+}
+
+func (m Model) renderNonInteractive() string {
+	var b strings.Builder
+
+	b.WriteString("jotr dashboard\n")
+	b.WriteString(strings.Repeat("-", 40) + "\n\n")
+
+	b.WriteString("Recent Notes:\n")
+	if len(m.notes) == 0 {
+		b.WriteString("  No recent notes\n")
+	}
+	for _, note := range m.notes {
+		basename := filepath.Base(note)
+		basename = strings.TrimSuffix(basename, ".md")
+		b.WriteString(fmt.Sprintf("  - %s\n", basename))
+	}
+
+	b.WriteString("\nPending Tasks:\n")
+	count := 0
+	for _, task := range m.tasks {
+		if task.Completed {
+			continue
+		}
+		b.WriteString(fmt.Sprintf("  - %s\n", task.Text))
+		count++
+	}
+	if count == 0 {
+		b.WriteString("  No pending tasks\n")
+	}
+
+	b.WriteString(fmt.Sprintf("\nStats: %d notes, %d tasks, %d streak\n", m.totalNotes, m.totalTasks, m.streak))
+
+	return b.String()
 }

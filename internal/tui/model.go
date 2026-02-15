@@ -2,12 +2,14 @@ package tui
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mattn/go-isatty"
 
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/output"
@@ -154,6 +156,7 @@ type Model struct {
 	updateAvailable  bool
 	editorConfigured bool
 	editorFallback   bool
+	isNonInteractive bool
 }
 
 type tickMsg time.Time
@@ -230,21 +233,22 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig) Model {
 	helpModel.Styles.ShortSeparator = helpModel.Styles.ShortSeparator.Foreground(output.SecondaryColor)
 
 	m := Model{
-		ctx:             ctx,
-		config:          cfg,
-		focusedPanel:    panelNotes,
-		notes:           []string{},
-		tasks:           []tasks.Task{},
-		notesViewport:   viewport.New(0, 0),
-		previewViewport: viewport.New(0, 0),
-		tasksViewport:   viewport.New(0, 0),
-		statsViewport:   viewport.New(0, 0),
-		helpModel:       helpModel,
-		keys:            defaultKeyMap,
-		width:           80, // Default width
-		height:          24, // Default height (will be updated by WindowSizeMsg)
-		statusLevel:     "",
-		statusDuration:  0,
+		ctx:              ctx,
+		config:           cfg,
+		focusedPanel:     panelNotes,
+		notes:            []string{},
+		tasks:            []tasks.Task{},
+		notesViewport:    viewport.New(0, 0),
+		previewViewport:  viewport.New(0, 0),
+		tasksViewport:    viewport.New(0, 0),
+		statsViewport:    viewport.New(0, 0),
+		helpModel:        helpModel,
+		keys:             defaultKeyMap,
+		width:            80, // Default width
+		height:           24, // Default height (will be updated by WindowSizeMsg)
+		statusLevel:      "",
+		statusDuration:   0,
+		isNonInteractive: !isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()),
 	}
 	m.updateCachedKeyMap()
 	return m
