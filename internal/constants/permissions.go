@@ -13,4 +13,9 @@ const (
 	// Use for locks, credentials, and other files that should only be
 	// accessible by the owner.
 	FilePerm0600 = os.FileMode(0600)
+
+	// FilePermDir is the permission for directories (rwxr-xr-x).
+	// Use for creating directories where execute permission is needed
+	// to access contents.
+	FilePermDir = os.FileMode(0755)
 )

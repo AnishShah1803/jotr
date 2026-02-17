@@ -227,7 +227,7 @@ func EnsureDir(path string) error {
 		return fmt.Errorf("cannot create directory %s: %w", path, err)
 	}
 
-	if err := os.MkdirAll(path, 0755); err != nil {
+	if err := os.MkdirAll(path, constants.FilePermDir); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", path, err)
 	}
 

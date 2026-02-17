@@ -57,7 +57,7 @@ Examples:
 func createDevConfig(path string) error {
 	// Create dev data directory
 	devDataDir := "dev-data"
-	if err := os.MkdirAll(filepath.Join(devDataDir, "Diary"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(devDataDir, "Diary"), constants.FilePermDir); err != nil {
 		return fmt.Errorf("failed to create dev data directory: %w", err)
 	}
 

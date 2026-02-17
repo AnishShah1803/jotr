@@ -87,7 +87,7 @@ func GetEditorCmdWithShellFallback(ctx context.Context, path string) (*exec.Cmd,
 
 // EnsureDir creates a directory if it doesn't exist.
 func EnsureDir(path string) error {
-	return os.MkdirAll(path, 0755)
+	return os.MkdirAll(path, constants.FilePermDir)
 }
 
 // ReadNote reads a note file with context support for cancellation.
