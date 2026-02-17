@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
@@ -319,7 +320,7 @@ tags: [test, example]
 Content here.
 `
 
-	err = os.WriteFile(notePath, []byte(noteContent), 0600)
+	err = os.WriteFile(notePath, []byte(noteContent), constants.FilePerm0600)
 	if err != nil {
 		t.Fatalf("Failed to write test note: %v", err)
 	}
@@ -402,7 +403,7 @@ func TestMonthlySummary(t *testing.T) {
 
 	notePath := filepath.Join(diaryPath, now.Format("2006-01-02-Mon.md"))
 
-	err = os.WriteFile(notePath, []byte("# Test Daily Note\n\nContent"), 0600)
+	err = os.WriteFile(notePath, []byte("# Test Daily Note\n\nContent"), constants.FilePerm0600)
 	if err != nil {
 		t.Fatalf("Failed to write test note: %v", err)
 	}
@@ -574,7 +575,7 @@ func TestShowFrontmatter(t *testing.T) {
 	// Create a note without frontmatter
 	notePath := filepath.Join(tmpDir, "NoFrontmatter.md")
 
-	err = os.WriteFile(notePath, []byte("# Test Note\n\nContent"), 0600)
+	err = os.WriteFile(notePath, []byte("# Test Note\n\nContent"), constants.FilePerm0600)
 	if err != nil {
 		t.Fatalf("Failed to write test note: %v", err)
 	}
@@ -595,7 +596,7 @@ priority: P1
 Content here.
 `
 
-	err = os.WriteFile(noteWithFM, []byte(fmContent), 0600)
+	err = os.WriteFile(noteWithFM, []byte(fmContent), constants.FilePerm0600)
 	if err != nil {
 		t.Fatalf("Failed to write test note with frontmatter: %v", err)
 	}

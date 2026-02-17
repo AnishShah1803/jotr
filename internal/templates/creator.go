@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/notes"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
@@ -19,7 +20,7 @@ func CreateFromTemplate(ctx context.Context, tmpl *Template, content, targetPath
 		return fmt.Errorf("file already exists: %s", targetPath)
 	}
 
-	if err := utils.AtomicWriteFileCtx(ctx, targetPath, []byte(content), 0644); err != nil {
+	if err := utils.AtomicWriteFileCtx(ctx, targetPath, []byte(content), constants.FilePerm0644); err != nil {
 		return fmt.Errorf("writing file: %w", err)
 	}
 

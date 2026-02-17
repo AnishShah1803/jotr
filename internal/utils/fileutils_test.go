@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/AnishShah1803/jotr/internal/constants"
 )
 
 func TestAtomicWriteFile(t *testing.T) {
@@ -22,7 +24,7 @@ func TestAtomicWriteFile(t *testing.T) {
 	testData := []byte("Hello, atomic world!")
 
 	// Test basic atomic write
-	err = AtomicWriteFile(testFile, testData, 0644)
+	err = AtomicWriteFile(testFile, testData, constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("AtomicWriteFile failed: %v", err)
 	}
@@ -43,7 +45,7 @@ func TestAtomicWriteFile(t *testing.T) {
 		t.Fatalf("Failed to stat file: %v", err)
 	}
 
-	if info.Mode().Perm() != 0644 {
+	if info.Mode().Perm() != constants.FilePerm0644 {
 		t.Errorf("Permission mismatch. Expected 0644, got %o", info.Mode().Perm())
 	}
 }
@@ -60,7 +62,7 @@ func TestAtomicWriteFile_Overwrite(t *testing.T) {
 	// Create initial file
 	initialData := []byte("Initial content")
 
-	err = AtomicWriteFile(testFile, initialData, 0644)
+	err = AtomicWriteFile(testFile, initialData, constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Initial write failed: %v", err)
 	}
@@ -68,7 +70,7 @@ func TestAtomicWriteFile_Overwrite(t *testing.T) {
 	// Overwrite with new content
 	newData := []byte("Updated content")
 
-	err = AtomicWriteFile(testFile, newData, 0644)
+	err = AtomicWriteFile(testFile, newData, constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Overwrite failed: %v", err)
 	}
@@ -96,7 +98,7 @@ func TestAtomicWriteFile_ReadonlySource(t *testing.T) {
 	// Create initial file and make it readonly
 	initialData := []byte("Readonly content")
 
-	err = AtomicWriteFile(testFile, initialData, 0644)
+	err = AtomicWriteFile(testFile, initialData, constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Initial write failed: %v", err)
 	}
@@ -109,7 +111,7 @@ func TestAtomicWriteFile_ReadonlySource(t *testing.T) {
 	// Atomic write should still work (creates new file, renames)
 	newData := []byte("New content for readonly file")
 
-	err = AtomicWriteFile(testFile, newData, 0644)
+	err = AtomicWriteFile(testFile, newData, constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Atomic write to readonly file failed: %v", err)
 	}
@@ -129,7 +131,7 @@ func TestAtomicWriteFile_ReadonlySource(t *testing.T) {
 		t.Fatalf("Failed to stat file: %v", err)
 	}
 
-	if info.Mode().Perm() != 0644 {
+	if info.Mode().Perm() != constants.FilePerm0644 {
 		t.Errorf("Permission should be restored to 0644, got %o", info.Mode().Perm())
 	}
 }
@@ -161,7 +163,7 @@ func TestAtomicWriteFile_ReadonlyDirectory(t *testing.T) {
 	testData := []byte("Test data")
 
 	// Should fail with permission error
-	err = AtomicWriteFile(testFile, testData, 0644)
+	err = AtomicWriteFile(testFile, testData, constants.FilePerm0644)
 	if err == nil {
 		t.Errorf("Expected permission error, but write succeeded")
 	}
@@ -191,7 +193,7 @@ func TestCheckWritePermission(t *testing.T) {
 	// Create a file and test write permission
 	testFile := filepath.Join(tmpDir, "test.txt")
 
-	err = os.WriteFile(testFile, []byte("test"), 0644)
+	err = os.WriteFile(testFile, []byte("test"), constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -224,7 +226,7 @@ func TestBackupFile(t *testing.T) {
 	testData := []byte("Original content")
 
 	// Create original file
-	err = os.WriteFile(testFile, testData, 0644)
+	err = os.WriteFile(testFile, testData, constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -349,7 +351,7 @@ func TestLockFile(t *testing.T) {
 	testFile := filepath.Join(tmpDir, "test.txt")
 
 	// Create test file
-	err = os.WriteFile(testFile, []byte("test content"), 0644)
+	err = os.WriteFile(testFile, []byte("test content"), constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -403,7 +405,7 @@ func TestLockFile_Timeout(t *testing.T) {
 	testFile := filepath.Join(tmpDir, "test.txt")
 
 	// Create test file
-	err = os.WriteFile(testFile, []byte("test content"), 0644)
+	err = os.WriteFile(testFile, []byte("test content"), constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -436,7 +438,7 @@ func TestTryLockFile(t *testing.T) {
 	testFile := filepath.Join(tmpDir, "test.txt")
 
 	// Create test file
-	err = os.WriteFile(testFile, []byte("test content"), 0644)
+	err = os.WriteFile(testFile, []byte("test content"), constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -493,14 +495,14 @@ func TestAtomicWriteFileCtx_Cancellation(t *testing.T) {
 	cancelledCtx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err = AtomicWriteFileCtx(cancelledCtx, testFile, testData, 0644)
+	err = AtomicWriteFileCtx(cancelledCtx, testFile, testData, constants.FilePerm0644)
 	if err != context.Canceled {
 		t.Errorf("Expected context.Canceled error, got %v", err)
 	}
 
 	// Test with valid context - should succeed
 	validCtx := context.Background()
-	err = AtomicWriteFileCtx(validCtx, testFile, testData, 0644)
+	err = AtomicWriteFileCtx(validCtx, testFile, testData, constants.FilePerm0644)
 	if err != nil {
 		t.Errorf("AtomicWriteFileCtx with valid context failed: %v", err)
 	}
@@ -603,7 +605,7 @@ func TestFileExists(t *testing.T) {
 
 	// Test existing file
 	existingFile := filepath.Join(tmpDir, "existing.txt")
-	err = os.WriteFile(existingFile, []byte("content"), 0644)
+	err = os.WriteFile(existingFile, []byte("content"), constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}

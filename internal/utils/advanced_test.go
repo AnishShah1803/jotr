@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/AnishShah1803/jotr/internal/constants"
 )
 
 // TestAtomicWriteFile_TableDriven demonstrates table-driven test pattern.
@@ -18,19 +20,19 @@ func TestAtomicWriteFile_TableDriven(t *testing.T) {
 		{
 			name:        "basic write",
 			data:        []byte("hello world"),
-			permissions: 0644,
+			permissions: constants.FilePerm0644,
 			wantErr:     false,
 		},
 		{
 			name:        "empty file",
 			data:        []byte(""),
-			permissions: 0644,
+			permissions: constants.FilePerm0644,
 			wantErr:     false,
 		},
 		{
 			name:        "large file",
 			data:        make([]byte, 1024*1024), // 1MB
-			permissions: 0600,
+			permissions: constants.FilePerm0600,
 			wantErr:     false,
 		},
 		{
@@ -103,7 +105,7 @@ func TestAtomicWriteFile_Subtests(t *testing.T) {
 
 			testFile1 := filepath.Join(tmpDir, "concurrent1.txt")
 
-			err := AtomicWriteFile(testFile1, []byte("data1"), 0644)
+			err := AtomicWriteFile(testFile1, []byte("data1"), constants.FilePerm0644)
 			if err != nil {
 				t.Errorf("Concurrent write 1 failed: %v", err)
 			}
@@ -114,7 +116,7 @@ func TestAtomicWriteFile_Subtests(t *testing.T) {
 
 			testFile2 := filepath.Join(tmpDir, "concurrent2.txt")
 
-			err := AtomicWriteFile(testFile2, []byte("data2"), 0644)
+			err := AtomicWriteFile(testFile2, []byte("data2"), constants.FilePerm0644)
 			if err != nil {
 				t.Errorf("Concurrent write 2 failed: %v", err)
 			}
@@ -129,13 +131,13 @@ func TestAtomicWriteFile_Subtests(t *testing.T) {
 		testFile := filepath.Join(tmpDir, "overwrite.txt")
 
 		// Create initial file
-		err := AtomicWriteFile(testFile, []byte("initial"), 0644)
+		err := AtomicWriteFile(testFile, []byte("initial"), constants.FilePerm0644)
 		if err != nil {
 			t.Fatalf("Initial write failed: %v", err)
 		}
 
 		// Overwrite
-		err = AtomicWriteFile(testFile, []byte("updated"), 0644)
+		err = AtomicWriteFile(testFile, []byte("updated"), constants.FilePerm0644)
 		if err != nil {
 			t.Fatalf("Overwrite failed: %v", err)
 		}
@@ -167,7 +169,7 @@ func BenchmarkAtomicWriteFile(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		testFile := filepath.Join(tmpDir, "bench.txt")
 
-		err := AtomicWriteFile(testFile, data, 0644)
+		err := AtomicWriteFile(testFile, data, constants.FilePerm0644)
 		if err != nil {
 			b.Fatalf("AtomicWriteFile failed: %v", err)
 		}
@@ -198,7 +200,7 @@ func BenchmarkAtomicWriteFile_Sizes(b *testing.B) {
 			b.SetBytes(int64(size))
 
 			for i := 0; i < b.N; i++ {
-				err := AtomicWriteFile(testFile, data, 0644)
+				err := AtomicWriteFile(testFile, data, constants.FilePerm0644)
 				if err != nil {
 					b.Fatalf("AtomicWriteFile failed: %v", err)
 				}

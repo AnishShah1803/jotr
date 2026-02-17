@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 )
 
 func TestCaptureCommand(t *testing.T) {
@@ -53,7 +54,7 @@ func TestCaptureCommand(t *testing.T) {
 
 `
 
-	err = os.WriteFile(expectedFilePath, []byte(initialContent), 0600)
+	err = os.WriteFile(expectedFilePath, []byte(initialContent), constants.FilePerm0600)
 	if err != nil {
 		t.Fatalf("Failed to create initial daily note: %v", err)
 	}
@@ -94,7 +95,7 @@ func TestCaptureCommand_Task(t *testing.T) {
 
 `
 
-	err = os.WriteFile(expectedFilePath, []byte(initialContent), 0600)
+	err = os.WriteFile(expectedFilePath, []byte(initialContent), constants.FilePerm0600)
 	if err != nil {
 		t.Fatalf("Failed to create initial note: %v", err)
 	}
@@ -159,5 +160,5 @@ func appendToFile(filePath, section, text string, isTask bool) error {
 	// Insert the text
 	newContent := contentStr[:insertPoint] + newText + contentStr[insertPoint:]
 
-	return os.WriteFile(filePath, []byte(newContent), 0600)
+	return os.WriteFile(filePath, []byte(newContent), constants.FilePerm0600)
 }

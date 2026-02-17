@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/notes"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
@@ -113,7 +114,7 @@ func createTemplate(cfg *config.LoadedConfig, name string) error {
 
 	// Create basic template
 	content := fmt.Sprintf("# %s Template\n\n## Section 1\n\n## Section 2\n\n", name)
-	if err := os.WriteFile(templatePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(templatePath, []byte(content), constants.FilePerm0644); err != nil {
 		return fmt.Errorf("failed to create template: %w", err)
 	}
 

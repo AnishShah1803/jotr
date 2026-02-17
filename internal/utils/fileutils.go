@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/utils/platform"
 )
 
@@ -18,7 +19,7 @@ var ErrLockTimeout = errors.New("timeout waiting for file lock")
 func LockFile(path string, timeout time.Duration) (*os.File, error) {
 	lockPath := path + ".lock"
 
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, constants.FilePerm0600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open lock file: %w", err)
 	}
@@ -64,7 +65,7 @@ func UnlockFile(lockFile *os.File) error {
 func TryLockFile(path string) (*os.File, error) {
 	lockPath := path + ".lock"
 
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, constants.FilePerm0600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open lock file: %w", err)
 	}
@@ -226,7 +227,7 @@ func EnsureDir(path string) error {
 		return fmt.Errorf("cannot create directory %s: %w", path, err)
 	}
 
-	if err := os.MkdirAll(path, 0755); err != nil {
+	if err := os.MkdirAll(path, constants.FilePermDir); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", path, err)
 	}
 
@@ -260,7 +261,7 @@ func BackupFileCtx(ctx context.Context, filename string) (string, error) {
 	}
 
 	// Write backup atomically
-	if err := AtomicWriteFileCtx(ctx, backupName, data, 0644); err != nil {
+	if err := AtomicWriteFileCtx(ctx, backupName, data, constants.FilePerm0644); err != nil {
 		return "", fmt.Errorf("failed to create backup: %w", err)
 	}
 

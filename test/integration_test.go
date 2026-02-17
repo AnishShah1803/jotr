@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 )
 
 func TestIntegrationWorkflow(t *testing.T) {
@@ -48,7 +49,7 @@ func TestIntegrationWorkflow(t *testing.T) {
 		}
 	}`
 
-	if err := os.WriteFile(configPath, []byte(testConfigJSON), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(testConfigJSON), constants.FilePerm0644); err != nil {
 		t.Fatalf("Failed to create test config: %v", err)
 	}
 
@@ -69,7 +70,7 @@ func TestIntegrationWorkflow(t *testing.T) {
 	}
 
 	// Test note creation
-	if err := os.WriteFile(filepath.Join(baseDir, "Diary", "test-integration.md"), []byte("# Test Integration Note"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(baseDir, "Diary", "test-integration.md"), []byte("# Test Integration Note"), constants.FilePerm0644); err != nil {
 		t.Fatalf("Failed to create test integration note: %v", err)
 	}
 

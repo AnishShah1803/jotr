@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
@@ -86,7 +87,7 @@ func GetEditorCmdWithShellFallback(ctx context.Context, path string) (*exec.Cmd,
 
 // EnsureDir creates a directory if it doesn't exist.
 func EnsureDir(path string) error {
-	return os.MkdirAll(path, 0755)
+	return os.MkdirAll(path, constants.FilePermDir)
 }
 
 // ReadNote reads a note file with context support for cancellation.
@@ -124,7 +125,7 @@ func WriteNote(ctx context.Context, path string, content string) error {
 		return err
 	}
 
-	return os.WriteFile(path, []byte(content), 0644)
+	return os.WriteFile(path, []byte(content), constants.FilePerm0644)
 }
 
 // FindNotes finds all markdown files in a directory recursively with context support.
@@ -226,7 +227,7 @@ func CreateDailyNote(ctx context.Context, notePath string, sections []string, da
 		content += fmt.Sprintf("## %s\n\n", section)
 	}
 
-	return os.WriteFile(notePath, []byte(content), 0644)
+	return os.WriteFile(notePath, []byte(content), constants.FilePerm0644)
 }
 
 // BuildDailyNoteSections prepares the complete sections list for a daily note,
@@ -363,7 +364,7 @@ func UpdateLinks(ctx context.Context) error {
 		}
 
 		if updatedContent != contentStr {
-			if err := utils.AtomicWriteFileCtx(ctx, notePath, []byte(updatedContent), 0644); err != nil {
+			if err := utils.AtomicWriteFileCtx(ctx, notePath, []byte(updatedContent), constants.FilePerm0644); err != nil {
 				return err
 			}
 		}

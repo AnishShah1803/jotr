@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -56,7 +57,7 @@ Examples:
 func createDevConfig(path string) error {
 	// Create dev data directory
 	devDataDir := "dev-data"
-	if err := os.MkdirAll(filepath.Join(devDataDir, "Diary"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(devDataDir, "Diary"), constants.FilePermDir); err != nil {
 		return fmt.Errorf("failed to create dev data directory: %w", err)
 	}
 
@@ -87,7 +88,7 @@ func saveDevConfig(path string, cfg *config.Config) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, constants.FilePerm0644); err != nil {
 		return fmt.Errorf("failed to write dev config: %w", err)
 	}
 

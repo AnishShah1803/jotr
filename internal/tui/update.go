@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/notes"
 	"github.com/AnishShah1803/jotr/internal/output"
 	"github.com/AnishShah1803/jotr/internal/tasks"
@@ -562,7 +563,7 @@ func (m *Model) updateStatsViewport() {
 }
 
 func createTodoFile(path string) error {
-	return os.WriteFile(path, []byte("# Todo\n\n## Tasks\n\n\n\n"), 0644)
+	return os.WriteFile(path, []byte("# Todo\n\n## Tasks\n\n\n\n"), constants.FilePerm0644)
 }
 
 func isAnyEditorAvailable(ctx context.Context, cfg *config.LoadedConfig) bool {

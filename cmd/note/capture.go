@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/notes"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
@@ -89,7 +90,7 @@ func captureText(ctx context.Context, cfg *config.LoadedConfig, text string) err
 	newLines = append(newLines, lines[insertIndex:]...)
 
 	newContent := strings.Join(newLines, "\n")
-	if err := utils.AtomicWriteFile(notePath, []byte(newContent), 0644); err != nil {
+	if err := utils.AtomicWriteFile(notePath, []byte(newContent), constants.FilePerm0644); err != nil {
 		return fmt.Errorf("failed to write note: %w", err)
 	}
 

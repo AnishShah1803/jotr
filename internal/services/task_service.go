@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/notes"
 	"github.com/AnishShah1803/jotr/internal/state"
 	"github.com/AnishShah1803/jotr/internal/tasks"
@@ -320,7 +321,7 @@ func (s *TaskService) updateDailyNoteFromState(notePath string, dailyTasks []tas
 		content += "\n"
 	}
 
-	if err := utils.AtomicWriteFile(notePath, []byte(content), 0644); err != nil {
+	if err := utils.AtomicWriteFile(notePath, []byte(content), constants.FilePerm0644); err != nil {
 		return fmt.Errorf("failed to write daily note: %w", err)
 	}
 
@@ -404,7 +405,7 @@ func (s *TaskService) writeTodoFileFromState(todoPath string, todoState *state.T
 		content.WriteString("\n")
 	}
 
-	if err := utils.AtomicWriteFile(todoPath, []byte(content.String()), 0644); err != nil {
+	if err := utils.AtomicWriteFile(todoPath, []byte(content.String()), constants.FilePerm0644); err != nil {
 		return fmt.Errorf("failed to write todo file: %w", err)
 	}
 
@@ -496,7 +497,7 @@ func (s *TaskService) ArchiveTasks(ctx context.Context, opts ArchiveOptions) (*A
 		archiveContent += fmt.Sprintf("- [x] %s\n", task.Text)
 	}
 
-	if err := utils.AtomicWriteFile(archiveFile, []byte(archiveContent), 0644); err != nil {
+	if err := utils.AtomicWriteFile(archiveFile, []byte(archiveContent), constants.FilePerm0644); err != nil {
 		return nil, fmt.Errorf("failed to write archive: %w", err)
 	}
 

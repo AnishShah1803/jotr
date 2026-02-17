@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
@@ -90,7 +91,7 @@ func saveShortcuts(cfg *config.LoadedConfig, shortcuts map[string]string) error 
 		return err
 	}
 
-	return os.WriteFile(shortcutFile, data, 0644)
+	return os.WriteFile(shortcutFile, data, constants.FilePerm0644)
 }
 
 var reservedCommands = []string{

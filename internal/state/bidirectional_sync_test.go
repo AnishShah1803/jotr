@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/tasks"
 )
 
@@ -510,7 +511,7 @@ func TestConcurrentBidirectionalSync(t *testing.T) {
 - [ ] Task 2 <!-- id: task2 -->
 - [ ] New Task from Daily <!-- id: task3 -->
 `
-	if err := os.WriteFile(dailyNotePath, []byte(dailyContent), 0644); err != nil {
+	if err := os.WriteFile(dailyNotePath, []byte(dailyContent), constants.FilePerm0644); err != nil {
 		t.Fatalf("Failed to write daily note: %v", err)
 	}
 
@@ -519,7 +520,7 @@ func TestConcurrentBidirectionalSync(t *testing.T) {
 - [ ] Task 2
 - [ ] Task from Todo
 `
-	if err := os.WriteFile(todoFilePath, []byte(todoContent), 0644); err != nil {
+	if err := os.WriteFile(todoFilePath, []byte(todoContent), constants.FilePerm0644); err != nil {
 		t.Fatalf("Failed to write todo file: %v", err)
 	}
 
@@ -645,7 +646,7 @@ func TestLockTimeoutBehavior(t *testing.T) {
 	}
 
 	lockPath := statePath + ".lock"
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, constants.FilePerm0600)
 	if err != nil {
 		t.Fatalf("Failed to open lock file: %v", err)
 	}
@@ -786,14 +787,14 @@ func TestDeadlockPrevention(t *testing.T) {
 	dailyContent := `## Tasks
 - [ ] Task 1 <!-- id: task1 -->
 `
-	if err := os.WriteFile(dailyNotePath, []byte(dailyContent), 0644); err != nil {
+	if err := os.WriteFile(dailyNotePath, []byte(dailyContent), constants.FilePerm0644); err != nil {
 		t.Fatalf("Failed to write daily note: %v", err)
 	}
 
 	todoContent := `## Tasks
 - [ ] Task 1
 `
-	if err := os.WriteFile(todoFilePath, []byte(todoContent), 0644); err != nil {
+	if err := os.WriteFile(todoFilePath, []byte(todoContent), constants.FilePerm0644); err != nil {
 		t.Fatalf("Failed to write todo file: %v", err)
 	}
 

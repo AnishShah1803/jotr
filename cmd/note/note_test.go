@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/notes"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
@@ -589,7 +590,7 @@ func TestCreateNoteWithReader_AlreadyExists(t *testing.T) {
 
 	// Create existing note
 	existingPath := filepath.Join(tmpDir, "ExistingNote.md")
-	if err := os.WriteFile(existingPath, []byte("# ExistingNote\n"), 0644); err != nil {
+	if err := os.WriteFile(existingPath, []byte("# ExistingNote\n"), constants.FilePerm0644); err != nil {
 		t.Fatalf("Failed to create existing note: %v", err)
 	}
 

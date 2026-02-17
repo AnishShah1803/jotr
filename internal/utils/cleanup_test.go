@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/AnishShah1803/jotr/internal/constants"
 )
 
 // TestCleanup_TempFileCleanup verifies that all temporary files are cleaned up.
@@ -29,12 +31,12 @@ func TestCleanup_TempFileCleanup(t *testing.T) {
 	testFile1 := filepath.Join(tmpDir1, "test1.txt")
 	testFile2 := filepath.Join(tmpDir2, "test2.txt")
 
-	err = AtomicWriteFile(testFile1, []byte("test data 1"), 0644)
+	err = AtomicWriteFile(testFile1, []byte("test data 1"), constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to write test file 1: %v", err)
 	}
 
-	err = AtomicWriteFile(testFile2, []byte("test data 2"), 0644)
+	err = AtomicWriteFile(testFile2, []byte("test data 2"), constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to write test file 2: %v", err)
 	}
@@ -83,7 +85,7 @@ func TestCleanup_BackupFileManagement(t *testing.T) {
 	// Create initial file
 	initialData := []byte("initial content")
 
-	err = os.WriteFile(testFile, initialData, 0644)
+	err = os.WriteFile(testFile, initialData, constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to create initial file: %v", err)
 	}

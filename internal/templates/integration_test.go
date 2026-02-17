@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
@@ -40,7 +41,7 @@ func TestCompleteTemplateWorkflow(t *testing.T) {
 `
 
 	templatePath := filepath.Join(templatesDir, "1-1-meeting.md")
-	if err := os.WriteFile(templatePath, []byte(templateContent), 0644); err != nil {
+	if err := os.WriteFile(templatePath, []byte(templateContent), constants.FilePerm0644); err != nil {
 		t.Fatalf("Failed to create template: %v", err)
 	}
 

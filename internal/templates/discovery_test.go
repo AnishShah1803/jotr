@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 )
 
 func TestSortTemplates(t *testing.T) {
@@ -65,8 +66,8 @@ func TestDiscoverTemplates(t *testing.T) {
 	t.Run("valid templates only", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		os.WriteFile(filepath.Join(tmpDir, "1-1-meeting.md"), []byte(`# Meeting`), 0644)
-		os.WriteFile(filepath.Join(tmpDir, "2-2-journal.md"), []byte(`# Journal`), 0644)
+		os.WriteFile(filepath.Join(tmpDir, "1-1-meeting.md"), []byte(`# Meeting`), constants.FilePerm0644)
+		os.WriteFile(filepath.Join(tmpDir, "2-2-journal.md"), []byte(`# Journal`), constants.FilePerm0644)
 
 		templates, errs := DiscoverTemplates(tmpDir)
 
@@ -81,9 +82,9 @@ func TestDiscoverTemplates(t *testing.T) {
 	t.Run("mixed valid and invalid templates", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		os.WriteFile(filepath.Join(tmpDir, "1-1-valid.md"), []byte(`# Valid`), 0644)
-		os.WriteFile(filepath.Join(tmpDir, "invalid.md"), []byte(`# Invalid`), 0644)
-		os.WriteFile(filepath.Join(tmpDir, "2-2-another.md"), []byte(`# Another`), 0644)
+		os.WriteFile(filepath.Join(tmpDir, "1-1-valid.md"), []byte(`# Valid`), constants.FilePerm0644)
+		os.WriteFile(filepath.Join(tmpDir, "invalid.md"), []byte(`# Invalid`), constants.FilePerm0644)
+		os.WriteFile(filepath.Join(tmpDir, "2-2-another.md"), []byte(`# Another`), constants.FilePerm0644)
 
 		templates, errs := DiscoverTemplates(tmpDir)
 
@@ -98,8 +99,8 @@ func TestDiscoverTemplates(t *testing.T) {
 	t.Run("ignores non-md files", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		os.WriteFile(filepath.Join(tmpDir, "1-1-test.md"), []byte(`# Test`), 0644)
-		os.WriteFile(filepath.Join(tmpDir, "readme.txt"), []byte(`text`), 0644)
+		os.WriteFile(filepath.Join(tmpDir, "1-1-test.md"), []byte(`# Test`), constants.FilePerm0644)
+		os.WriteFile(filepath.Join(tmpDir, "readme.txt"), []byte(`text`), constants.FilePerm0644)
 
 		templates, errs := DiscoverTemplates(tmpDir)
 
@@ -115,7 +116,7 @@ func TestDiscoverTemplates(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		os.MkdirAll(filepath.Join(tmpDir, "subdir"), 0755)
-		os.WriteFile(filepath.Join(tmpDir, "1-1-test.md"), []byte(`# Test`), 0644)
+		os.WriteFile(filepath.Join(tmpDir, "1-1-test.md"), []byte(`# Test`), constants.FilePerm0644)
 
 		templates, errs := DiscoverTemplates(tmpDir)
 
@@ -135,8 +136,8 @@ func TestLoadTemplates(t *testing.T) {
 		cfg := &config.LoadedConfig{}
 		cfg.TemplatesPath = tmpDir
 
-		os.WriteFile(filepath.Join(tmpDir, "1-1-first.md"), []byte(`# First`), 0644)
-		os.WriteFile(filepath.Join(tmpDir, "2-2-second.md"), []byte(`# Second`), 0644)
+		os.WriteFile(filepath.Join(tmpDir, "1-1-first.md"), []byte(`# First`), constants.FilePerm0644)
+		os.WriteFile(filepath.Join(tmpDir, "2-2-second.md"), []byte(`# Second`), constants.FilePerm0644)
 
 		templates, warnings := LoadTemplates(cfg)
 
@@ -157,8 +158,8 @@ func TestLoadTemplates(t *testing.T) {
 		cfg := &config.LoadedConfig{}
 		cfg.TemplatesPath = tmpDir
 
-		os.WriteFile(filepath.Join(tmpDir, "1-1-valid.md"), []byte(`# Valid`), 0644)
-		os.WriteFile(filepath.Join(tmpDir, "invalid.md"), []byte(`# Invalid`), 0644)
+		os.WriteFile(filepath.Join(tmpDir, "1-1-valid.md"), []byte(`# Valid`), constants.FilePerm0644)
+		os.WriteFile(filepath.Join(tmpDir, "invalid.md"), []byte(`# Invalid`), constants.FilePerm0644)
 
 		templates, warnings := LoadTemplates(cfg)
 

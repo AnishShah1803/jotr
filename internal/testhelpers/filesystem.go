@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/AnishShah1803/jotr/internal/constants"
 )
 
 // Pattern used by: kubernetes, docker, go toolchain.
@@ -52,7 +54,7 @@ func (fs *TestFS) WriteFile(t *testing.T, path, content string) {
 		t.Fatalf("Failed to create directory %s: %v", dir, err)
 	}
 
-	err = os.WriteFile(fullPath, []byte(content), 0644)
+	err = os.WriteFile(fullPath, []byte(content), constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to write file %s: %v", fullPath, err)
 	}

@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 )
@@ -26,7 +27,7 @@ By default, pages are written to the current directory.`,
 			dir = args[0]
 		}
 
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, constants.FilePermDir); err != nil {
 			return err
 		}
 

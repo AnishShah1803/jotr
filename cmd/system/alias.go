@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/notes"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
@@ -100,7 +101,7 @@ func saveAliases(cfg *config.LoadedConfig, aliases map[string]string) error {
 		return err
 	}
 
-	return os.WriteFile(aliasFile, data, 0644)
+	return os.WriteFile(aliasFile, data, constants.FilePerm0644)
 }
 
 func addAlias(cfg *config.LoadedConfig, name, target string) error {
