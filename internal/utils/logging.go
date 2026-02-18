@@ -20,16 +20,16 @@ var globalLogContext = &logContext{verbose: false}
 
 // SetVerbose enables or disables verbose output (legacy API).
 func SetVerbose(verbose bool) {
-	globalLogContext.mu.Lock()
-	defer globalLogContext.mu.Unlock()
-	globalLogContext.verbose = verbose
+	WithWLock(&globalLogContext.mu, func() {
+		globalLogContext.verbose = verbose
+	})
 }
 
 // SetVerboseWithContext sets verbose output with context (legacy API).
 func SetVerboseWithContext(ctx context.Context, verbose bool) {
-	globalLogContext.mu.Lock()
-	defer globalLogContext.mu.Unlock()
-	globalLogContext.verbose = verbose
+	WithWLock(&globalLogContext.mu, func() {
+		globalLogContext.verbose = verbose
+	})
 
 	select {
 	case <-ctx.Done():
@@ -51,13 +51,12 @@ func VerboseLogWithContext(ctx context.Context, format string, args ...interface
 	default:
 	}
 
-	globalLogContext.mu.RLock()
-	defer globalLogContext.mu.RUnlock()
-
-	if globalLogContext.verbose {
-		timestamp := time.Now().Format("15:04:05")
-		fmt.Fprintf(os.Stderr, "[%s] DEBUG: %s\n", timestamp, fmt.Sprintf(format, args...))
-	}
+	WithRLock(&globalLogContext.mu, func() {
+		if globalLogContext.verbose {
+			timestamp := time.Now().Format("15:04:05")
+			fmt.Fprintf(os.Stderr, "[%s] DEBUG: %s\n", timestamp, fmt.Sprintf(format, args...))
+		}
+	})
 }
 
 // VerboseLogError prints error details when verbose mode is enabled (legacy API).
@@ -73,13 +72,12 @@ func VerboseLogErrorWithContext(ctx context.Context, operation string, err error
 	default:
 	}
 
-	globalLogContext.mu.RLock()
-	defer globalLogContext.mu.RUnlock()
-
-	if globalLogContext.verbose {
-		timestamp := time.Now().Format("15:04:05")
-		fmt.Fprintf(os.Stderr, "[%s] ERROR in %s: %v\n", timestamp, operation, err)
-	}
+	WithRLock(&globalLogContext.mu, func() {
+		if globalLogContext.verbose {
+			timestamp := time.Now().Format("15:04:05")
+			fmt.Fprintf(os.Stderr, "[%s] ERROR in %s: %v\n", timestamp, operation, err)
+		}
+	})
 }
 
 // PrintError prints an error message to stderr with consistent formatting.

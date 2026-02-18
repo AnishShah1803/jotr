@@ -111,11 +111,11 @@ func (l *Logger) ErrorCtx(ctx context.Context, msg string, args ...any) {
 
 func (l *Logger) log(ctx context.Context, level Level, msg string, args ...any) {
 	l.mu.RLock()
-	defer l.mu.RUnlock()
-
 	if level < l.level {
+		l.mu.RUnlock()
 		return
 	}
+	defer l.mu.RUnlock()
 
 	var slogLevel slog.Level
 	switch level {
@@ -232,21 +232,24 @@ func GlobalLogger() *Logger {
 
 // SetLevel sets the logging level for the logger.
 func (l *Logger) SetLevel(level Level) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.level = level
+	WithWLock(&l.mu, func() {
+		l.level = level
+	})
 }
 
 func (l *Logger) With(args ...any) *Logger {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-	return NewLogger(l.handler.WithAttrs(toSlogAttrs(args...)))
+	var newHandler slog.Handler
+	WithRLock(&l.mu, func() {
+		newHandler = l.handler.WithAttrs(toSlogAttrs(args...))
+	})
+	return NewLogger(newHandler)
 }
 
 func SetGlobalLogger(logger *Logger) {
-	getGlobalLogger().mu.Lock()
-	defer getGlobalLogger().mu.Unlock()
-	globalLogger = logger
+	gl := getGlobalLogger()
+	WithWLock(&gl.mu, func() {
+		globalLogger = logger
+	})
 }
 
 func SetGlobalLevel(level Level) {
@@ -254,16 +257,17 @@ func SetGlobalLevel(level Level) {
 }
 
 func SetGlobalJSONOutput(json bool) {
-	getGlobalLogger().mu.Lock()
-	defer getGlobalLogger().mu.Unlock()
-	handlerOpts := &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}
-	if json {
-		getGlobalLogger().handler = slog.NewJSONHandler(os.Stderr, handlerOpts)
-	} else {
-		getGlobalLogger().handler = slog.NewTextHandler(os.Stderr, handlerOpts)
-	}
+	gl := getGlobalLogger()
+	WithWLock(&gl.mu, func() {
+		handlerOpts := &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		}
+		if json {
+			gl.handler = slog.NewJSONHandler(os.Stderr, handlerOpts)
+		} else {
+			gl.handler = slog.NewTextHandler(os.Stderr, handlerOpts)
+		}
+	})
 }
 
 func Debug(msg string, args ...any) {
