@@ -2,20 +2,6 @@ package utils
 
 import "sync"
 
-// WithLock acquires a mutex lock and ensures it's released.
-// This helper eliminates the need for repetitive defer mu.Unlock() patterns.
-//
-// Usage:
-//
-//	WithLock(&mu, func() {
-//		// Critical section code here
-//	})
-func WithLock(mu *sync.Mutex, fn func()) {
-	mu.Lock()
-	defer mu.Unlock()
-	fn()
-}
-
 // WithRLock acquires a read lock and ensures it's released.
 // This helper eliminates the need for repetitive defer mu.RUnlock() patterns.
 //
@@ -31,7 +17,7 @@ func WithRLock(mu *sync.RWMutex, fn func()) {
 }
 
 // WithWLock acquires a write lock on an RWMutex and ensures it's released.
-// This helper eliminates the need for repetitive defer mu.Unlock() patterns on RWMutex.
+// This helper eliminates the need for repetitive defer mu.RUnlock() patterns for write locks.
 //
 // Usage:
 //

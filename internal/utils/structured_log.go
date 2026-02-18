@@ -110,38 +110,39 @@ func (l *Logger) ErrorCtx(ctx context.Context, msg string, args ...any) {
 }
 
 func (l *Logger) log(ctx context.Context, level Level, msg string, args ...any) {
-	WithRLock(&l.mu, func() {
-		if level < l.level {
-			return
-		}
+	l.mu.RLock()
+	if level < l.level {
+		l.mu.RUnlock()
+		return
+	}
+	defer l.mu.RUnlock()
 
-		var slogLevel slog.Level
-		switch level {
-		case LevelDebug:
-			slogLevel = slog.LevelDebug
-		case LevelInfo:
-			slogLevel = slog.LevelInfo
-		case LevelWarn:
-			slogLevel = slog.LevelWarn
-		case LevelError:
-			slogLevel = slog.LevelError
-		default:
-			slogLevel = slog.LevelInfo
-		}
+	var slogLevel slog.Level
+	switch level {
+	case LevelDebug:
+		slogLevel = slog.LevelDebug
+	case LevelInfo:
+		slogLevel = slog.LevelInfo
+	case LevelWarn:
+		slogLevel = slog.LevelWarn
+	case LevelError:
+		slogLevel = slog.LevelError
+	default:
+		slogLevel = slog.LevelInfo
+	}
 
-		handler := l.handler.WithAttrs([]slog.Attr{
-			slog.String("level", level.String()),
-		})
-
-		record := slog.Record{
-			Message: msg,
-			Time:    time.Now(),
-			Level:   slogLevel,
-		}
-		record.AddAttrs(toSlogAttrs(args...)...)
-
-		_ = handler.Handle(ctx, record)
+	handler := l.handler.WithAttrs([]slog.Attr{
+		slog.String("level", level.String()),
 	})
+
+	record := slog.Record{
+		Message: msg,
+		Time:    time.Now(),
+		Level:   slogLevel,
+	}
+	record.AddAttrs(toSlogAttrs(args...)...)
+
+	_ = handler.Handle(ctx, record)
 }
 
 func toSlogAttrs(args ...any) []slog.Attr {
@@ -245,7 +246,8 @@ func (l *Logger) With(args ...any) *Logger {
 }
 
 func SetGlobalLogger(logger *Logger) {
-	WithWLock(&getGlobalLogger().mu, func() {
+	gl := getGlobalLogger()
+	WithWLock(&gl.mu, func() {
 		globalLogger = logger
 	})
 }
@@ -255,14 +257,15 @@ func SetGlobalLevel(level Level) {
 }
 
 func SetGlobalJSONOutput(json bool) {
-	WithWLock(&getGlobalLogger().mu, func() {
+	gl := getGlobalLogger()
+	WithWLock(&gl.mu, func() {
 		handlerOpts := &slog.HandlerOptions{
 			Level: slog.LevelInfo,
 		}
 		if json {
-			getGlobalLogger().handler = slog.NewJSONHandler(os.Stderr, handlerOpts)
+			gl.handler = slog.NewJSONHandler(os.Stderr, handlerOpts)
 		} else {
-			getGlobalLogger().handler = slog.NewTextHandler(os.Stderr, handlerOpts)
+			gl.handler = slog.NewTextHandler(os.Stderr, handlerOpts)
 		}
 	})
 }
