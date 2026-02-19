@@ -457,8 +457,10 @@ func (s *TaskService) ArchiveTasks(ctx context.Context, opts ArchiveOptions) (*A
 	}
 
 	if todoState.NeedsMigration() && utils.FileExists(opts.TodoPath) {
-		existingTasks, _ := tasks.ReadTasks(ctx, opts.TodoPath)
-		if len(existingTasks) > 0 {
+		existingTasks, err := tasks.ReadTasks(ctx, opts.TodoPath)
+		if err != nil {
+			utils.VerboseLogErrorWithContext(ctx, "failed to read existing tasks during migration", err)
+		} else if len(existingTasks) > 0 {
 			todoState.MigrateFromMarkdown(existingTasks, "migration")
 		}
 	}
