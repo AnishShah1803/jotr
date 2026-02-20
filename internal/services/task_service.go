@@ -184,7 +184,10 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*SyncRes
 	}
 
 	if todoState.NeedsMigration() && utils.FileExists(opts.TodoPath) {
-		existingTasks, _ := tasks.ReadTasks(ctx, opts.TodoPath)
+		existingTasks, err := tasks.ReadTasks(ctx, opts.TodoPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read existing tasks during migration: %w", err)
+		}
 		if len(existingTasks) > 0 {
 			todoState.MigrateFromMarkdown(existingTasks, "migration")
 		}
@@ -457,7 +460,10 @@ func (s *TaskService) ArchiveTasks(ctx context.Context, opts ArchiveOptions) (*A
 	}
 
 	if todoState.NeedsMigration() && utils.FileExists(opts.TodoPath) {
-		existingTasks, _ := tasks.ReadTasks(ctx, opts.TodoPath)
+		existingTasks, err := tasks.ReadTasks(ctx, opts.TodoPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read existing tasks during migration: %w", err)
+		}
 		if len(existingTasks) > 0 {
 			todoState.MigrateFromMarkdown(existingTasks, "migration")
 		}
