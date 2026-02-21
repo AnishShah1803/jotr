@@ -127,6 +127,20 @@ func (m Model) versionStyle() lipgloss.Style {
 	return versionStyleBase.Width(width)
 }
 
+func (m Model) getPanelStyle(p panel) lipgloss.Style {
+	if m.focusedPanel == p {
+		return focusedPanelStyle
+	}
+	return panelStyle
+}
+
+func (m Model) getTitleStyle(p panel) lipgloss.Style {
+	if m.focusedPanel == p {
+		return focusedTitleStyle
+	}
+	return titleStyle
+}
+
 func calculateLayoutHeight(header, main, footer string) int {
 	return lipgloss.Height(header) + lipgloss.Height(main) + lipgloss.Height(footer)
 }
@@ -269,17 +283,8 @@ func (m Model) renderFooter() string {
 }
 
 func (m Model) renderNotesPanel(width, height int) string {
-	var tStyle lipgloss.Style
-
-	var style lipgloss.Style
-
-	if m.focusedPanel == panelNotes {
-		tStyle = focusedTitleStyle
-		style = focusedPanelStyle
-	} else {
-		tStyle = titleStyle
-		style = panelStyle
-	}
+	tStyle := m.getTitleStyle(panelNotes)
+	style := m.getPanelStyle(panelNotes)
 
 	// Calculate content dimensions
 	contentWidth := width - 4 // Account for border and padding
@@ -323,17 +328,8 @@ func (m Model) renderNotesPanel(width, height int) string {
 }
 
 func (m Model) renderPreviewPanel(width, height int) string {
-	var tStyle lipgloss.Style
-
-	var style lipgloss.Style
-
-	if m.focusedPanel == panelPreview {
-		tStyle = focusedTitleStyle
-		style = focusedPanelStyle
-	} else {
-		tStyle = titleStyle
-		style = panelStyle
-	}
+	tStyle := m.getTitleStyle(panelPreview)
+	style := m.getPanelStyle(panelPreview)
 
 	// Calculate content width
 	contentWidth := width - 4
@@ -352,17 +348,8 @@ func (m Model) renderPreviewPanel(width, height int) string {
 }
 
 func (m Model) renderTasksPanel(width, height int) string {
-	var tStyle lipgloss.Style
-
-	var style lipgloss.Style
-
-	if m.focusedPanel == panelTasks {
-		tStyle = focusedTitleStyle
-		style = focusedPanelStyle
-	} else {
-		tStyle = titleStyle
-		style = panelStyle
-	}
+	tStyle := m.getTitleStyle(panelTasks)
+	style := m.getPanelStyle(panelTasks)
 
 	// Calculate content dimensions
 	contentWidth := width - 4 // Account for border and padding
@@ -411,17 +398,8 @@ func (m Model) renderTasksPanel(width, height int) string {
 }
 
 func (m Model) renderStatsPanel(width, height int) string {
-	var tStyle lipgloss.Style
-
-	var style lipgloss.Style
-
-	if m.focusedPanel == panelStats {
-		tStyle = focusedTitleStyle
-		style = focusedPanelStyle
-	} else {
-		tStyle = titleStyle
-		style = panelStyle
-	}
+	tStyle := m.getTitleStyle(panelStats)
+	style := m.getPanelStyle(panelStats)
 
 	// Calculate content width
 	contentWidth := width - 4
