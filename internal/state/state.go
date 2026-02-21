@@ -475,7 +475,7 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 	dailyChanges := s.CompareWithDailyNotes(dailyTasks, dailySourcePath)
 	todoChanges := s.CompareWithTodoList(todoTasks)
 
-	conflicts := s.detectSyncConflicts(dailyChanges, todoChanges)
+	conflicts := s.DetectConflicts(dailyChanges, todoChanges)
 	if len(conflicts) > 0 {
 		result.Conflicts = conflicts
 		result.ConflictsDetail = s.buildConflictDetails(dailyChanges, todoChanges, conflicts)
@@ -498,10 +498,6 @@ func (s *TodoState) buildChangeMap(changes []TaskChange) map[string]TaskChange {
 		changeMap[change.TaskID] = change
 	}
 	return changeMap
-}
-
-func (s *TodoState) detectSyncConflicts(dailyChanges, todoChanges []TaskChange) map[string]string {
-	return s.DetectConflicts(dailyChanges, todoChanges)
 }
 
 func (s *TodoState) applyDailyToTodoChanges(dailyChangeMap, todoChangeMap map[string]TaskChange, result *SyncResult) {
