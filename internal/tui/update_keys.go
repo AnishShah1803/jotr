@@ -17,13 +17,11 @@ func handleKeyEvent(m Model, msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, tea.Sequence(tea.ExitAltScreen, tea.Quit)
 
 	case key.Matches(msg, m.keys.Tab):
-		m.focusedPanel = (m.focusedPanel + 1) % 4
-		m.updateCachedKeyMap()
+		m.cycleFocus(true)
 		return m, nil
 
 	case key.Matches(msg, m.keys.TabReverse):
-		m.focusedPanel = (m.focusedPanel + 3) % 4
-		m.updateCachedKeyMap()
+		m.cycleFocus(false)
 		return m, nil
 
 	case key.Matches(msg, m.keys.Up):

@@ -62,8 +62,8 @@ func (m Model) loadData() tea.Cmd {
 			return newErrorMsg(fmt.Errorf("failed to find notes: %w", err), true)
 		}
 
-		editorConfigured := isAnyEditorAvailable(ctx, m.config)
-		editorFallback := !isConfigEditorAvailable(ctx, m.config) && isShellEditorAvailable(ctx)
+		editorConfigured := isAnyEditorAvailable(m.config)
+		editorFallback := !isConfigEditorAvailable(m.config) && isShellEditorAvailable()
 
 		return dataLoadedMsg{
 			notes:            recentNotes,

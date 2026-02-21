@@ -53,6 +53,13 @@ var (
 				Foreground(accentColor).
 				Bold(true)
 
+	labelStyle = lipgloss.NewStyle().
+			Foreground(primaryColor)
+
+	streakStyleBase = lipgloss.NewStyle().Bold(true)
+
+	barStyleBase = lipgloss.NewStyle()
+
 	// ASCII Art - Only used for large terminals (40+ lines, 50+ width).
 	asciiArtLarge = `     ██╗ ██████╗ ████████╗██████╗
      ██║██╔═══██╗╚══██╔══╝██╔══██╗

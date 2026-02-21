@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -52,7 +51,7 @@ func createTodoFile(path string) error {
 	return os.WriteFile(path, []byte("# Todo\n\n## Tasks\n\n\n\n"), constants.FilePerm0644)
 }
 
-func isAnyEditorAvailable(ctx context.Context, cfg *config.LoadedConfig) bool {
+func isAnyEditorAvailable(cfg *config.LoadedConfig) bool {
 	configEditor := cfg.GetDefaultEditor()
 
 	if configEditor != "" {
@@ -71,7 +70,7 @@ func isAnyEditorAvailable(ctx context.Context, cfg *config.LoadedConfig) bool {
 	return false
 }
 
-func isConfigEditorAvailable(ctx context.Context, cfg *config.LoadedConfig) bool {
+func isConfigEditorAvailable(cfg *config.LoadedConfig) bool {
 	configEditor := cfg.GetDefaultEditor()
 
 	if configEditor == "" {
@@ -85,7 +84,7 @@ func isConfigEditorAvailable(ctx context.Context, cfg *config.LoadedConfig) bool
 	return true
 }
 
-func isShellEditorAvailable(ctx context.Context) bool {
+func isShellEditorAvailable() bool {
 	shellEditor := os.Getenv("EDITOR")
 
 	if shellEditor == "" {
@@ -201,14 +200,13 @@ func (m *Model) updateStatsViewport() {
 		streakIcon = iconStreak + iconStreak
 	}
 
-	streakStyle := lipgloss.NewStyle().Foreground(streakColor).Bold(true)
-	content := " " + streakStyle.Render(fmt.Sprintf("%s %d day streak", streakIcon, m.streak)) + "\n\n"
+	content := " " + streakStyleBase.Foreground(streakColor).Render(fmt.Sprintf("%s %d day streak", streakIcon, m.streak)) + "\n\n"
 
-	content += " " + lipgloss.NewStyle().Foreground(primaryColor).Render("Notes") + "\n"
+	content += " " + labelStyle.Render("Notes") + "\n"
 	content += fmt.Sprintf("  Total: %d\n", m.totalNotes)
 	content += fmt.Sprintf("  Recent: %d\n\n", len(m.notes))
 
-	content += " " + lipgloss.NewStyle().Foreground(primaryColor).Render("Tasks") + "\n"
+	content += " " + labelStyle.Render("Tasks") + "\n"
 	pendingTasks := m.totalTasks - m.completedTasks
 	content += fmt.Sprintf("  Pending: %d\n", pendingTasks)
 	content += fmt.Sprintf("  Done: %d\n", m.completedTasks)
@@ -237,7 +235,7 @@ func (m *Model) updateStatsViewport() {
 			barColor = output.SecondaryColor
 		}
 
-		barStyle := lipgloss.NewStyle().Foreground(barColor)
+		barStyle := barStyleBase.Foreground(barColor)
 		content += fmt.Sprintf("  %s %.0f%%\n", barStyle.Render(bar), completion)
 	}
 
