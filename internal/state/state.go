@@ -482,16 +482,25 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 		return result
 	}
 
-	dailyChangeMap := make(map[string]TaskChange)
-	for _, change := range dailyChanges {
-		dailyChangeMap[change.TaskID] = change
-	}
+	dailyChangeMap := s.buildChangeMap(dailyChanges)
+	todoChangeMap := s.buildChangeMap(todoChanges)
 
-	todoChangeMap := make(map[string]TaskChange)
-	for _, change := range todoChanges {
-		todoChangeMap[change.TaskID] = change
-	}
+	s.applyDailyToTodoChanges(dailyChangeMap, todoChangeMap, &result)
+	s.applyTodoToDailyChanges(todoChangeMap, dailyChangeMap, &result)
+	s.handleSyncDeletions(dailyTasks, todoTasks, &result)
 
+	return result
+}
+
+func (s *TodoState) buildChangeMap(changes []TaskChange) map[string]TaskChange {
+	changeMap := make(map[string]TaskChange)
+	for _, change := range changes {
+		changeMap[change.TaskID] = change
+	}
+	return changeMap
+}
+
+func (s *TodoState) applyDailyToTodoChanges(dailyChangeMap, todoChangeMap map[string]TaskChange, result *SyncResult) {
 	for taskID, dailyChange := range dailyChangeMap {
 		todoChange, todoHasChange := todoChangeMap[taskID]
 
@@ -539,7 +548,9 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 			}
 		}
 	}
+}
 
+func (s *TodoState) applyTodoToDailyChanges(todoChangeMap, dailyChangeMap map[string]TaskChange, result *SyncResult) {
 	for taskID, todoChange := range todoChangeMap {
 		if _, dailyHasChange := dailyChangeMap[taskID]; !dailyHasChange {
 			s.applyChange(todoChange)
@@ -556,7 +567,9 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 			}
 		}
 	}
+}
 
+func (s *TodoState) handleSyncDeletions(dailyTasks, todoTasks []tasks.Task, result *SyncResult) {
 	deletions := s.DetectDeletions(dailyTasks, todoTasks)
 	for _, deletion := range deletions {
 		if deletion.OldTask != nil && deletion.OldTask.Completed {
@@ -569,8 +582,6 @@ func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailyS
 
 		result.DeletedTasks = append(result.DeletedTasks, buildTaskChangeDetail(deletion))
 	}
-
-	return result
 }
 
 func (s *TodoState) applyChange(change TaskChange) {
