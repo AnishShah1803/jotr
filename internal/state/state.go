@@ -445,26 +445,6 @@ func (s *TodoState) DetectConflicts(dailyChanges, todoChanges []TaskChange) map[
 	return conflicts
 }
 
-// SyncResult represents the result of a sync operation
-type SyncResult struct {
-	StateUpdated     bool
-	DailyChanged     bool
-	TodoChanged      bool
-	Conflicts        map[string]string
-	AppliedDaily     int
-	AppliedTodo      int
-	Deleted          int // Number of tasks deleted during sync
-	Skipped          int
-	ChangedTaskIDs   []string // Task IDs that changed and may need their source files updated
-	DeletedTaskIDs   []string // Task IDs that were deleted
-	AddedFromDaily   []TaskChangeDetail
-	UpdatedFromDaily []TaskChangeDetail
-	AddedFromTodo    []TaskChangeDetail
-	UpdatedFromTodo  []TaskChangeDetail
-	DeletedTasks     []TaskChangeDetail
-	ConflictsDetail  []ConflictDetail
-}
-
 // BidirectionalSync performs bidirectional sync between daily notes and todo list
 // Compares both sources with state and propagates changes appropriately
 func (s *TodoState) BidirectionalSync(dailyTasks, todoTasks []tasks.Task, dailySourcePath string) SyncResult {
@@ -580,7 +560,7 @@ func (s *TodoState) handleSyncDeletions(dailyTasks, todoTasks []tasks.Task, resu
 		result.StateUpdated = true
 		result.DeletedTaskIDs = append(result.DeletedTaskIDs, deletion.TaskID)
 
-		result.DeletedTasks = append(result.DeletedTasks, buildTaskChangeDetail(deletion))
+		result.DeletedTasksDetail = append(result.DeletedTasksDetail, buildTaskChangeDetail(deletion))
 	}
 }
 

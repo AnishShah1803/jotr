@@ -117,7 +117,7 @@ func syncTasks(ctx context.Context, cfg *config.LoadedConfig) error {
 	return outputSyncDefault(result, syncVerbose)
 }
 
-func outputSyncJSON(result *services.SyncResult) error {
+func outputSyncJSON(result *state.SyncResult) error {
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal result to JSON: %w", err)
@@ -126,7 +126,7 @@ func outputSyncJSON(result *services.SyncResult) error {
 	return nil
 }
 
-func outputSyncQuiet(result *services.SyncResult) error {
+func outputSyncQuiet(result *state.SyncResult) error {
 	if len(result.Conflicts) > 0 {
 		fmt.Printf("Conflicts: %d\n", len(result.Conflicts))
 		return nil
@@ -142,7 +142,7 @@ func outputSyncQuiet(result *services.SyncResult) error {
 	return nil
 }
 
-func outputSyncDefault(result *services.SyncResult, verbose bool) error {
+func outputSyncDefault(result *state.SyncResult, verbose bool) error {
 	c := isColorEnabled()
 
 	if syncDryRun {
