@@ -8,85 +8,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/utils/platform"
 )
 
 var ErrLockTimeout = errors.New("timeout waiting for file lock")
-
-func LockFile(path string, timeout time.Duration) (*os.File, error) {
-	lockPath := path + ".lock"
-
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, constants.FilePerm0600)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open lock file: %w", err)
-	}
-
-	deadline := time.Now().Add(timeout)
-
-	for {
-		err := platform.Flock(int(lockFile.Fd()), platform.LOCK_EX)
-		if err == nil {
-			return lockFile, nil
-		}
-
-		if time.Now().After(deadline) {
-			lockFile.Close()
-			return nil, fmt.Errorf("%w: %s", ErrLockTimeout, path)
-		}
-
-		time.Sleep(50 * time.Millisecond)
-	}
-}
-
-// UnlockFile releases the lock acquired by LockFile and closes the file handle.
-func UnlockFile(lockFile *os.File) error {
-	if lockFile == nil {
-		return nil
-	}
-
-	// Release the lock
-	err := platform.Flock(int(lockFile.Fd()), platform.LOCK_UN)
-	if err != nil {
-		// Still try to close the file even if unlock fails
-		closeErr := lockFile.Close()
-		// Use errors.Join to preserve both errors in the chain
-		return fmt.Errorf("failed to release file lock: %w", errors.Join(err, closeErr))
-	}
-
-	return lockFile.Close()
-}
-
-// TryLockFile attempts to acquire a non-blocking exclusive lock on a file.
-// Returns nil, nil if lock is immediately available.
-// Returns (nil, error) if lock cannot be acquired.
-func TryLockFile(path string) (*os.File, error) {
-	lockPath := path + ".lock"
-
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, constants.FilePerm0600)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open lock file: %w", err)
-	}
-
-	err = platform.Flock(int(lockFile.Fd()), platform.LOCK_EX|platform.LOCK_NB)
-	if err != nil {
-		lockFile.Close()
-
-		if platform.IsLockBusy(err) {
-			return nil, nil // Lock is held by another process
-		}
-		if err == platform.ErrNotSupported {
-			// On platforms that don't support locking, assume success
-			return lockFile, nil
-		}
-
-		return nil, fmt.Errorf("failed to acquire file lock: %w", err)
-	}
-
-	return lockFile, nil
-}
 
 // CheckWritePermission checks if we have write permission to a directory or file.
 func CheckWritePermission(path string) error {

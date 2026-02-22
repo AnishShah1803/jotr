@@ -350,34 +350,26 @@ func TestLockFile(t *testing.T) {
 
 	testFile := filepath.Join(tmpDir, "test.txt")
 
-	// Create test file
 	err = os.WriteFile(testFile, []byte("test content"), constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	// Acquire lock
-	lockFile, err := LockFile(testFile, 5*time.Second)
+	lm := NewDefaultFileLockManager()
+
+	lockHandle, err := lm.LockFile(testFile, 5*time.Second)
 	if err != nil {
 		t.Fatalf("LockFile failed: %v", err)
 	}
-	if lockFile == nil {
-		t.Fatal("LockFile returned nil file handle")
+	if lockHandle == nil {
+		t.Fatal("LockFile returned nil handle")
 	}
 
-	// Verify we can read/write the lock file
-	_, err = lockFile.Write([]byte("locked"))
-	if err != nil {
-		t.Errorf("Failed to write to lock file: %v", err)
-	}
-
-	// Release lock
-	err = UnlockFile(lockFile)
+	err = lm.UnlockFile(lockHandle)
 	if err != nil {
 		t.Errorf("UnlockFile failed: %v", err)
 	}
 
-	// Verify original file is still intact
 	content, err := os.ReadFile(testFile)
 	if err != nil {
 		t.Fatalf("Failed to read original file: %v", err)
@@ -388,8 +380,8 @@ func TestLockFile(t *testing.T) {
 }
 
 func TestLockFile_NilHandle(t *testing.T) {
-	// UnlockFile with nil should not panic and should return nil
-	err := UnlockFile(nil)
+	lm := NewDefaultFileLockManager()
+	err := lm.UnlockFile(nil)
 	if err != nil {
 		t.Errorf("UnlockFile(nil) should return nil, got %v", err)
 	}
@@ -404,27 +396,26 @@ func TestLockFile_Timeout(t *testing.T) {
 
 	testFile := filepath.Join(tmpDir, "test.txt")
 
-	// Create test file
 	err = os.WriteFile(testFile, []byte("test content"), constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	// Acquire first lock using blocking LockFile
-	lockFile1, err := LockFile(testFile, 5*time.Second)
+	lm := NewDefaultFileLockManager()
+
+	lockHandle1, err := lm.LockFile(testFile, 5*time.Second)
 	if err != nil {
 		t.Fatalf("First LockFile failed: %v", err)
 	}
-	defer UnlockFile(lockFile1)
+	defer lm.UnlockFile(lockHandle1)
 
-	// Try to acquire second lock with TryLockFile - should return nil immediately
-	lockFile2, err := TryLockFile(testFile)
+	lockHandle2, err := lm.TryLockFile(testFile)
 	if err != nil {
 		t.Fatalf("TryLockFile returned unexpected error: %v", err)
 	}
-	if lockFile2 != nil {
+	if lockHandle2 != nil {
 		t.Error("TryLockFile should return nil when lock is held by another process")
-		UnlockFile(lockFile2)
+		lm.UnlockFile(lockHandle2)
 	}
 }
 
@@ -437,48 +428,44 @@ func TestTryLockFile(t *testing.T) {
 
 	testFile := filepath.Join(tmpDir, "test.txt")
 
-	// Create test file
 	err = os.WriteFile(testFile, []byte("test content"), constants.FilePerm0644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	// First tryLock should succeed
-	lockFile1, err := TryLockFile(testFile)
+	lm := NewDefaultFileLockManager()
+
+	lockHandle1, err := lm.TryLockFile(testFile)
 	if err != nil {
 		t.Fatalf("First TryLockFile failed: %v", err)
 	}
-	if lockFile1 == nil {
-		t.Fatal("First TryLockFile returned nil, expected lock file")
+	if lockHandle1 == nil {
+		t.Fatal("First TryLockFile returned nil, expected lock handle")
 	}
 
-	// Second tryLock should return nil (lock already held)
-	lockFile2, err := TryLockFile(testFile)
+	lockHandle2, err := lm.TryLockFile(testFile)
 	if err != nil {
 		t.Fatalf("Second TryLockFile returned error: %v", err)
 	}
-	if lockFile2 != nil {
+	if lockHandle2 != nil {
 		t.Error("Second TryLockFile should return nil when lock is held")
-		UnlockFile(lockFile2)
+		lm.UnlockFile(lockHandle2)
 	}
 
-	// Release first lock
-	err = UnlockFile(lockFile1)
+	err = lm.UnlockFile(lockHandle1)
 	if err != nil {
 		t.Errorf("UnlockFile failed: %v", err)
 	}
 
-	// Third tryLock should succeed after first is released
-	lockFile3, err := TryLockFile(testFile)
+	lockHandle3, err := lm.TryLockFile(testFile)
 	if err != nil {
 		t.Fatalf("Third TryLockFile failed: %v", err)
 	}
-	if lockFile3 == nil {
-		t.Fatal("Third TryLockFile returned nil, expected lock file")
+	if lockHandle3 == nil {
+		t.Fatal("Third TryLockFile returned nil, expected lock handle")
 	}
 
-	// Clean up
-	UnlockFile(lockFile3)
+	lm.UnlockFile(lockHandle3)
 }
 
 func TestAtomicWriteFileCtx_Cancellation(t *testing.T) {

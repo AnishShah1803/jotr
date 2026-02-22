@@ -10,25 +10,11 @@ import (
 	"github.com/AnishShah1803/jotr/internal/utils/platform"
 )
 
-type lockHandleFile struct {
-	file *os.File
-}
-
-func (h *lockHandleFile) Close() error {
-	if h.file == nil {
-		return nil
-	}
-
-	err := platform.Flock(int(h.file.Fd()), platform.LOCK_UN)
-	if err != nil {
-		closeErr := h.file.Close()
-		return fmt.Errorf("failed to release file lock: %w", errors.Join(err, closeErr))
-	}
-
-	return h.file.Close()
-}
-
 type DefaultFileLockManager struct{}
+
+func NewDefaultFileLockManager() *DefaultFileLockManager {
+	return &DefaultFileLockManager{}
+}
 
 func (m *DefaultFileLockManager) LockFile(path string, timeout time.Duration) (LockHandle, error) {
 	lockPath := path + ".lock"
@@ -87,6 +73,20 @@ func (m *DefaultFileLockManager) UnlockFile(handle LockHandle) error {
 	return handle.Close()
 }
 
-func NewDefaultFileLockManager() *DefaultFileLockManager {
-	return &DefaultFileLockManager{}
+type lockHandleFile struct {
+	file *os.File
+}
+
+func (h *lockHandleFile) Close() error {
+	if h.file == nil {
+		return nil
+	}
+
+	err := platform.Flock(int(h.file.Fd()), platform.LOCK_UN)
+	if err != nil {
+		closeErr := h.file.Close()
+		return fmt.Errorf("failed to release file lock: %w", errors.Join(err, closeErr))
+	}
+
+	return h.file.Close()
 }

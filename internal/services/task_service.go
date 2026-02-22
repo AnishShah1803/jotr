@@ -23,11 +23,20 @@ type TaskService struct {
 	lockManager utils.FileLockManager
 }
 
-// NewTaskService creates a new TaskService instance.
-func NewTaskService() *TaskService {
-	return &TaskService{
+type TaskServiceOption func(*TaskService)
+
+func WithLockManager(lm utils.FileLockManager) TaskServiceOption {
+	return func(s *TaskService) { s.lockManager = lm }
+}
+
+func NewTaskService(opts ...TaskServiceOption) *TaskService {
+	s := &TaskService{
 		lockManager: utils.NewDefaultFileLockManager(),
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // SyncOptions contains options for syncing tasks.
