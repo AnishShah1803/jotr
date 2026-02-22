@@ -614,14 +614,15 @@ func TestTaskService_SyncTasks_LockTimeoutError(t *testing.T) {
 
 	statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
 
-	lockFile, err := utils.TryLockFile(statePath)
+	lm := utils.NewDefaultFileLockManager()
+	lockHandle, err := lm.TryLockFile(statePath)
 	if err != nil {
 		t.Fatalf("Failed to acquire lock: %v", err)
 	}
-	if lockFile == nil {
-		t.Fatal("TryLockFile returned nil file")
+	if lockHandle == nil {
+		t.Fatal("TryLockFile returned nil handle")
 	}
-	defer utils.UnlockFile(lockFile)
+	defer lm.UnlockFile(lockHandle)
 
 	service := NewTaskService()
 

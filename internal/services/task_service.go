@@ -19,11 +19,24 @@ import (
 )
 
 // TaskService provides task management operations.
-type TaskService struct{}
+type TaskService struct {
+	lockManager utils.FileLockManager
+}
 
-// NewTaskService creates a new TaskService instance.
-func NewTaskService() *TaskService {
-	return &TaskService{}
+type TaskServiceOption func(*TaskService)
+
+func WithLockManager(lm utils.FileLockManager) TaskServiceOption {
+	return func(s *TaskService) { s.lockManager = lm }
+}
+
+func NewTaskService(opts ...TaskServiceOption) *TaskService {
+	s := &TaskService{
+		lockManager: utils.NewDefaultFileLockManager(),
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // SyncOptions contains options for syncing tasks.
@@ -37,51 +50,51 @@ type SyncOptions struct {
 }
 
 // acquireSyncLocks acquires locks on state, todo, and daily note files in the correct order.
-// Returns a slice of file handles that must be released in reverse order.
+// Returns a slice of lock handles that must be released in reverse order.
 // Lock order: state file → todo file → daily note
-func (s *TaskService) acquireSyncLocks(statePath, todoPath, notePath string, timeout time.Duration) ([]*os.File, error) {
-	var locks []*os.File
+func (s *TaskService) acquireSyncLocks(statePath, todoPath, notePath string, timeout time.Duration) ([]utils.LockHandle, error) {
+	var locks []utils.LockHandle
 
 	// Acquire lock order: state file → todo file → daily note
 	// This ordering must be consistent to prevent deadlocks
 
 	// Lock state file
 	if statePath != "" {
-		lockFile, err := utils.LockFile(statePath, timeout)
+		lockHandle, err := s.lockManager.LockFile(statePath, timeout)
 		if err != nil {
 			// Release any already acquired locks
 			for _, l := range locks {
-				utils.UnlockFile(l)
+				s.lockManager.UnlockFile(l)
 			}
 			return nil, fmt.Errorf("failed to acquire lock on state file: %w", err)
 		}
-		locks = append(locks, lockFile)
+		locks = append(locks, lockHandle)
 	}
 
 	// Lock todo file
 	if todoPath != "" {
-		lockFile, err := utils.LockFile(todoPath, timeout)
+		lockHandle, err := s.lockManager.LockFile(todoPath, timeout)
 		if err != nil {
 			// Release any already acquired locks
 			for _, l := range locks {
-				utils.UnlockFile(l)
+				s.lockManager.UnlockFile(l)
 			}
 			return nil, fmt.Errorf("failed to acquire lock on todo file: %w", err)
 		}
-		locks = append(locks, lockFile)
+		locks = append(locks, lockHandle)
 	}
 
 	// Lock daily note (if provided)
 	if notePath != "" {
-		lockFile, err := utils.LockFile(notePath, timeout)
+		lockHandle, err := s.lockManager.LockFile(notePath, timeout)
 		if err != nil {
 			// Release any already acquired locks
 			for _, l := range locks {
-				utils.UnlockFile(l)
+				s.lockManager.UnlockFile(l)
 			}
 			return nil, fmt.Errorf("failed to acquire lock on daily note: %w", err)
 		}
-		locks = append(locks, lockFile)
+		locks = append(locks, lockHandle)
 	}
 
 	return locks, nil
@@ -124,13 +137,12 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*state.S
 		}
 		return nil, err
 	}
-	// Release locks in reverse order when function returns
 	defer func() {
 		if locks == nil {
 			return
 		}
 		for i := len(locks) - 1; i >= 0; i-- {
-			utils.UnlockFile(locks[i])
+			s.lockManager.UnlockFile(locks[i])
 		}
 	}()
 
@@ -428,7 +440,7 @@ func (s *TaskService) ArchiveTasks(ctx context.Context, opts ArchiveOptions) (*A
 			return
 		}
 		for i := len(locks) - 1; i >= 0; i-- {
-			utils.UnlockFile(locks[i])
+			s.lockManager.UnlockFile(locks[i])
 		}
 	}()
 
