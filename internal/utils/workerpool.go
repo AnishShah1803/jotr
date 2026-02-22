@@ -74,7 +74,7 @@ func ProcessFilesParallel(
 		}
 	}
 
-	return matched, ctx.Err()
+	return matched, nil
 }
 
 func ProcessFilesParallelWithContent(
@@ -142,5 +142,5 @@ func ProcessFilesParallelWithContent(
 		}
 	}
 
-	return matched, ctx.Err()
+	return matched, nil
 }

@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -86,7 +85,6 @@ func listTags(ctx context.Context, cfg *config.LoadedConfig) error {
 	}
 
 	tagSet := make(map[string]bool)
-	var mu sync.Mutex
 
 	results, err := utils.ProcessFilesParallelWithContent(ctx, allNotes, 0, func(path string, content []byte) bool {
 		return true
@@ -97,11 +95,9 @@ func listTags(ctx context.Context, cfg *config.LoadedConfig) error {
 
 	for _, r := range results {
 		tags := extractTags(string(r.Content))
-		mu.Lock()
 		for _, tag := range tags {
 			tagSet[tag] = true
 		}
-		mu.Unlock()
 	}
 
 	if len(tagSet) == 0 {
@@ -168,7 +164,6 @@ func tagStats(ctx context.Context, cfg *config.LoadedConfig) error {
 	}
 
 	tagCounts := make(map[string]int)
-	var mu sync.Mutex
 
 	results, err := utils.ProcessFilesParallelWithContent(ctx, allNotes, 0, func(path string, content []byte) bool {
 		return true
@@ -179,11 +174,9 @@ func tagStats(ctx context.Context, cfg *config.LoadedConfig) error {
 
 	for _, r := range results {
 		tags := extractTags(string(r.Content))
-		mu.Lock()
 		for _, tag := range tags {
 			tagCounts[tag]++
 		}
-		mu.Unlock()
 	}
 
 	if len(tagCounts) == 0 {
