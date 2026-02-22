@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -13,7 +12,10 @@ import (
 
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/notes"
+	"github.com/AnishShah1803/jotr/internal/utils"
 )
+
+var tagRegex = regexp.MustCompile(`#([a-zA-Z0-9_-]+)`)
 
 var TagsCmd = &cobra.Command{
 	Use:   "tags [action]",
@@ -58,9 +60,7 @@ Examples:
 }
 
 func extractTags(content string) []string {
-	// Match #tag pattern
-	re := regexp.MustCompile(`#([a-zA-Z0-9_-]+)`)
-	matches := re.FindAllStringSubmatch(content, -1)
+	matches := tagRegex.FindAllStringSubmatch(content, -1)
 
 	tagSet := make(map[string]bool)
 
@@ -86,13 +86,15 @@ func listTags(ctx context.Context, cfg *config.LoadedConfig) error {
 
 	tagSet := make(map[string]bool)
 
-	for _, notePath := range allNotes {
-		content, err := os.ReadFile(notePath)
-		if err != nil {
-			continue
-		}
+	results, err := utils.ProcessFilesParallelWithContent(ctx, allNotes, 0, func(path string, content []byte) bool {
+		return true
+	})
+	if err != nil {
+		return err
+	}
 
-		tags := extractTags(string(content))
+	for _, r := range results {
+		tags := extractTags(string(r.Content))
 		for _, tag := range tags {
 			tagSet[tag] = true
 		}
@@ -127,21 +129,17 @@ func findByTag(ctx context.Context, cfg *config.LoadedConfig, tag string) error 
 
 	tag = strings.TrimPrefix(tag, "#")
 
-	var matches []string
-
-	for _, notePath := range allNotes {
-		content, err := os.ReadFile(notePath)
-		if err != nil {
-			continue
-		}
-
+	matches, err := utils.ProcessFilesParallel(ctx, allNotes, 0, func(path string, content []byte) bool {
 		tags := extractTags(string(content))
 		for _, t := range tags {
 			if t == tag {
-				matches = append(matches, notePath)
-				break
+				return true
 			}
 		}
+		return false
+	})
+	if err != nil {
+		return err
 	}
 
 	if len(matches) == 0 {
@@ -167,13 +165,15 @@ func tagStats(ctx context.Context, cfg *config.LoadedConfig) error {
 
 	tagCounts := make(map[string]int)
 
-	for _, notePath := range allNotes {
-		content, err := os.ReadFile(notePath)
-		if err != nil {
-			continue
-		}
+	results, err := utils.ProcessFilesParallelWithContent(ctx, allNotes, 0, func(path string, content []byte) bool {
+		return true
+	})
+	if err != nil {
+		return err
+	}
 
-		tags := extractTags(string(content))
+	for _, r := range results {
+		tags := extractTags(string(r.Content))
 		for _, tag := range tags {
 			tagCounts[tag]++
 		}
@@ -184,7 +184,6 @@ func tagStats(ctx context.Context, cfg *config.LoadedConfig) error {
 		return nil
 	}
 
-	// Sort by count
 	type tagCount struct {
 		tag   string
 		count int

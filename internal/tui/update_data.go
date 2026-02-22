@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -27,25 +28,53 @@ func (m Model) loadData() tea.Cmd {
 		default:
 		}
 
-		recentNotes, err := notes.GetRecentDailyNotes(ctx, m.config.DiaryPath, 10)
-		if err != nil {
-			return newErrorMsg(fmt.Errorf("failed to load recent notes: %w", err), true)
-		}
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		var firstErr error
 
-		select {
-		case <-ctx.Done():
-			return newErrorMsg(ctx.Err(), true)
-		default:
-		}
-		allTasks, err := tasks.ReadTasks(ctx, m.config.TodoPath)
-		if err != nil {
-			return newErrorMsg(fmt.Errorf("failed to load tasks: %w", err), true)
-		}
+		var recentNotes []string
+		var allTasks []tasks.Task
+		var allNotes []string
 
-		select {
-		case <-ctx.Done():
-			return newErrorMsg(ctx.Err(), true)
-		default:
+		wg.Add(3)
+
+		go func() {
+			defer wg.Done()
+			n, err := notes.GetRecentDailyNotes(ctx, m.config.DiaryPath, 10)
+			mu.Lock()
+			if err != nil && firstErr == nil {
+				firstErr = fmt.Errorf("failed to load recent notes: %w", err)
+			}
+			recentNotes = n
+			mu.Unlock()
+		}()
+
+		go func() {
+			defer wg.Done()
+			t, err := tasks.ReadTasks(ctx, m.config.TodoPath)
+			mu.Lock()
+			if err != nil && firstErr == nil {
+				firstErr = fmt.Errorf("failed to load tasks: %w", err)
+			}
+			allTasks = t
+			mu.Unlock()
+		}()
+
+		go func() {
+			defer wg.Done()
+			n, err := notes.FindNotes(ctx, m.config.Paths.BaseDir)
+			mu.Lock()
+			if err != nil && firstErr == nil {
+				firstErr = fmt.Errorf("failed to find notes: %w", err)
+			}
+			allNotes = n
+			mu.Unlock()
+		}()
+
+		wg.Wait()
+
+		if firstErr != nil {
+			return newErrorMsg(firstErr, true)
 		}
 
 		total, completed, _ := tasks.CountTasks(allTasks)
@@ -56,10 +85,6 @@ func (m Model) loadData() tea.Cmd {
 		case <-ctx.Done():
 			return newErrorMsg(ctx.Err(), true)
 		default:
-		}
-		allNotes, err := notes.FindNotes(ctx, m.config.Paths.BaseDir)
-		if err != nil {
-			return newErrorMsg(fmt.Errorf("failed to find notes: %w", err), true)
 		}
 
 		editorConfigured := isAnyEditorAvailable(m.config)
