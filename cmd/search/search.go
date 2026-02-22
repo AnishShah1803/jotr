@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -93,7 +92,7 @@ func SearchNotes(ctx context.Context, cfg *config.LoadedConfig, query string) er
 	// Files only
 	if GetSearchFilesForTest() || searchOutputOption.FilesOnly {
 		for _, match := range matches {
-			relPath, _ := filepath.Rel(cfg.Paths.BaseDir, match)
+			relPath, _ := filepath.Rel(cfg.Paths.BaseDir, match.Path)
 			fmt.Println(relPath)
 		}
 
@@ -103,23 +102,17 @@ func SearchNotes(ctx context.Context, cfg *config.LoadedConfig, query string) er
 	// Full output with context
 	fmt.Printf("Found %d matches:\n\n", len(matches))
 
+	queryLower := strings.ToLower(query)
+
 	for _, match := range matches {
-		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, match)
+		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, match.Path)
 		fmt.Printf("📄 %s\n", relPath)
 
-		// Read file and show matching lines
-		content, err := os.ReadFile(match)
-		if err != nil {
-			continue
-		}
-
-		lines := strings.Split(string(content), "\n")
-		queryLower := strings.ToLower(query)
+		lines := strings.Split(string(match.Content), "\n")
 
 		for i, line := range lines {
 			if strings.Contains(strings.ToLower(line), queryLower) {
 				lineNum := i + 1
-				// Highlight the match (simple version)
 				highlighted := strings.ReplaceAll(line, query, fmt.Sprintf("**%s**", query))
 				fmt.Printf("  %d: %s\n", lineNum, highlighted)
 			}
