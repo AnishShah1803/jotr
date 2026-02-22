@@ -2,9 +2,11 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -97,29 +99,69 @@ func TestProcessFilesParallelWithContent(t *testing.T) {
 func TestProcessFilesParallel_Cancellation(t *testing.T) {
 	tempDir := t.TempDir()
 
-	for i := 0; i < 10; i++ {
-		path := filepath.Join(tempDir, "file"+string(rune('0'+i))+".txt")
-		if err := os.WriteFile(path, []byte("content"), 0644); err != nil {
+	for i := 0; i < 50; i++ {
+		path := filepath.Join(tempDir, fmt.Sprintf("file%02d.txt", i))
+		content := make([]byte, 10000)
+		for j := range content {
+			content[j] = 'x'
+		}
+		if err := os.WriteFile(path, content, 0644); err != nil {
 			t.Fatalf("Failed to create test file: %v", err)
 		}
 	}
 
-	paths := make([]string, 10)
-	for i := 0; i < 10; i++ {
-		paths[i] = filepath.Join(tempDir, "file"+string(rune('0'+i))+".txt")
+	paths := make([]string, 50)
+	for i := 0; i < 50; i++ {
+		paths[i] = filepath.Join(tempDir, fmt.Sprintf("file%02d.txt", i))
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
-	defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
 
-	time.Sleep(1 * time.Millisecond)
-
-	_, err := ProcessFilesParallel(ctx, paths, 4, func(path string, content []byte) bool {
+	_, err := ProcessFilesParallel(ctx, paths, 2, func(path string, content []byte) bool {
 		return true
 	})
 
-	if err != context.DeadlineExceeded {
-		t.Logf("Expected context deadline exceeded, got: %v", err)
+	if err != context.Canceled {
+		t.Errorf("Expected context.Canceled, got: %v", err)
+	}
+}
+
+func TestProcessFilesParallel_MidProcessCancellation(t *testing.T) {
+	tempDir := t.TempDir()
+
+	for i := 0; i < 100; i++ {
+		path := filepath.Join(tempDir, fmt.Sprintf("file%02d.txt", i))
+		content := make([]byte, 100000)
+		for j := range content {
+			content[j] = 'x'
+		}
+		if err := os.WriteFile(path, content, 0644); err != nil {
+			t.Fatalf("Failed to create test file: %v", err)
+		}
+	}
+
+	paths := make([]string, 100)
+	for i := 0; i < 100; i++ {
+		paths[i] = filepath.Join(tempDir, fmt.Sprintf("file%02d.txt", i))
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var processed int32
+
+	go func() {
+		time.Sleep(1 * time.Millisecond)
+		cancel()
+	}()
+
+	_, err := ProcessFilesParallel(ctx, paths, 1, func(path string, content []byte) bool {
+		atomic.AddInt32(&processed, 1)
+		return true
+	})
+
+	if err != context.Canceled {
+		t.Errorf("Expected context.Canceled, got: %v (processed %d files)", err, processed)
 	}
 }
 

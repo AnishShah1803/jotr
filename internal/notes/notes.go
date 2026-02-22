@@ -318,6 +318,7 @@ func UpdateLinks(ctx context.Context) error {
 
 	noteMap := make(map[string]string)
 	titleMap := make(map[string]string)
+	contentMap := make(map[string][]byte)
 
 	results, err := utils.ProcessFilesParallelWithContent(ctx, allNotes, 0, func(path string, content []byte) bool {
 		return true
@@ -335,6 +336,7 @@ func UpdateLinks(ctx context.Context) error {
 
 		name := strings.TrimSuffix(filepath.Base(r.Path), ".md")
 		noteMap[name] = r.Path
+		contentMap[r.Path] = r.Content
 
 		title := extractTitle(string(r.Content))
 		if title == "" {
@@ -350,8 +352,8 @@ func UpdateLinks(ctx context.Context) error {
 		default:
 		}
 
-		content, err := os.ReadFile(notePath)
-		if err != nil {
+		content, exists := contentMap[notePath]
+		if !exists {
 			continue
 		}
 

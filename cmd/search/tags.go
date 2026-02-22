@@ -15,6 +15,8 @@ import (
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
+var tagRegex = regexp.MustCompile(`#([a-zA-Z0-9_-]+)`)
+
 var TagsCmd = &cobra.Command{
 	Use:   "tags [action]",
 	Short: "Manage tags (list, find, stats)",
@@ -58,9 +60,7 @@ Examples:
 }
 
 func extractTags(content string) []string {
-	// Match #tag pattern
-	re := regexp.MustCompile(`#([a-zA-Z0-9_-]+)`)
-	matches := re.FindAllStringSubmatch(content, -1)
+	matches := tagRegex.FindAllStringSubmatch(content, -1)
 
 	tagSet := make(map[string]bool)
 

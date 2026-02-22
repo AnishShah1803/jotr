@@ -13,6 +13,16 @@ type FileResult struct {
 	Matched bool
 }
 
+const maxWorkers = 32
+
+func defaultWorkers() int {
+	w := runtime.GOMAXPROCS(0)
+	if w > maxWorkers {
+		return maxWorkers
+	}
+	return w
+}
+
 func ProcessFilesParallel(
 	ctx context.Context,
 	paths []string,
@@ -20,7 +30,7 @@ func ProcessFilesParallel(
 	matcher func(path string, content []byte) bool,
 ) ([]string, error) {
 	if workers <= 0 {
-		workers = runtime.GOMAXPROCS(0)
+		workers = defaultWorkers()
 	}
 
 	jobs := make(chan string, workers)
@@ -74,6 +84,10 @@ func ProcessFilesParallel(
 		}
 	}
 
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
 	return matched, nil
 }
 
@@ -84,7 +98,7 @@ func ProcessFilesParallelWithContent(
 	matcher func(path string, content []byte) bool,
 ) ([]FileResult, error) {
 	if workers <= 0 {
-		workers = runtime.GOMAXPROCS(0)
+		workers = defaultWorkers()
 	}
 
 	jobs := make(chan string, workers)
@@ -140,6 +154,10 @@ func ProcessFilesParallelWithContent(
 		if r.Matched {
 			matched = append(matched, r)
 		}
+	}
+
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
 
 	return matched, nil
