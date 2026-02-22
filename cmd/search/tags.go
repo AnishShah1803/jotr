@@ -3,16 +3,17 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/notes"
+	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
 var TagsCmd = &cobra.Command{
@@ -85,17 +86,22 @@ func listTags(ctx context.Context, cfg *config.LoadedConfig) error {
 	}
 
 	tagSet := make(map[string]bool)
+	var mu sync.Mutex
 
-	for _, notePath := range allNotes {
-		content, err := os.ReadFile(notePath)
-		if err != nil {
-			continue
-		}
+	results, err := utils.ProcessFilesParallelWithContent(ctx, allNotes, 0, func(path string, content []byte) bool {
+		return true
+	})
+	if err != nil {
+		return err
+	}
 
-		tags := extractTags(string(content))
+	for _, r := range results {
+		tags := extractTags(string(r.Content))
+		mu.Lock()
 		for _, tag := range tags {
 			tagSet[tag] = true
 		}
+		mu.Unlock()
 	}
 
 	if len(tagSet) == 0 {
@@ -127,21 +133,17 @@ func findByTag(ctx context.Context, cfg *config.LoadedConfig, tag string) error 
 
 	tag = strings.TrimPrefix(tag, "#")
 
-	var matches []string
-
-	for _, notePath := range allNotes {
-		content, err := os.ReadFile(notePath)
-		if err != nil {
-			continue
-		}
-
+	matches, err := utils.ProcessFilesParallel(ctx, allNotes, 0, func(path string, content []byte) bool {
 		tags := extractTags(string(content))
 		for _, t := range tags {
 			if t == tag {
-				matches = append(matches, notePath)
-				break
+				return true
 			}
 		}
+		return false
+	})
+	if err != nil {
+		return err
 	}
 
 	if len(matches) == 0 {
@@ -166,17 +168,22 @@ func tagStats(ctx context.Context, cfg *config.LoadedConfig) error {
 	}
 
 	tagCounts := make(map[string]int)
+	var mu sync.Mutex
 
-	for _, notePath := range allNotes {
-		content, err := os.ReadFile(notePath)
-		if err != nil {
-			continue
-		}
+	results, err := utils.ProcessFilesParallelWithContent(ctx, allNotes, 0, func(path string, content []byte) bool {
+		return true
+	})
+	if err != nil {
+		return err
+	}
 
-		tags := extractTags(string(content))
+	for _, r := range results {
+		tags := extractTags(string(r.Content))
+		mu.Lock()
 		for _, tag := range tags {
 			tagCounts[tag]++
 		}
+		mu.Unlock()
 	}
 
 	if len(tagCounts) == 0 {
@@ -184,7 +191,6 @@ func tagStats(ctx context.Context, cfg *config.LoadedConfig) error {
 		return nil
 	}
 
-	// Sort by count
 	type tagCount struct {
 		tag   string
 		count int

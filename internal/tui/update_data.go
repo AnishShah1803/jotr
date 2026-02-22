@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -27,28 +28,71 @@ func (m Model) loadData() tea.Cmd {
 		default:
 		}
 
-		recentNotes, err := notes.GetRecentDailyNotes(ctx, m.config.DiaryPath, 10)
-		if err != nil {
-			return newErrorMsg(fmt.Errorf("failed to load recent notes: %w", err), true)
+		type loadResult struct {
+			recentNotes []string
+			allTasks    []tasks.Task
+			allNotes    []string
+			err         error
 		}
 
-		select {
-		case <-ctx.Done():
-			return newErrorMsg(ctx.Err(), true)
-		default:
-		}
-		allTasks, err := tasks.ReadTasks(ctx, m.config.TodoPath)
-		if err != nil {
-			return newErrorMsg(fmt.Errorf("failed to load tasks: %w", err), true)
+		results := make(chan loadResult, 1)
+
+		go func() {
+			defer close(results)
+
+			var wg sync.WaitGroup
+			var mu sync.Mutex
+			var firstErr error
+
+			var recentNotes []string
+			var allTasks []tasks.Task
+			var allNotes []string
+
+			wg.Add(3)
+
+			go func() {
+				defer wg.Done()
+				n, err := notes.GetRecentDailyNotes(ctx, m.config.DiaryPath, 10)
+				mu.Lock()
+				if err != nil && firstErr == nil {
+					firstErr = fmt.Errorf("failed to load recent notes: %w", err)
+				}
+				recentNotes = n
+				mu.Unlock()
+			}()
+
+			go func() {
+				defer wg.Done()
+				t, err := tasks.ReadTasks(ctx, m.config.TodoPath)
+				mu.Lock()
+				if err != nil && firstErr == nil {
+					firstErr = fmt.Errorf("failed to load tasks: %w", err)
+				}
+				allTasks = t
+				mu.Unlock()
+			}()
+
+			go func() {
+				defer wg.Done()
+				n, err := notes.FindNotes(ctx, m.config.Paths.BaseDir)
+				mu.Lock()
+				if err != nil && firstErr == nil {
+					firstErr = fmt.Errorf("failed to find notes: %w", err)
+				}
+				allNotes = n
+				mu.Unlock()
+			}()
+
+			wg.Wait()
+			results <- loadResult{recentNotes, allTasks, allNotes, firstErr}
+		}()
+
+		result := <-results
+		if result.err != nil {
+			return newErrorMsg(result.err, true)
 		}
 
-		select {
-		case <-ctx.Done():
-			return newErrorMsg(ctx.Err(), true)
-		default:
-		}
-
-		total, completed, _ := tasks.CountTasks(allTasks)
+		total, completed, _ := tasks.CountTasks(result.allTasks)
 
 		streak := calculateStreak(m.config)
 
@@ -57,19 +101,15 @@ func (m Model) loadData() tea.Cmd {
 			return newErrorMsg(ctx.Err(), true)
 		default:
 		}
-		allNotes, err := notes.FindNotes(ctx, m.config.Paths.BaseDir)
-		if err != nil {
-			return newErrorMsg(fmt.Errorf("failed to find notes: %w", err), true)
-		}
 
 		editorConfigured := isAnyEditorAvailable(m.config)
 		editorFallback := !isConfigEditorAvailable(m.config) && isShellEditorAvailable()
 
 		return dataLoadedMsg{
-			notes:            recentNotes,
-			tasks:            allTasks,
+			notes:            result.recentNotes,
+			tasks:            result.allTasks,
 			streak:           streak,
-			totalNotes:       len(allNotes),
+			totalNotes:       len(result.allNotes),
 			totalTasks:       total,
 			completedTasks:   completed,
 			editorConfigured: editorConfigured,

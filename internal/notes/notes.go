@@ -166,35 +166,26 @@ type SearchMatch struct {
 	Content []byte
 }
 
-// SearchNotes searches for notes containing a query with context support.
-// Returns matches with content to avoid re-reading files later.
 func SearchNotes(ctx context.Context, dir string, query string) ([]SearchMatch, error) {
 	allNotes, err := FindNotes(ctx, dir)
 	if err != nil {
 		return nil, err
 	}
 
-	var matches []SearchMatch
-
 	query = strings.ToLower(query)
 
-	for _, notePath := range allNotes {
-		select {
-		case <-ctx.Done():
-			return matches, ctx.Err()
-		default:
-		}
+	results, err := utils.ProcessFilesParallelWithContent(ctx, allNotes, 0, func(path string, content []byte) bool {
+		return strings.Contains(strings.ToLower(string(content)), query)
+	})
+	if err != nil {
+		return nil, err
+	}
 
-		content, err := os.ReadFile(notePath)
-		if err != nil {
-			continue
-		}
-
-		if strings.Contains(strings.ToLower(string(content)), query) {
-			matches = append(matches, SearchMatch{
-				Path:    notePath,
-				Content: content,
-			})
+	matches := make([]SearchMatch, len(results))
+	for i, r := range results {
+		matches[i] = SearchMatch{
+			Path:    r.Path,
+			Content: r.Content,
 		}
 	}
 
@@ -297,7 +288,17 @@ func GetRecentDailyNotes(ctx context.Context, diaryDir string, count int) ([]str
 	return notes, nil
 }
 
-// UpdateLinks updates wiki-style links in all notes with context support.
+func extractTitle(content string) string {
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "# ") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "# "))
+		}
+	}
+	return ""
+}
+
 func UpdateLinks(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
@@ -318,39 +319,31 @@ func UpdateLinks(ctx context.Context) error {
 	noteMap := make(map[string]string)
 	titleMap := make(map[string]string)
 
-	for _, notePath := range allNotes {
-		// Check context during processing
+	results, err := utils.ProcessFilesParallelWithContent(ctx, allNotes, 0, func(path string, content []byte) bool {
+		return true
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, r := range results {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 
-		name := strings.TrimSuffix(filepath.Base(notePath), ".md")
-		noteMap[name] = notePath
+		name := strings.TrimSuffix(filepath.Base(r.Path), ".md")
+		noteMap[name] = r.Path
 
-		if content, err := os.ReadFile(notePath); err == nil {
-			contentStr := string(content)
-
-			lines := strings.Split(contentStr, "\n")
-			for _, line := range lines {
-				line = strings.TrimSpace(line)
-				if strings.HasPrefix(line, "# ") {
-					title := strings.TrimSpace(strings.TrimPrefix(line, "# "))
-					titleMap[name] = title
-
-					break
-				}
-			}
+		title := extractTitle(string(r.Content))
+		if title == "" {
+			title = name
 		}
-
-		if titleMap[name] == "" {
-			titleMap[name] = name
-		}
+		titleMap[name] = title
 	}
 
 	for _, notePath := range allNotes {
-		// Check context before processing each note
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -407,7 +400,6 @@ func GetNotesByPattern(ctx context.Context, pattern string) ([]string, error) {
 	return FindNotes(ctx, cfg.Paths.BaseDir)
 }
 
-// GetNotesByTag finds notes containing the given tag with context support.
 func GetNotesByTag(ctx context.Context, tag string) ([]string, error) {
 	select {
 	case <-ctx.Done():
@@ -420,31 +412,18 @@ func GetNotesByTag(ctx context.Context, tag string) ([]string, error) {
 		return nil, err
 	}
 
-	notes, err := FindNotes(ctx, cfg.Paths.BaseDir)
+	allNotes, err := FindNotes(ctx, cfg.Paths.BaseDir)
 	if err != nil {
 		return nil, err
 	}
 
-	var matching []string
-
 	tagPattern := "#" + tag
 
-	for _, notePath := range notes {
-		// Check context before reading each file
-		select {
-		case <-ctx.Done():
-			return matching, ctx.Err()
-		default:
-		}
-
-		content, err := os.ReadFile(notePath)
-		if err != nil {
-			continue
-		}
-
-		if strings.Contains(string(content), tagPattern) {
-			matching = append(matching, notePath)
-		}
+	matching, err := utils.ProcessFilesParallel(ctx, allNotes, 0, func(path string, content []byte) bool {
+		return strings.Contains(string(content), tagPattern)
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return matching, nil
