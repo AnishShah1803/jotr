@@ -580,3 +580,35 @@ type TaskStats struct {
 	Overdue        int
 	CompletionRate float64
 }
+
+// GetTasksAndStats reads tasks from a file once and returns both the tasks and their statistics.
+// This eliminates the double-read pattern when both data are needed.
+func (s *TaskService) GetTasksAndStats(ctx context.Context, todoPath string) ([]tasks.Task, *TaskStats, error) {
+	allTasks, err := tasks.ReadTasks(ctx, todoPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read tasks: %w", err)
+	}
+
+	stats := &TaskStats{
+		Total:      len(allTasks),
+		ByPriority: tasks.GroupByPriority(allTasks),
+		BySection:  tasks.GroupBySection(allTasks),
+	}
+
+	_, completed, pending := tasks.CountTasks(allTasks)
+	stats.Completed = completed
+	stats.Pending = pending
+
+	if stats.Total > 0 {
+		stats.CompletionRate = float64(stats.Completed) / float64(stats.Total) * 100
+	}
+
+	// Count overdue tasks
+	for _, task := range allTasks {
+		if tasks.IsOverdue(task) {
+			stats.Overdue++
+		}
+	}
+
+	return allTasks, stats, nil
+}

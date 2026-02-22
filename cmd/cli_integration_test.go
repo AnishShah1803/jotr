@@ -384,7 +384,7 @@ func TestSearchCommand_Integration(t *testing.T) {
 		for _, expectedFile := range tt.expectedFiles {
 			found := false
 			for _, match := range matches {
-				if strings.Contains(filepath.Base(match), expectedFile) {
+				if strings.Contains(filepath.Base(match.Path), expectedFile) {
 					found = true
 					break
 				}
@@ -449,7 +449,7 @@ func TestSearchCommand_SubdirectorySearch(t *testing.T) {
 
 	foundProjectSpec := false
 	for _, match := range matches {
-		if strings.Contains(filepath.Base(match), "ProjectSpec") {
+		if strings.Contains(filepath.Base(match.Path), "ProjectSpec") {
 			foundProjectSpec = true
 			break
 		}
@@ -498,7 +498,7 @@ func TestSearchCommand_LinksAndTags(t *testing.T) {
 
 	found := false
 	for _, match := range matches {
-		if strings.Contains(filepath.Base(match), "NoteWithTags") {
+		if strings.Contains(filepath.Base(match.Path), "NoteWithTags") {
 			found = true
 			break
 		}

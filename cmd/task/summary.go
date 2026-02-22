@@ -38,12 +38,7 @@ func ShowSummary(ctx context.Context, cfg *config.LoadedConfig) error {
 
 	taskService := services.NewTaskService()
 
-	stats, err := taskService.GetTaskStats(ctx, cfg.TodoPath)
-	if err != nil {
-		return fmt.Errorf("failed to read tasks: %w", err)
-	}
-
-	allTasks, err := taskService.GetAllTasks(ctx, cfg.TodoPath)
+	allTasks, stats, err := taskService.GetTasksAndStats(ctx, cfg.TodoPath)
 	if err != nil {
 		return fmt.Errorf("failed to read tasks: %w", err)
 	}

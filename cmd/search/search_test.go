@@ -93,8 +93,8 @@ func TestSearchNotes_SingleMatch(t *testing.T) {
 		t.Errorf("Expected 1 match, got %d", len(matches))
 	}
 
-	if len(matches) > 0 && !strings.Contains(matches[0], "MeetingNotes") {
-		t.Errorf("Expected match to contain MeetingNotes, got: %s", matches[0])
+	if len(matches) > 0 && !strings.Contains(matches[0].Path, "MeetingNotes") {
+		t.Errorf("Expected match to contain MeetingNotes, got: %s", matches[0].Path)
 	}
 }
 

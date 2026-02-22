@@ -3,6 +3,7 @@ package notes
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -138,19 +139,18 @@ func FindNotes(ctx context.Context, dir string) ([]string, error) {
 
 	var notes []string
 
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Check context cancellation during traversal
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 
-		if !info.IsDir() && strings.HasSuffix(path, ".md") {
+		if !d.IsDir() && strings.HasSuffix(path, ".md") {
 			notes = append(notes, path)
 		}
 
@@ -160,19 +160,25 @@ func FindNotes(ctx context.Context, dir string) ([]string, error) {
 	return notes, err
 }
 
+// SearchMatch represents a file that matched a search query, including its content.
+type SearchMatch struct {
+	Path    string
+	Content []byte
+}
+
 // SearchNotes searches for notes containing a query with context support.
-func SearchNotes(ctx context.Context, dir string, query string) ([]string, error) {
+// Returns matches with content to avoid re-reading files later.
+func SearchNotes(ctx context.Context, dir string, query string) ([]SearchMatch, error) {
 	allNotes, err := FindNotes(ctx, dir)
 	if err != nil {
 		return nil, err
 	}
 
-	var matches []string
+	var matches []SearchMatch
 
 	query = strings.ToLower(query)
 
 	for _, notePath := range allNotes {
-		// Check context before reading each file
 		select {
 		case <-ctx.Done():
 			return matches, ctx.Err()
@@ -185,7 +191,10 @@ func SearchNotes(ctx context.Context, dir string, query string) ([]string, error
 		}
 
 		if strings.Contains(strings.ToLower(string(content)), query) {
-			matches = append(matches, notePath)
+			matches = append(matches, SearchMatch{
+				Path:    notePath,
+				Content: content,
+			})
 		}
 	}
 

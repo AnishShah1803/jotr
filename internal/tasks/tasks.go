@@ -26,7 +26,16 @@ type Task struct {
 // - [ ] and - [x] (dash)
 // * [ ] and * [x] (asterisk)
 // + [ ] and + [x] (plus)
-var taskFormatRegex = regexp.MustCompile(`^(\*|-|\+)\s*\[([ xX])\]\s*(.*)$`)
+var (
+	taskFormatRegex = regexp.MustCompile(`^(\*|-|\+)\s*\[([ xX])\]\s*(.*)$`)
+	priorityRegex   = regexp.MustCompile(`\[P([0-3])\]`)
+	tagRegex        = regexp.MustCompile(`#([a-zA-Z0-9_-]+)`)
+	dueRegex        = regexp.MustCompile(`due:\s*(\d{4}-\d{2}-\d{2})`)
+	taskIDRegex     = regexp.MustCompile(`<!-- id: ([a-f0-9]{8}) -->`)
+	stripIDRegex    = regexp.MustCompile(`\s*<!-- id: [a-f0-9]{8} -->`)
+	completedTagRe  = regexp.MustCompile(`\s*@completed\(\d{4}-\d{2}-\d{2}\)`)
+	completedDateRe = regexp.MustCompile(`@completed\((\d{4}-\d{2}-\d{2})\)`)
+)
 
 // ParseTasks parses tasks from markdown content.
 func ParseTasks(content string) []Task {
@@ -63,15 +72,12 @@ func ParseTasks(content string) []Task {
 		task.Text = strings.TrimSpace(match[3])
 
 		// Extract priority
-		priorityRe := regexp.MustCompile(`\[P([0-3])\]`)
-		if match := priorityRe.FindStringSubmatch(task.Text); len(match) > 1 {
+		if match := priorityRegex.FindStringSubmatch(task.Text); len(match) > 1 {
 			task.Priority = "P" + match[1]
 		}
 
 		// Extract tags
-		tagRe := regexp.MustCompile(`#([a-zA-Z0-9_-]+)`)
-
-		matches := tagRe.FindAllStringSubmatch(task.Text, -1)
+		matches := tagRegex.FindAllStringSubmatch(task.Text, -1)
 		for _, match := range matches {
 			if len(match) > 1 {
 				task.Tags = append(task.Tags, match[1])
@@ -201,8 +207,7 @@ func FormatTask(task Task) string {
 // IsOverdue checks if a task is overdue based on due date in text.
 func IsOverdue(task Task) bool {
 	// Simple check for "due:" pattern
-	dueRe := regexp.MustCompile(`due:\s*(\d{4}-\d{2}-\d{2})`)
-	if match := dueRe.FindStringSubmatch(task.Text); len(match) > 1 {
+	if match := dueRegex.FindStringSubmatch(task.Text); len(match) > 1 {
 		dueDate, err := time.Parse("2006-01-02", match[1])
 		if err == nil && dueDate.Before(time.Now()) && !task.Completed {
 			return true
@@ -221,8 +226,7 @@ func GenerateTaskID(text string) string {
 // ExtractTaskID extracts task ID from task text.
 func ExtractTaskID(text string) string {
 	// Look for <!-- id: abc12345 --> pattern (8 hex chars)
-	idRe := regexp.MustCompile(`<!-- id: ([a-f0-9]{8}) -->`)
-	if match := idRe.FindStringSubmatch(text); len(match) > 1 {
+	if match := taskIDRegex.FindStringSubmatch(text); len(match) > 1 {
 		return match[1]
 	}
 
@@ -245,19 +249,16 @@ func EnsureTaskID(task *Task) {
 
 // StripTaskID removes task ID from task text for display.
 func StripTaskID(text string) string {
-	idRe := regexp.MustCompile(`\s*<!-- id: [a-f0-9]{8} -->`)
-	return idRe.ReplaceAllString(text, "")
+	return stripIDRegex.ReplaceAllString(text, "")
 }
 
 // StripCompletedTag removes @completed(YYYY-MM-DD) tag from task text for clean display.
 func StripCompletedTag(text string) string {
-	completedRe := regexp.MustCompile(`\s*@completed\(\d{4}-\d{2}-\d{2}\)`)
-	return completedRe.ReplaceAllString(text, "")
+	return completedTagRe.ReplaceAllString(text, "")
 }
 
 func ExtractCompletedDate(text string) string {
-	completedRe := regexp.MustCompile(`@completed\((\d{4}-\d{2}-\d{2})\)`)
-	if match := completedRe.FindStringSubmatch(text); len(match) > 1 {
+	if match := completedDateRe.FindStringSubmatch(text); len(match) > 1 {
 		if _, err := time.Parse("2006-01-02", match[1]); err == nil {
 			return match[1]
 		}
