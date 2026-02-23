@@ -32,6 +32,9 @@ import (
 
 	// Template Commands.
 	templatecmd "github.com/AnishShah1803/jotr/cmd/templatecmd"
+
+	// Index Commands.
+	indexcmd "github.com/AnishShah1803/jotr/cmd/index"
 )
 
 var updateFlag bool
@@ -159,6 +162,9 @@ func init() {
 	// Setup
 	rootCmd.AddCommand(systemcmd.ConfigureCmd)
 	rootCmd.AddCommand(versionCmd)
+
+	// Search Index
+	rootCmd.AddCommand(indexcmd.IndexCmd)
 }
 
 // launchDashboard is defined in visual/dashboard.go

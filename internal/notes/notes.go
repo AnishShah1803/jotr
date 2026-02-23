@@ -12,6 +12,7 @@ import (
 
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/constants"
+	"github.com/AnishShah1803/jotr/internal/search"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
@@ -126,7 +127,43 @@ func WriteNote(ctx context.Context, path string, content string) error {
 		return err
 	}
 
-	return os.WriteFile(path, []byte(content), constants.FilePerm0644)
+	if err := os.WriteFile(path, []byte(content), constants.FilePerm0644); err != nil {
+		return err
+	}
+
+	updateIndex(ctx, path, content)
+
+	return nil
+}
+
+func updateIndex(ctx context.Context, path string, content string) {
+	cfg, err := config.LoadWithContext(ctx, "")
+	if err != nil {
+		return
+	}
+
+	indexPath := search.GetIndexPath(cfg.Paths.BaseDir)
+
+	if _, err := os.Stat(indexPath); err != nil {
+		return
+	}
+
+	idx, err := search.Open(indexPath)
+	if err != nil {
+		return
+	}
+	defer idx.Close()
+
+	title := search.ExtractTitle(content)
+	info, _ := os.Stat(path)
+	var modTime time.Time
+	if info != nil {
+		modTime = info.ModTime()
+	} else {
+		modTime = time.Now()
+	}
+
+	idx.IndexNote(ctx, path, title, content, modTime)
 }
 
 // FindNotes finds all markdown files in a directory recursively with context support.
@@ -150,6 +187,10 @@ func FindNotes(ctx context.Context, dir string) ([]string, error) {
 		default:
 		}
 
+		if d.IsDir() && d.Name() == ".jotr" {
+			return filepath.SkipDir
+		}
+
 		if !d.IsDir() && strings.HasSuffix(path, ".md") {
 			notes = append(notes, path)
 		}
@@ -167,6 +208,27 @@ type SearchMatch struct {
 }
 
 func SearchNotes(ctx context.Context, dir string, query string) ([]SearchMatch, error) {
+	indexPath := search.GetIndexPath(dir)
+
+	if _, err := os.Stat(indexPath); err == nil {
+		idx, err := search.Open(indexPath)
+		if err == nil {
+			defer idx.Close()
+			results, err := idx.Search(ctx, query, 0)
+			if err == nil && len(results) > 0 {
+				matches := make([]SearchMatch, len(results))
+				for i, r := range results {
+					content, _ := os.ReadFile(r.Path)
+					matches[i] = SearchMatch{
+						Path:    r.Path,
+						Content: content,
+					}
+				}
+				return matches, nil
+			}
+		}
+	}
+
 	allNotes, err := FindNotes(ctx, dir)
 	if err != nil {
 		return nil, err
@@ -227,7 +289,13 @@ func CreateDailyNote(ctx context.Context, notePath string, sections []string, da
 		content += fmt.Sprintf("## %s\n\n", section)
 	}
 
-	return os.WriteFile(notePath, []byte(content), constants.FilePerm0644)
+	if err := os.WriteFile(notePath, []byte(content), constants.FilePerm0644); err != nil {
+		return err
+	}
+
+	updateIndex(ctx, notePath, content)
+
+	return nil
 }
 
 // BuildDailyNoteSections prepares the complete sections list for a daily note,
@@ -288,17 +356,6 @@ func GetRecentDailyNotes(ctx context.Context, diaryDir string, count int) ([]str
 	return notes, nil
 }
 
-func extractTitle(content string) string {
-	lines := strings.Split(content, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "# ") {
-			return strings.TrimSpace(strings.TrimPrefix(line, "# "))
-		}
-	}
-	return ""
-}
-
 func UpdateLinks(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
@@ -338,7 +395,7 @@ func UpdateLinks(ctx context.Context) error {
 		noteMap[name] = r.Path
 		contentMap[r.Path] = r.Content
 
-		title := extractTitle(string(r.Content))
+		title := search.ExtractTitle(string(r.Content))
 		if title == "" {
 			title = name
 		}
@@ -412,6 +469,23 @@ func GetNotesByTag(ctx context.Context, tag string) ([]string, error) {
 	cfg, err := config.LoadWithContext(ctx, "")
 	if err != nil {
 		return nil, err
+	}
+
+	indexPath := search.GetIndexPath(cfg.Paths.BaseDir)
+
+	if _, err := os.Stat(indexPath); err == nil {
+		idx, err := search.Open(indexPath)
+		if err == nil {
+			defer idx.Close()
+			results, err := idx.SearchByTag(ctx, tag, 0)
+			if err == nil && len(results) > 0 {
+				paths := make([]string, len(results))
+				for i, r := range results {
+					paths[i] = r.Path
+				}
+				return paths, nil
+			}
+		}
 	}
 
 	allNotes, err := FindNotes(ctx, cfg.Paths.BaseDir)
