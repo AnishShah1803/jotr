@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/notes"
 	"github.com/AnishShah1803/jotr/internal/options"
+	"github.com/AnishShah1803/jotr/internal/search"
 )
 
 var searchOutputOption = options.NewOutputOption()
@@ -68,9 +70,50 @@ Examples:
 // SearchNotes performs a full-text search across all notes in the configured base directory.
 // It displays matching files with highlighted context lines unless --count or --files flags are used.
 func SearchNotes(ctx context.Context, cfg *config.LoadedConfig, query string) error {
-	// Skip empty queries
 	if query == "" {
 		return nil
+	}
+
+	indexPath := search.GetIndexPath(cfg.Paths.BaseDir)
+
+	if _, err := os.Stat(indexPath); err == nil {
+		idx, err := search.Open(indexPath)
+		if err == nil {
+			defer idx.Close()
+
+			results, err := idx.Search(ctx, query, 50)
+			if err == nil && len(results) > 0 {
+				if GetSearchCountForTest() || searchOutputOption.CountOnly {
+					fmt.Printf("%d matches found\n", len(results))
+					return nil
+				}
+
+				if GetSearchFilesForTest() || searchOutputOption.FilesOnly {
+					for _, r := range results {
+						relPath, _ := filepath.Rel(cfg.Paths.BaseDir, r.Path)
+						fmt.Println(relPath)
+					}
+					return nil
+				}
+
+				fmt.Printf("Found %d matches:\n\n", len(results))
+
+				for _, r := range results {
+					relPath, _ := filepath.Rel(cfg.Paths.BaseDir, r.Path)
+					fmt.Printf("📄 %s", relPath)
+					if r.Title != "" {
+						fmt.Printf(" (%s)", r.Title)
+					}
+					fmt.Println()
+
+					if r.Snippet != "" {
+						fmt.Printf("   %s\n", r.Snippet)
+					}
+					fmt.Println()
+				}
+				return nil
+			}
+		}
 	}
 
 	matches, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, query)
@@ -83,23 +126,19 @@ func SearchNotes(ctx context.Context, cfg *config.LoadedConfig, query string) er
 		return nil
 	}
 
-	// Count only
 	if GetSearchCountForTest() || searchOutputOption.CountOnly {
 		fmt.Printf("%d matches found\n", len(matches))
 		return nil
 	}
 
-	// Files only
 	if GetSearchFilesForTest() || searchOutputOption.FilesOnly {
 		for _, match := range matches {
 			relPath, _ := filepath.Rel(cfg.Paths.BaseDir, match.Path)
 			fmt.Println(relPath)
 		}
-
 		return nil
 	}
 
-	// Full output with context
 	fmt.Printf("Found %d matches:\n\n", len(matches))
 
 	queryLower := strings.ToLower(query)

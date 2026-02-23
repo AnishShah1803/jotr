@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/notes"
+	"github.com/AnishShah1803/jotr/internal/search"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
@@ -122,12 +124,36 @@ func listTags(ctx context.Context, cfg *config.LoadedConfig) error {
 }
 
 func findByTag(ctx context.Context, cfg *config.LoadedConfig, tag string) error {
+	tag = strings.TrimPrefix(tag, "#")
+
+	indexPath := search.GetIndexPath(cfg.Paths.BaseDir)
+
+	if _, err := os.Stat(indexPath); err == nil {
+		idx, err := search.Open(indexPath)
+		if err == nil {
+			defer idx.Close()
+
+			results, err := idx.SearchByTag(ctx, tag, 0)
+			if err == nil && len(results) > 0 {
+				fmt.Printf("Found %d notes with #%s:\n\n", len(results), tag)
+
+				for _, r := range results {
+					relPath, _ := filepath.Rel(cfg.Paths.BaseDir, r.Path)
+					fmt.Printf("  %s", relPath)
+					if r.Title != "" {
+						fmt.Printf(" (%s)", r.Title)
+					}
+					fmt.Println()
+				}
+				return nil
+			}
+		}
+	}
+
 	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
 	if err != nil {
 		return err
 	}
-
-	tag = strings.TrimPrefix(tag, "#")
 
 	matches, err := utils.ProcessFilesParallel(ctx, allNotes, 0, func(path string, content []byte) bool {
 		tags := extractTags(string(content))
