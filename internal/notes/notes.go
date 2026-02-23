@@ -26,6 +26,8 @@ type Note struct {
 }
 
 // OpenInEditor opens a file in the user's preferred editor.
+// Note: External edits via this function do not automatically update the search index.
+// Run 'jotr index sync' to sync external modifications.
 func OpenInEditor(path string) error {
 	return OpenInEditorWithContext(context.Background(), path)
 }
@@ -139,6 +141,7 @@ func WriteNote(ctx context.Context, path string, content string) error {
 func updateIndex(ctx context.Context, path string, content string) {
 	cfg, err := config.LoadWithContext(ctx, "")
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "updateIndex: failed to load config: %v\n", err)
 		return
 	}
 
@@ -150,6 +153,7 @@ func updateIndex(ctx context.Context, path string, content string) {
 
 	idx, err := search.Open(indexPath)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "updateIndex: failed to open index: %v\n", err)
 		return
 	}
 	defer idx.Close()
@@ -163,7 +167,9 @@ func updateIndex(ctx context.Context, path string, content string) {
 		modTime = time.Now()
 	}
 
-	idx.IndexNote(ctx, path, title, content, modTime)
+	if err := idx.IndexNote(ctx, path, title, content, modTime); err != nil {
+		fmt.Fprintf(os.Stderr, "updateIndex: failed to index note: %v\n", err)
+	}
 }
 
 // FindNotes finds all markdown files in a directory recursively with context support.

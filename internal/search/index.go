@@ -191,7 +191,7 @@ func (idx *Index) Search(ctx context.Context, query string, limit int) ([]Search
 
 	rows, err := idx.db.QueryContext(ctx, `
 		SELECT n.path, n.title,
-				COALESCE(snippet(notes_fts, 1, '**', '**', '...', 32), '') AS snippet,
+				COALESCE(snippet(notes_fts, 1, '>>>', '<<<', '...', 32), '') AS snippet,
 				bm25(notes_fts) AS rank
 		FROM notes_fts
 		JOIN notes n ON n.id = notes_fts.rowid
@@ -216,6 +216,9 @@ func (idx *Index) Search(ctx context.Context, query string, limit int) ([]Search
 	return results, rows.Err()
 }
 
+// SearchByTag searches for notes containing the given tag.
+// The tag parameter should not include the # prefix - it will be added automatically.
+// A limit of 0 or negative will use the default limit of 50 results.
 func (idx *Index) SearchByTag(ctx context.Context, tag string, limit int) ([]SearchResult, error) {
 	return idx.Search(ctx, "#"+tag, limit)
 }
@@ -269,8 +272,15 @@ func (idx *Index) GetIndexedPaths(ctx context.Context) (map[string]int64, error)
 }
 
 func escapeFTS5Query(query string) string {
-	query = strings.ReplaceAll(query, "\"", "\"\"")
-	return fmt.Sprintf("\"%s\"", query)
+	replacer := strings.NewReplacer(
+		`"`, `""`,
+		`*`, ``,
+		`^`, ``,
+		`(`, ``,
+		`)`, ``,
+	)
+	escaped := replacer.Replace(query)
+	return fmt.Sprintf(`"%s"`, escaped)
 }
 
 func GetIndexPath(baseDir string) string {

@@ -77,11 +77,12 @@ func rebuildIndex(ctx context.Context, cfg *config.LoadedConfig) error {
 		ProgressCallback: progress,
 	})
 
-	fmt.Println()
-
 	if err != nil {
+		fmt.Println()
 		return fmt.Errorf("rebuild failed: %w", err)
 	}
+
+	fmt.Println()
 
 	duration := time.Since(start)
 	fmt.Printf("\nIndex rebuilt successfully in %v\n", duration.Round(time.Second))
@@ -117,11 +118,12 @@ func syncIndex(ctx context.Context, cfg *config.LoadedConfig) error {
 		DeleteMissing:    true,
 	})
 
-	fmt.Println()
-
 	if err != nil {
+		fmt.Println()
 		return fmt.Errorf("sync failed: %w", err)
 	}
+
+	fmt.Println()
 
 	duration := time.Since(start)
 	fmt.Printf("\nIndex synced successfully in %v\n", duration.Round(time.Millisecond*100))
