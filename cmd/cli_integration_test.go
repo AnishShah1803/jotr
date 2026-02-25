@@ -371,7 +371,7 @@ func TestSearchCommand_Integration(t *testing.T) {
 		expectCount   int
 	}) {
 		ctx := context.Background()
-		matches, err := notes.SearchNotes(ctx, fs.BaseDir, tt.query)
+		matches, err := notes.SearchNotes(ctx, fs.BaseDir, tt.query, 0)
 
 		if tt.expectSuccess && err != nil {
 			t.Fatalf("SearchNotes failed: %v", err)
@@ -433,7 +433,7 @@ func TestSearchCommand_SubdirectorySearch(t *testing.T) {
 
 	ctx := context.Background()
 
-	matches, err := notes.SearchNotes(ctx, fs.BaseDir, "work")
+	matches, err := notes.SearchNotes(ctx, fs.BaseDir, "work", 0)
 	if err != nil {
 		t.Fatalf("SearchNotes failed: %v", err)
 	}
@@ -442,7 +442,7 @@ func TestSearchCommand_SubdirectorySearch(t *testing.T) {
 		t.Errorf("Expected 2 matches for 'work', got %d: %v", len(matches), matches)
 	}
 
-	matches, err = notes.SearchNotes(ctx, fs.BaseDir, "project")
+	matches, err = notes.SearchNotes(ctx, fs.BaseDir, "project", 0)
 	if err != nil {
 		t.Fatalf("SearchNotes failed: %v", err)
 	}
@@ -458,7 +458,7 @@ func TestSearchCommand_SubdirectorySearch(t *testing.T) {
 		t.Errorf("Expected to find ProjectSpec in matches: %v", matches)
 	}
 
-	matches, err = notes.SearchNotes(ctx, fs.BaseDir, "specifications")
+	matches, err = notes.SearchNotes(ctx, fs.BaseDir, "specifications", 0)
 	if err != nil {
 		t.Fatalf("SearchNotes failed: %v", err)
 	}
@@ -491,7 +491,7 @@ func TestSearchCommand_LinksAndTags(t *testing.T) {
 
 	ctx := context.Background()
 
-	matches, err := notes.SearchNotes(ctx, fs.BaseDir, "#important")
+	matches, err := notes.SearchNotes(ctx, fs.BaseDir, "#important", 0)
 	if err != nil {
 		t.Fatalf("SearchNotes failed: %v", err)
 	}
@@ -507,7 +507,7 @@ func TestSearchCommand_LinksAndTags(t *testing.T) {
 		t.Errorf("Expected to find NoteWithTags when searching for #important")
 	}
 
-	matches, err = notes.SearchNotes(ctx, fs.BaseDir, "reference")
+	matches, err = notes.SearchNotes(ctx, fs.BaseDir, "reference", 0)
 	if err != nil {
 		t.Fatalf("SearchNotes failed: %v", err)
 	}

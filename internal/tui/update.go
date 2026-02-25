@@ -41,6 +41,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case errorMsg:
 		return handleError(m, msg)
+
+	case searchResultsMsg:
+		return handleSearchResults(m, msg)
 	}
 
 	return m, nil

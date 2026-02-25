@@ -129,32 +129,33 @@ func WriteNote(ctx context.Context, path string, content string) error {
 		return err
 	}
 
-	if err := os.WriteFile(path, []byte(content), constants.FilePerm0644); err != nil {
+	if err := utils.AtomicWriteFileCtx(ctx, path, []byte(content), constants.FilePerm0644); err != nil {
 		return err
 	}
 
-	updateIndex(ctx, path, content)
+	if err := UpdateIndex(ctx, path, content); err != nil {
+		return fmt.Errorf("failed to update index: %w", err)
+	}
 
 	return nil
 }
 
-func updateIndex(ctx context.Context, path string, content string) {
+func UpdateIndex(ctx context.Context, path string, content string) error {
 	cfg, err := config.LoadWithContext(ctx, "")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "updateIndex: failed to load config: %v\n", err)
-		return
+		return nil
 	}
 
 	indexPath := search.GetIndexPath(cfg.Paths.BaseDir)
 
 	if _, err := os.Stat(indexPath); err != nil {
-		return
+		return nil
 	}
 
 	idx, err := search.Open(indexPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "updateIndex: failed to open index: %v\n", err)
-		return
+		fmt.Fprintf(os.Stderr, "warning: failed to open search index: %v\n", err)
+		return nil
 	}
 	defer idx.Close()
 
@@ -168,8 +169,11 @@ func updateIndex(ctx context.Context, path string, content string) {
 	}
 
 	if err := idx.IndexNote(ctx, path, title, content, modTime); err != nil {
-		fmt.Fprintf(os.Stderr, "updateIndex: failed to index note: %v\n", err)
+		fmt.Fprintf(os.Stderr, "warning: failed to index note %s: %v\n", path, err)
+		return nil
 	}
+
+	return nil
 }
 
 // FindNotes finds all markdown files in a directory recursively with context support.
@@ -213,14 +217,14 @@ type SearchMatch struct {
 	Content []byte
 }
 
-func SearchNotes(ctx context.Context, dir string, query string) ([]SearchMatch, error) {
+func SearchNotes(ctx context.Context, dir string, query string, limit int) ([]SearchMatch, error) {
 	indexPath := search.GetIndexPath(dir)
 
 	if _, err := os.Stat(indexPath); err == nil {
 		idx, err := search.Open(indexPath)
 		if err == nil {
 			defer idx.Close()
-			results, err := idx.Search(ctx, query, 0)
+			results, err := idx.Search(ctx, query, limit)
 			if err == nil && len(results) > 0 {
 				matches := make([]SearchMatch, len(results))
 				for i, r := range results {
@@ -247,6 +251,10 @@ func SearchNotes(ctx context.Context, dir string, query string) ([]SearchMatch, 
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	if limit > 0 && len(results) > limit {
+		results = results[:limit]
 	}
 
 	matches := make([]SearchMatch, len(results))
@@ -295,11 +303,13 @@ func CreateDailyNote(ctx context.Context, notePath string, sections []string, da
 		content += fmt.Sprintf("## %s\n\n", section)
 	}
 
-	if err := os.WriteFile(notePath, []byte(content), constants.FilePerm0644); err != nil {
+	if err := utils.AtomicWriteFileCtx(ctx, notePath, []byte(content), constants.FilePerm0644); err != nil {
 		return err
 	}
 
-	updateIndex(ctx, notePath, content)
+	if err := UpdateIndex(ctx, notePath, content); err != nil {
+		return fmt.Errorf("failed to update index for daily note: %w", err)
+	}
 
 	return nil
 }
@@ -434,6 +444,9 @@ func UpdateLinks(ctx context.Context) error {
 			if err := utils.AtomicWriteFileCtx(ctx, notePath, []byte(updatedContent), constants.FilePerm0644); err != nil {
 				return err
 			}
+			if err := UpdateIndex(ctx, notePath, updatedContent); err != nil {
+				return fmt.Errorf("failed to update index after link replacement: %w", err)
+			}
 		}
 	}
 
@@ -465,7 +478,7 @@ func GetNotesByPattern(ctx context.Context, pattern string) ([]string, error) {
 	return FindNotes(ctx, cfg.Paths.BaseDir)
 }
 
-func GetNotesByTag(ctx context.Context, tag string) ([]string, error) {
+func GetNotesByTag(ctx context.Context, tag string, limit int) ([]string, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -483,7 +496,7 @@ func GetNotesByTag(ctx context.Context, tag string) ([]string, error) {
 		idx, err := search.Open(indexPath)
 		if err == nil {
 			defer idx.Close()
-			results, err := idx.SearchByTag(ctx, tag, 0)
+			results, err := idx.SearchByTag(ctx, tag, limit)
 			if err == nil && len(results) > 0 {
 				paths := make([]string, len(results))
 				for i, r := range results {
@@ -506,6 +519,10 @@ func GetNotesByTag(ctx context.Context, tag string) ([]string, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	if limit > 0 && len(matching) > limit {
+		matching = matching[:limit]
 	}
 
 	return matching, nil

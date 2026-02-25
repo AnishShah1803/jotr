@@ -12,6 +12,7 @@ import (
 
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/notes"
+	"github.com/AnishShah1803/jotr/internal/search"
 )
 
 var LinksCmd = &cobra.Command{
@@ -43,10 +44,25 @@ Examples:
 }
 
 func showLinks(ctx context.Context, cfg *config.LoadedConfig, noteName string) error {
-	// Find the note
-	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
-	if err != nil {
-		return err
+	var allNotes []string
+	indexPath := search.GetIndexPath(cfg.Paths.BaseDir)
+	if _, err := os.Stat(indexPath); err == nil {
+		if idx, err := search.Open(indexPath); err == nil {
+			defer idx.Close()
+			if paths, err := idx.GetIndexedPaths(ctx); err == nil {
+				for p := range paths {
+					allNotes = append(allNotes, p)
+				}
+			}
+		}
+	}
+
+	if len(allNotes) == 0 {
+		var err error
+		allNotes, err = notes.FindNotes(ctx, cfg.Paths.BaseDir)
+		if err != nil {
+			return err
+		}
 	}
 
 	var targetNote string
@@ -96,10 +112,25 @@ func showLinks(ctx context.Context, cfg *config.LoadedConfig, noteName string) e
 }
 
 func showBacklinks(ctx context.Context, cfg *config.LoadedConfig, noteName string) error {
-	// Find all notes
-	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
-	if err != nil {
-		return err
+	var allNotes []string
+	indexPath := search.GetIndexPath(cfg.Paths.BaseDir)
+	if _, err := os.Stat(indexPath); err == nil {
+		if idx, err := search.Open(indexPath); err == nil {
+			defer idx.Close()
+			if results, err := idx.Search(ctx, noteName, 0); err == nil {
+				for _, r := range results {
+					allNotes = append(allNotes, r.Path)
+				}
+			}
+		}
+	}
+
+	if len(allNotes) == 0 {
+		var err error
+		allNotes, err = notes.FindNotes(ctx, cfg.Paths.BaseDir)
+		if err != nil {
+			return err
+		}
 	}
 
 	fmt.Printf("Finding backlinks to '%s'...\n\n", noteName)

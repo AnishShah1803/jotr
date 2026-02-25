@@ -217,15 +217,19 @@ func (m Model) View() string {
 		panelHeight = 8
 	}
 
-	// Render all panels
 	notesPanel := m.renderNotesPanel(leftPanelWidth, panelHeight)
 	previewPanel := m.renderPreviewPanel(rightPanelWidth, panelHeight)
 	tasksPanel := m.renderTasksPanel(leftPanelWidth, panelHeight)
-	statsPanel := m.renderStatsPanel(rightPanelWidth, panelHeight)
 
-	// Combine panels with gap
+	var rightBottomPanel string
+	if m.focusedPanel == panelSearch {
+		rightBottomPanel = m.renderSearchPanel(rightPanelWidth, panelHeight)
+	} else {
+		rightBottomPanel = m.renderStatsPanel(rightPanelWidth, panelHeight)
+	}
+
 	topRow := lipgloss.JoinHorizontal(lipgloss.Top, notesPanel, "  ", previewPanel)
-	bottomRow := lipgloss.JoinHorizontal(lipgloss.Top, tasksPanel, "  ", statsPanel)
+	bottomRow := lipgloss.JoinHorizontal(lipgloss.Top, tasksPanel, "  ", rightBottomPanel)
 	mainContent := lipgloss.JoinVertical(lipgloss.Left, topRow, "", bottomRow)
 
 	// Add margin - always have top margin
@@ -408,19 +412,30 @@ func (m Model) renderStatsPanel(width, height int) string {
 	tStyle := m.getTitleStyle(panelStats)
 	style := m.getPanelStyle(panelStats)
 
-	// Calculate content width
 	contentWidth := width - 4
 	if contentWidth < 10 {
 		contentWidth = 10
 	}
 
-	// Render title with width constraint to prevent overflow
 	title := tStyle.Width(contentWidth).Render("Quick Stats")
 
-	// Combine title and viewport
 	panel := title + "\n" + m.statsViewport.View()
 
-	// Render with border and exact width/height
+	return style.Width(width).Height(height).Render(panel)
+}
+
+func (m Model) renderSearchPanel(width, height int) string {
+	tStyle := m.getTitleStyle(panelSearch)
+	style := m.getPanelStyle(panelSearch)
+
+	contentWidth := width - 4
+	if contentWidth < 10 {
+		contentWidth = 10
+	}
+
+	title := tStyle.Width(contentWidth).Render("Search: " + m.textInput.View())
+	panel := title + "\n" + m.searchViewport.View()
+
 	return style.Width(width).Height(height).Render(panel)
 }
 

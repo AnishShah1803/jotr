@@ -576,14 +576,18 @@ func TestModel_Navigation(t *testing.T) {
 			t.Errorf("Expected panelTasks after 2nd tab, got %v", model.focusedPanel)
 		}
 
-		// Tab again
 		updatedModel, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
 		model = updatedModel.(Model)
 		if model.focusedPanel != panelStats {
 			t.Errorf("Expected panelStats after 3rd tab, got %v", model.focusedPanel)
 		}
 
-		// Tab again - should cycle back to notes
+		updatedModel, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+		model = updatedModel.(Model)
+		if model.focusedPanel != panelSearch {
+			t.Errorf("Expected panelSearch after 4th tab, got %v", model.focusedPanel)
+		}
+
 		updatedModel, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
 		model = updatedModel.(Model)
 		if model.focusedPanel != panelNotes {

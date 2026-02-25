@@ -57,7 +57,7 @@ func TestSearchNotes_NoQuery(t *testing.T) {
 	// Test with empty query - this tests the search functionality
 	ctx := context.Background()
 
-	matches, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "")
+	matches, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "", 0)
 	if err != nil {
 		// Empty query might return error or empty results depending on implementation
 		t.Logf("SearchNotes returned error for empty query: %v", err)
@@ -84,7 +84,7 @@ func TestSearchNotes_SingleMatch(t *testing.T) {
 	// Search for content that exists only in this note
 	ctx := context.Background()
 
-	matches, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "project X")
+	matches, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "project X", 0)
 	if err != nil {
 		t.Fatalf("SearchNotes failed: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestSearchNotes_MultipleMatches(t *testing.T) {
 	// Search for content that exists in multiple notes
 	ctx := context.Background()
 
-	matches, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "TODO")
+	matches, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "TODO", 0)
 	if err != nil {
 		t.Fatalf("SearchNotes failed: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestSearchNotes_NoMatches(t *testing.T) {
 	// Search for something that doesn't exist
 	ctx := context.Background()
 
-	matches, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "nonexistentterm12345")
+	matches, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "nonexistentterm12345", 0)
 	if err != nil {
 		t.Fatalf("SearchNotes failed: %v", err)
 	}
@@ -168,17 +168,17 @@ func TestSearchNotes_CaseInsensitive(t *testing.T) {
 	// Search with different cases
 	ctx := context.Background()
 
-	matchesLower, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "important")
+	matchesLower, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "important", 0)
 	if err != nil {
 		t.Fatalf("SearchNotes failed: %v", err)
 	}
 
-	matchesUpper, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "IMPORTANT")
+	matchesUpper, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "IMPORTANT", 0)
 	if err != nil {
 		t.Fatalf("SearchNotes failed: %v", err)
 	}
 
-	matchesMixed, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "Important")
+	matchesMixed, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "Important", 0)
 	if err != nil {
 		t.Fatalf("SearchNotes failed: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestSearchNotes_Subdirectory(t *testing.T) {
 	}
 
 	// Search should find notes in subdirectories
-	matches, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "requirements")
+	matches, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, "requirements", 0)
 	if err != nil {
 		t.Fatalf("SearchNotes failed: %v", err)
 	}
@@ -760,7 +760,7 @@ func BenchmarkSearchNotes_Small(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = notes.SearchNotes(ctx, tmpDir, "project")
+		_, _ = notes.SearchNotes(ctx, tmpDir, "project", 0)
 	}
 }
 
@@ -796,7 +796,7 @@ Summary of %s work completed.
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = notes.SearchNotes(ctx, tmpDir, "development")
+		_, _ = notes.SearchNotes(ctx, tmpDir, "development", 0)
 	}
 }
 
@@ -856,7 +856,7 @@ End of day reflection and summary.
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = notes.SearchNotes(ctx, tmpDir, "sprint")
+		_, _ = notes.SearchNotes(ctx, tmpDir, "sprint", 0)
 	}
 }
 
@@ -878,7 +878,7 @@ func BenchmarkSearchNotes_NoMatches(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = notes.SearchNotes(ctx, tmpDir, "nonexistenttermthatdoesnotexist12345")
+		_, _ = notes.SearchNotes(ctx, tmpDir, "nonexistenttermthatdoesnotexist12345", 0)
 	}
 }
 
@@ -900,7 +900,7 @@ func BenchmarkSearchNotes_CaseSensitivity(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = notes.SearchNotes(ctx, tmpDir, "important")
+		_, _ = notes.SearchNotes(ctx, tmpDir, "important", 0)
 	}
 }
 
@@ -932,7 +932,7 @@ func BenchmarkSearchNotes_Subdirectory(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = notes.SearchNotes(ctx, tmpDir, "content")
+		_, _ = notes.SearchNotes(ctx, tmpDir, "content", 0)
 	}
 }
 

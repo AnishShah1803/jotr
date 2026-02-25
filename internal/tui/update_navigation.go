@@ -19,6 +19,8 @@ func (m Model) handleUp() (Model, tea.Cmd) {
 		}
 	case panelStats:
 		m.statsViewport.LineUp(1)
+	case panelSearch:
+		m.searchViewport.LineUp(1)
 	}
 
 	return m, nil
@@ -41,6 +43,8 @@ func (m Model) handleDown() (Model, tea.Cmd) {
 		}
 	case panelStats:
 		m.statsViewport.LineDown(1)
+	case panelSearch:
+		m.searchViewport.LineDown(1)
 	}
 
 	return m, nil

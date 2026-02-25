@@ -18,12 +18,14 @@ import (
 var searchOutputOption = options.NewOutputOption()
 
 var searchCmdFlags = struct {
-	count bool
-	files bool
+	count      bool
+	files      bool
+	maxResults int
 }{}
 
 func init() {
 	searchOutputOption.AddFlags(SearchCmd)
+	SearchCmd.Flags().IntVarP(&searchCmdFlags.maxResults, "max-results", "n", 0, "Maximum number of results (0 = unlimited)")
 }
 
 func SetSearchCountForTest(count bool) {
@@ -81,7 +83,7 @@ func SearchNotes(ctx context.Context, cfg *config.LoadedConfig, query string) er
 		if err == nil {
 			defer idx.Close()
 
-			results, err := idx.Search(ctx, query, 50)
+			results, err := idx.Search(ctx, query, searchCmdFlags.maxResults)
 			if err == nil && len(results) > 0 {
 				if GetSearchCountForTest() || searchOutputOption.CountOnly {
 					fmt.Printf("%d matches found\n", len(results))
@@ -104,6 +106,9 @@ func SearchNotes(ctx context.Context, cfg *config.LoadedConfig, query string) er
 					if r.Title != "" {
 						fmt.Printf(" (%s)", r.Title)
 					}
+					if r.Rank > 0 {
+						fmt.Printf(" [score: %.2f]", r.Rank)
+					}
 					fmt.Println()
 
 					if r.Snippet != "" {
@@ -116,7 +121,7 @@ func SearchNotes(ctx context.Context, cfg *config.LoadedConfig, query string) er
 		}
 	}
 
-	matches, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, query)
+	matches, err := notes.SearchNotes(ctx, cfg.Paths.BaseDir, query, searchCmdFlags.maxResults)
 	if err != nil {
 		return fmt.Errorf("search failed: %w", err)
 	}
