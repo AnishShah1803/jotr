@@ -15,6 +15,8 @@ import (
 	"github.com/AnishShah1803/jotr/internal/search"
 )
 
+var linkRe = regexp.MustCompile(`\[\[([^\]]+)\]\]`)
+
 var LinksCmd = &cobra.Command{
 	Use:   "links [note-name]",
 	Short: "Show links and backlinks",
@@ -84,8 +86,6 @@ func showLinks(ctx context.Context, cfg *config.LoadedConfig, noteName string) e
 		return err
 	}
 
-	// Extract links [[link]]
-	linkRe := regexp.MustCompile(`\[\[([^\]]+)\]\]`)
 	matches := linkRe.FindAllStringSubmatch(string(content), -1)
 
 	if len(matches) == 0 {
@@ -135,7 +135,6 @@ func showBacklinks(ctx context.Context, cfg *config.LoadedConfig, noteName strin
 
 	fmt.Printf("Finding backlinks to '%s'...\n\n", noteName)
 
-	linkRe := regexp.MustCompile(`\[\[([^\]]+)\]\]`)
 	found := false
 
 	for _, note := range allNotes {

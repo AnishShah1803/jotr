@@ -186,7 +186,10 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig) Model {
 	indexPath := search.GetIndexPath(cfg.Paths.BaseDir)
 	var idx *search.Index
 	if _, err := os.Stat(indexPath); err == nil {
-		idx, _ = search.Open(indexPath)
+		idx, err = search.Open(indexPath)
+		if err != nil {
+			idx = nil
+		}
 	}
 
 	m := Model{

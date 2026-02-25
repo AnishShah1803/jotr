@@ -35,6 +35,7 @@ func Open(dbPath string) (*Index, error) {
 		return nil, fmt.Errorf("failed to open index: %w", err)
 	}
 
+	// SQLite requires single connection for WAL mode and to avoid "database is locked" errors
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 
@@ -240,12 +241,15 @@ func (idx *Index) Search(ctx context.Context, query string, limit int) ([]Search
 	for rows.Next() {
 		var r SearchResult
 		if err := rows.Scan(&r.Path, &r.Title, &r.Snippet, &r.Rank); err != nil {
-			continue
+			return nil, fmt.Errorf("failed to scan search result: %w", err)
 		}
 		results = append(results, r)
 	}
 
-	return results, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row iteration error: %w", err)
+	}
+	return results, nil
 }
 
 func (idx *Index) SearchByTag(ctx context.Context, tag string, limit int) ([]SearchResult, error) {
@@ -356,12 +360,15 @@ func (idx *Index) GetIndexedPaths(ctx context.Context) (map[string]int64, error)
 		var path string
 		var modTime int64
 		if err := rows.Scan(&path, &modTime); err != nil {
-			continue
+			return nil, fmt.Errorf("failed to scan indexed path: %w", err)
 		}
 		paths[path] = modTime
 	}
 
-	return paths, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row iteration error: %w", err)
+	}
+	return paths, nil
 }
 
 func escapeFTS5Query(query string) string {
