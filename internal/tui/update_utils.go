@@ -148,9 +148,12 @@ func (m *Model) updateViewportSizes() {
 	m.tasksViewport.Height = contentHeight
 	m.statsViewport.Width = rightContentWidth
 	m.statsViewport.Height = contentHeight
+	m.searchViewport.Width = rightContentWidth
+	m.searchViewport.Height = contentHeight
 
 	m.updatePreviewViewport()
 	m.updateStatsViewport()
+	m.updateSearchViewport()
 }
 
 func (m *Model) updatePreviewViewport() {
@@ -240,4 +243,39 @@ func (m *Model) updateStatsViewport() {
 	}
 
 	m.statsViewport.SetContent(content)
+}
+
+func (m *Model) updateSearchViewport() {
+	var content string
+
+	if m.searchQuery == "" {
+		content = "Type to search notes..."
+		m.searchViewport.GotoTop()
+	} else if len(m.searchResults) == 0 {
+		content = fmt.Sprintf("No results for: %s", m.searchQuery)
+	} else {
+		var lines []string
+		lines = append(lines, fmt.Sprintf("Results for: %s (%d found)\n", m.searchQuery, len(m.searchResults)))
+		for i, r := range m.searchResults {
+			if i >= 20 {
+				lines = append(lines, fmt.Sprintf("\n... and %d more", len(m.searchResults)-20))
+				break
+			}
+			title := r.Title
+			if title == "" {
+				title = r.Path
+			}
+			lines = append(lines, fmt.Sprintf("  %s", title))
+			if r.Snippet != "" {
+				snippet := r.Snippet
+				if len(snippet) > 60 {
+					snippet = snippet[:57] + "..."
+				}
+				lines = append(lines, fmt.Sprintf("    %s", snippet))
+			}
+		}
+		content = strings.Join(lines, "\n")
+	}
+
+	m.searchViewport.SetContent(content)
 }

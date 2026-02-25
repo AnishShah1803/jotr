@@ -53,7 +53,7 @@ func BenchmarkNoteSearch(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, err := notes.SearchNotes(ctx, tempDir, "search")
+		_, err := notes.SearchNotes(ctx, tempDir, "search", 0)
 		if err != nil {
 			b.Fatalf("Failed to search notes: %v", err)
 		}
@@ -77,7 +77,7 @@ func BenchmarkTaskSync(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, err := notes.SearchNotes(ctx, tempDir, "sync")
+		_, err := notes.SearchNotes(ctx, tempDir, "sync", 0)
 		if err != nil {
 			b.Fatalf("Failed to search notes: %v", err)
 		}
@@ -263,7 +263,7 @@ func BenchmarkSearchNotes(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, err := notes.SearchNotes(ctx, tempDir, "search term")
+		_, err := notes.SearchNotes(ctx, tempDir, "search term", 0)
 		if err != nil {
 			b.Fatalf("Failed to search notes: %v", err)
 		}
@@ -295,7 +295,7 @@ func BenchmarkSearchNotesLarge(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		matches, searchErr := notes.SearchNotes(ctx, tempDir, "jotr")
+		matches, searchErr := notes.SearchNotes(ctx, tempDir, "jotr", 0)
 		if searchErr != nil {
 			b.Fatalf("Failed to search notes: %v", searchErr)
 		}
@@ -328,7 +328,7 @@ func BenchmarkSearchNotesNoMatches(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		matches, searchErr := notes.SearchNotes(ctx, tempDir, "nonexistentterm12345")
+		matches, searchErr := notes.SearchNotes(ctx, tempDir, "nonexistentterm12345", 0)
 		if searchErr != nil {
 			b.Fatalf("Failed to search notes: %v", searchErr)
 		}
@@ -363,7 +363,7 @@ func BenchmarkSearchNotesNested(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		matches, searchErr := notes.SearchNotes(ctx, tempDir, "nested")
+		matches, searchErr := notes.SearchNotes(ctx, tempDir, "nested", 0)
 		if searchErr != nil {
 			b.Fatalf("Failed to search notes: %v", searchErr)
 		}
@@ -396,7 +396,7 @@ func BenchmarkSearchNotesCaseInsensitive(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		matches, searchErr := notes.SearchNotes(ctx, tempDir, "jotr")
+		matches, searchErr := notes.SearchNotes(ctx, tempDir, "jotr", 0)
 		if searchErr != nil {
 			b.Fatalf("Failed to search notes: %v", searchErr)
 		}

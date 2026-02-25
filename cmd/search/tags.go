@@ -19,6 +19,14 @@ import (
 
 var tagRegex = regexp.MustCompile(`#([a-zA-Z0-9_-]+)`)
 
+var tagsCmdFlags = struct {
+	maxResults int
+}{}
+
+func init() {
+	TagsCmd.Flags().IntVarP(&tagsCmdFlags.maxResults, "max-results", "n", 0, "Maximum number of results (0 = unlimited)")
+}
+
 var TagsCmd = &cobra.Command{
 	Use:   "tags [action]",
 	Short: "Manage tags (list, find, stats)",
@@ -133,7 +141,7 @@ func findByTag(ctx context.Context, cfg *config.LoadedConfig, tag string) error 
 		if err == nil {
 			defer idx.Close()
 
-			results, err := idx.SearchByTag(ctx, tag, 0)
+			results, err := idx.SearchByTag(ctx, tag, tagsCmdFlags.maxResults)
 			if err == nil && len(results) > 0 {
 				fmt.Printf("Found %d notes with #%s:\n\n", len(results), tag)
 

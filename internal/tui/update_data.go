@@ -105,7 +105,15 @@ func (m Model) loadData() tea.Cmd {
 
 func (m Model) loadPreview(notePath string) tea.Cmd {
 	return func() tea.Msg {
-		content, err := os.ReadFile(notePath)
+		var content []byte
+		var err error
+
+		if m.noteCache != nil {
+			content, err = m.noteCache.ReadFile(notePath)
+		} else {
+			content, err = os.ReadFile(notePath)
+		}
+
 		if err != nil {
 			return previewLoadedMsg([]byte(fmt.Sprintf("Error loading preview: %v", err)))
 		}
@@ -174,4 +182,31 @@ func calculateStreak(cfg *config.LoadedConfig) int {
 	}
 
 	return streak
+}
+
+func (m Model) performSearch(query string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := m.ctx
+		if ctx == nil {
+			ctx = context.Background()
+		}
+
+		if m.searchIndex == nil {
+			return searchResultsMsg{query: query}
+		}
+
+		results, err := m.searchIndex.Search(ctx, query, 50)
+		return searchResultsMsg{results: results, query: query, err: err}
+	}
+}
+
+func handleSearchResults(m Model, msg searchResultsMsg) (Model, tea.Cmd) {
+	if msg.err != nil {
+		m = setStatus(m, "Search error: "+msg.err.Error(), "error")
+		m.searchResults = nil
+	} else {
+		m.searchResults = msg.results
+	}
+	m.updateSearchViewport()
+	return m, nil
 }

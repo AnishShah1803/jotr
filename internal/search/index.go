@@ -35,6 +35,7 @@ func Open(dbPath string) (*Index, error) {
 		return nil, fmt.Errorf("failed to open index: %w", err)
 	}
 
+	// SQLite requires single connection for WAL mode and to avoid "database is locked" errors
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 
@@ -48,27 +49,59 @@ func Open(dbPath string) (*Index, error) {
 
 func createSchema(db *sql.DB) error {
 	schema := `
-		CREATE TABLE IF NOT EXISTS notes (
-			id INTEGER PRIMARY KEY,
-			path TEXT UNIQUE NOT NULL,
-			title TEXT,
-			mod_time INTEGER NOT NULL,
-			indexed_at INTEGER NOT NULL
-		);
-
-		CREATE INDEX IF NOT EXISTS idx_notes_path ON notes(path);
-		CREATE INDEX IF NOT EXISTS idx_notes_mod_time ON notes(mod_time);
-
-		CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
-			title,
-			content,
-			content='',
-			tokenize="trigram"
+		CREATE TABLE IF NOT EXISTS schema_version (
+			version INTEGER PRIMARY KEY
 		);
 	`
 
 	if _, err := db.Exec(schema); err != nil {
-		return fmt.Errorf("failed to create schema: %w", err)
+		return fmt.Errorf("failed to create base schema: %w", err)
+	}
+
+	var count int
+	if err := db.QueryRow("SELECT COUNT(*) FROM schema_version").Scan(&count); err != nil {
+		return fmt.Errorf("failed to count schema version: %w", err)
+	}
+	if count == 0 {
+		if _, err := db.Exec("INSERT INTO schema_version (version) VALUES (0)"); err != nil {
+			return fmt.Errorf("failed to initialize schema version: %w", err)
+		}
+	}
+
+	var version int
+	if err := db.QueryRow("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1").Scan(&version); err != nil {
+		return fmt.Errorf("failed to read schema version: %w", err)
+	}
+
+	if version < 1 {
+		// V1: Initial FTS5 table with contentless_delete=1
+		migrationV1 := `
+			DROP TABLE IF EXISTS notes_fts;
+			DROP TABLE IF EXISTS notes;
+            
+			CREATE TABLE notes (
+				id INTEGER PRIMARY KEY,
+				path TEXT UNIQUE NOT NULL,
+				title TEXT,
+				mod_time INTEGER NOT NULL,
+				indexed_at INTEGER NOT NULL
+			);
+
+			CREATE INDEX idx_notes_path ON notes(path);
+			CREATE INDEX idx_notes_mod_time ON notes(mod_time);
+
+			CREATE VIRTUAL TABLE notes_fts USING fts5(
+				title,
+				content,
+				content='',
+				contentless_delete=1,
+				tokenize="trigram"
+			);
+			UPDATE schema_version SET version = 1;
+		`
+		if _, err := db.Exec(migrationV1); err != nil {
+			return fmt.Errorf("failed to apply migration v1: %w", err)
+		}
 	}
 
 	return nil
@@ -208,19 +241,83 @@ func (idx *Index) Search(ctx context.Context, query string, limit int) ([]Search
 	for rows.Next() {
 		var r SearchResult
 		if err := rows.Scan(&r.Path, &r.Title, &r.Snippet, &r.Rank); err != nil {
-			continue
+			return nil, fmt.Errorf("failed to scan search result: %w", err)
 		}
 		results = append(results, r)
 	}
 
-	return results, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row iteration error: %w", err)
+	}
+	return results, nil
 }
 
-// SearchByTag searches for notes containing the given tag.
-// The tag parameter should not include the # prefix - it will be added automatically.
-// A limit of 0 or negative will use the default limit of 50 results.
 func (idx *Index) SearchByTag(ctx context.Context, tag string, limit int) ([]SearchResult, error) {
-	return idx.Search(ctx, "#"+tag, limit)
+	candidateLimit := limit
+	if candidateLimit == 0 {
+		candidateLimit = 500
+	}
+	candidates, err := idx.Search(ctx, "#"+tag, candidateLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []SearchResult
+	exactTag := "#" + tag
+
+	for _, c := range candidates {
+		content, err := os.ReadFile(c.Path)
+		if err != nil {
+			continue
+		}
+
+		if hasExactTag(string(content), exactTag) {
+			results = append(results, c)
+			if limit > 0 && len(results) >= limit {
+				break
+			}
+		}
+	}
+
+	return results, nil
+}
+
+func hasExactTag(content, exactTag string) bool {
+	idx := 0
+	tagLen := len(exactTag)
+	contentLen := len(content)
+
+	for {
+		i := strings.Index(content[idx:], exactTag)
+		if i == -1 {
+			return false
+		}
+
+		pos := idx + i
+		afterIdx := pos + tagLen
+		if afterIdx < contentLen {
+			nextChar := content[afterIdx]
+			if (nextChar >= 'a' && nextChar <= 'z') ||
+				(nextChar >= 'A' && nextChar <= 'Z') ||
+				(nextChar >= '0' && nextChar <= '9') ||
+				nextChar == '_' || nextChar == '-' {
+				idx = pos + 1
+				continue
+			}
+		}
+
+		if pos > 0 {
+			prevChar := content[pos-1]
+			if (prevChar >= 'a' && prevChar <= 'z') ||
+				(prevChar >= 'A' && prevChar <= 'Z') ||
+				(prevChar >= '0' && prevChar <= '9') {
+				idx = pos + 1
+				continue
+			}
+		}
+
+		return true
+	}
 }
 
 func (idx *Index) GetStats(ctx context.Context) (map[string]interface{}, error) {
@@ -263,12 +360,15 @@ func (idx *Index) GetIndexedPaths(ctx context.Context) (map[string]int64, error)
 		var path string
 		var modTime int64
 		if err := rows.Scan(&path, &modTime); err != nil {
-			continue
+			return nil, fmt.Errorf("failed to scan indexed path: %w", err)
 		}
 		paths[path] = modTime
 	}
 
-	return paths, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row iteration error: %w", err)
+	}
+	return paths, nil
 }
 
 func escapeFTS5Query(query string) string {

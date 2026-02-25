@@ -8,13 +8,16 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-isatty"
 
+	"github.com/AnishShah1803/jotr/internal/cache"
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/output"
+	"github.com/AnishShah1803/jotr/internal/search"
 	"github.com/AnishShah1803/jotr/internal/tasks"
 )
 
@@ -28,16 +31,18 @@ type keyMap struct {
 	NewTaskFile key.Binding
 	Refresh     key.Binding
 	Update      key.Binding
+	Search      key.Binding
+	Escape      key.Binding
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Quit, k.Refresh, k.Enter, k.Update}
+	return []key.Binding{k.Quit, k.Refresh, k.Enter, k.Search}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Tab, k.TabReverse},
-		{k.Enter, k.NewTaskFile, k.Refresh, k.Update, k.Quit},
+		{k.Enter, k.Search, k.NewTaskFile, k.Refresh, k.Update, k.Quit},
 	}
 }
 
@@ -78,6 +83,14 @@ var defaultKeyMap = keyMap{
 		key.WithKeys("u"),
 		key.WithHelp("u", "check updates"),
 	),
+	Search: key.NewBinding(
+		key.WithKeys("/"),
+		key.WithHelp("/", "search"),
+	),
+	Escape: key.NewBinding(
+		key.WithKeys("esc"),
+		key.WithHelp("esc", "back"),
+	),
 }
 
 func (m *Model) updateCachedKeyMap() {
@@ -98,7 +111,8 @@ const (
 	panelPreview
 	panelTasks
 	panelStats
-	numPanels = 4
+	panelSearch
+	numPanels = 5
 )
 
 const (
@@ -120,6 +134,12 @@ type Model struct {
 	statusDuration   time.Duration
 	notes            []string
 	tasks            []tasks.Task
+	noteCache        *cache.NoteCache
+	searchIndex      *search.Index
+	searchQuery      string
+	searchResults    []search.SearchResult
+	searchViewport   viewport.Model
+	textInput        textinput.Model
 	statsViewport    viewport.Model
 	tasksViewport    viewport.Model
 	notesViewport    viewport.Model
@@ -157,9 +177,26 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig) Model {
 	s.Spinner = spinner.Line
 	s.Style = lipgloss.NewStyle().Foreground(secondaryColor)
 
+	ti := textinput.New()
+	ti.Placeholder = "Search notes..."
+	ti.Focus()
+	ti.CharLimit = 156
+	ti.Width = 40
+
+	indexPath := search.GetIndexPath(cfg.Paths.BaseDir)
+	var idx *search.Index
+	if _, err := os.Stat(indexPath); err == nil {
+		idx, err = search.Open(indexPath)
+		if err != nil {
+			idx = nil
+		}
+	}
+
 	m := Model{
 		ctx:              ctx,
 		config:           cfg,
+		noteCache:        cache.NewNoteCache(50),
+		searchIndex:      idx,
 		focusedPanel:     panelNotes,
 		notes:            []string{},
 		tasks:            []tasks.Task{},
@@ -167,6 +204,8 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig) Model {
 		previewViewport:  viewport.New(0, 0),
 		tasksViewport:    viewport.New(0, 0),
 		statsViewport:    viewport.New(0, 0),
+		searchViewport:   viewport.New(0, 0),
+		textInput:        ti,
 		helpModel:        helpModel,
 		spinner:          s,
 		keys:             defaultKeyMap,

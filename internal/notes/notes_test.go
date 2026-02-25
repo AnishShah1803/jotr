@@ -118,7 +118,7 @@ func TestGetNotesByTag(t *testing.T) {
 
 	ctx := context.Background()
 
-	workNotes, err := GetNotesByTag(ctx, "work")
+	workNotes, err := GetNotesByTag(ctx, "work", 0)
 	if err != nil {
 		t.Fatalf("GetNotesByTag('work') error = %v", err)
 	}

@@ -3,10 +3,17 @@ package tui
 import (
 	"time"
 
+	"github.com/AnishShah1803/jotr/internal/search"
 	"github.com/AnishShah1803/jotr/internal/tasks"
 )
 
 type tickMsg time.Time
+
+type searchResultsMsg struct {
+	results []search.SearchResult
+	query   string
+	err     error
+}
 
 type editorFinishedMsg struct{ err error }
 

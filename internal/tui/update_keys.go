@@ -11,10 +11,40 @@ import (
 )
 
 func handleKeyEvent(m Model, msg tea.KeyMsg) (Model, tea.Cmd) {
+	if m.focusedPanel == panelSearch {
+		switch {
+		case key.Matches(msg, m.keys.Quit), key.Matches(msg, m.keys.Tab), key.Matches(msg, m.keys.TabReverse), key.Matches(msg, m.keys.Up), key.Matches(msg, m.keys.Down), key.Matches(msg, m.keys.Enter), key.Matches(msg, m.keys.Escape):
+		default:
+			var tiCmd tea.Cmd
+			m.textInput, tiCmd = m.textInput.Update(msg)
+
+			if m.textInput.Value() != m.searchQuery {
+				m.searchQuery = m.textInput.Value()
+				if m.searchQuery == "" {
+					m.searchResults = nil
+					m.updateSearchViewport()
+				} else if m.searchIndex != nil {
+					return m, tea.Batch(tiCmd, m.performSearch(m.searchQuery))
+				}
+			}
+			return m, tiCmd
+		}
+	}
+
 	switch {
 	case key.Matches(msg, m.keys.Quit):
 		m.quitting = true
 		return m, tea.Sequence(tea.ExitAltScreen, tea.Quit)
+
+	case key.Matches(msg, m.keys.Escape):
+		if m.focusedPanel == panelSearch {
+			m.focusedPanel = panelNotes
+			m.textInput.SetValue("")
+			m.searchQuery = ""
+			m.searchResults = nil
+			m.updateCachedKeyMap()
+		}
+		return m, nil
 
 	case key.Matches(msg, m.keys.Tab):
 		m.cycleFocus(true)
@@ -34,6 +64,9 @@ func handleKeyEvent(m Model, msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m.handleEnter()
 
 	case key.Matches(msg, m.keys.Refresh):
+		if m.noteCache != nil {
+			m.noteCache.Clear()
+		}
 		m.err = nil
 		m.errorRetryable = false
 		m = setStatus(m, "Refreshing...", "info")
@@ -44,6 +77,16 @@ func handleKeyEvent(m Model, msg tea.KeyMsg) (Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Update):
 		m = setStatus(m, "Checking for updates...", "info")
 		return m, checkForUpdatesCmd()
+
+	case key.Matches(msg, m.keys.Search):
+		m.focusedPanel = panelSearch
+		m.textInput.SetValue("")
+		m.textInput.Focus()
+		m.searchQuery = ""
+		m.searchResults = nil
+		m.updateSearchViewport()
+		m.updateCachedKeyMap()
+		return m, nil
 
 	case key.Matches(msg, m.keys.NewTaskFile):
 		if m.err != nil && m.errorRetryable {
@@ -123,6 +166,10 @@ func (m Model) handleFileOpen() (Model, tea.Cmd) {
 }
 
 func handleEditorFinished(m Model, msg editorFinishedMsg) (Model, tea.Cmd) {
+	if m.noteCache != nil {
+		m.noteCache.Clear()
+	}
+
 	m = clearStatus(m)
 	if msg.err != nil {
 		m.err = msg.err
