@@ -121,7 +121,6 @@ func init() {
 	rootCmd.AddCommand(notecmd.DailyCmd)
 	rootCmd.AddCommand(notecmd.NoteCmd)
 	rootCmd.AddCommand(notecmd.CaptureCmd)
-	rootCmd.AddCommand(notecmd.TemplateCmd)
 
 	// Task Management
 	rootCmd.AddCommand(taskcmd.SyncCmd)
