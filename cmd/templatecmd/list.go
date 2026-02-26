@@ -2,6 +2,8 @@ package templatecmd
 
 import (
 	"fmt"
+	"os"
+	"sort"
 
 	"github.com/spf13/cobra"
 
@@ -29,7 +31,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	templateList, warnings := templates.LoadTemplates(cfg)
 
 	for _, warn := range warnings {
-		fmt.Printf("Warning: %s\n", warn)
+		fmt.Fprintf(os.Stderr, "Warning: %s\n", warn)
 	}
 
 	if len(templateList) == 0 {
@@ -45,7 +47,15 @@ func runList(cmd *cobra.Command, args []string) error {
 		categories[tmpl.Category] = append(categories[tmpl.Category], tmpl)
 	}
 
-	for cat, tmpls := range categories {
+	var sortedCategories []string
+	for cat := range categories {
+		sortedCategories = append(sortedCategories, cat)
+	}
+	sort.Strings(sortedCategories)
+
+	for _, cat := range sortedCategories {
+		tmpls := categories[cat]
+		sort.Slice(tmpls, func(i, j int) bool { return tmpls[i].Name < tmpls[j].Name })
 		fmt.Printf("%s:\n", cat)
 		for _, tmpl := range tmpls {
 			fmt.Printf("  %s\n", tmpl.Name)

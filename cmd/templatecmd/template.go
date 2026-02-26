@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/spf13/cobra"
 
@@ -57,22 +58,27 @@ func SelectTemplateForIntegration(templateList []*templates.Template) *templates
 		categories[tmpl.Category] = append(categories[tmpl.Category], tmpl)
 	}
 
+	var sortedCategories []string
+	for cat := range categories {
+		sortedCategories = append(sortedCategories, cat)
+	}
+	sort.Strings(sortedCategories)
+
 	fmt.Println("\nAvailable Templates:")
 	index := 1
-	for cat, tmpls := range categories {
+	var flat []*templates.Template
+	for _, cat := range sortedCategories {
+		tmpls := categories[cat]
+		sort.Slice(tmpls, func(i, j int) bool { return tmpls[i].Name < tmpls[j].Name })
 		fmt.Printf("\n%s:\n", cat)
 		for _, tmpl := range tmpls {
 			fmt.Printf("  %d. %s\n", index, tmpl.Name)
+			flat = append(flat, tmpl)
 			index++
 		}
 	}
 
 	choice := utils.PromptChoice("Select template", 1, index-1)
-
-	var flat []*templates.Template
-	for _, tmpls := range categories {
-		flat = append(flat, tmpls...)
-	}
 
 	return flat[choice-1]
 }

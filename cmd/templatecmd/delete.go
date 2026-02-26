@@ -12,6 +12,8 @@ import (
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
+var forceDelete bool
+
 var DeleteCmd = &cobra.Command{
 	Use:   "delete [name]",
 	Short: "Delete a template",
@@ -21,6 +23,7 @@ var DeleteCmd = &cobra.Command{
 
 func init() {
 	TemplateCmd.AddCommand(DeleteCmd)
+	DeleteCmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Skip confirmation prompt")
 }
 
 func runDelete(cmd *cobra.Command, args []string) error {
@@ -52,17 +55,19 @@ func runDelete(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("template file not found: %s", templatePath)
 	}
 
-	fmt.Printf("Delete template '%s'? (y/N): ", selected.Name)
+	if !forceDelete {
+		fmt.Printf("Delete template '%s'? (y/N): ", selected.Name)
 
-	var response string
-	if _, err := fmt.Scanln(&response); err != nil {
-		fmt.Println("Canceled")
-		return nil
-	}
+		var response string
+		if _, err := fmt.Scanln(&response); err != nil {
+			fmt.Println("Canceled")
+			return nil
+		}
 
-	if response != "y" && response != "Y" {
-		fmt.Println("Canceled")
-		return nil
+		if response != "y" && response != "Y" {
+			fmt.Println("Canceled")
+			return nil
+		}
 	}
 
 	if err := os.Remove(templatePath); err != nil {
