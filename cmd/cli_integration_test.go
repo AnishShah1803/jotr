@@ -177,7 +177,7 @@ func createTestRootCommand() *cobra.Command {
 		Long: `jotr is a command-line journaling and note-taking tool designed for daily use.
  It supports daily notes, task management, templates, search, and much more.
 
- When run without arguments, jotr launches the interactive dashboard.`,
+ When run without arguments, jotr launches an interactive REPL interface.`,
 	}
 
 	// Add essential commands for testing
