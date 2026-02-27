@@ -27,6 +27,7 @@ func NewHistory() *History {
 	}
 	h.filePath = h.getHistoryPath()
 	h.load()
+	h.position = len(h.entries)
 	return h
 }
 
