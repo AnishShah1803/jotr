@@ -107,8 +107,8 @@ func (h *History) Add(entry string) {
 }
 
 func (h *History) Previous() string {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
 	if len(h.entries) == 0 {
 		return ""
@@ -126,8 +126,8 @@ func (h *History) Previous() string {
 }
 
 func (h *History) Next() string {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
 	if len(h.entries) == 0 {
 		return ""
