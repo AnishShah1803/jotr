@@ -138,6 +138,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.textInput.SetValue("")
 			m.lastOutput = output
 			m.showOutput = true
+			if m.quitting {
+				return m, tea.Quit
+			}
 			return m, nil
 
 		case tea.KeyUp:
@@ -277,10 +280,35 @@ func (m Model) renderHeader() (string, int) {
 	logo := logoStyle.Render("jotr")
 	ver := versionStyle.Render(version.GetVersion())
 	hint := helpStyle.Render(helpHint)
+
+	// Compute required width for horizontal layout: left padding + logo + space + version.
+	requiredWidth := leftPad + lipgloss.Width(logo) + lipgloss.Width(ver) + 2
+
+	// If the terminal is too narrow, stack logo and version vertically to avoid negative padding.
+	if m.width < requiredWidth {
+		header := leftPadStr + logo + "\n" + leftPadStr + ver
+
+		maxContent := lipgloss.Width(logo)
+		if w := lipgloss.Width(ver); w > maxContent {
+			maxContent = w
+		}
+		if w := lipgloss.Width(hint); w > maxContent {
+			maxContent = w
+		}
+
+		contentWidth := leftPad + maxContent
+		return header + "\n" + leftPadStr + hint, contentWidth
+	}
+
+	padding := m.width - lipgloss.Width(logo) - lipgloss.Width(ver) - leftPad - 2
+	if padding < 0 {
+		padding = 0
+	}
+
 	header := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		leftPadStr+logo,
-		strings.Repeat(" ", m.width-lipgloss.Width(logo)-lipgloss.Width(ver)-leftPad-2),
+		strings.Repeat(" ", padding),
 		ver,
 	)
 	contentWidth := leftPad + lipgloss.Width(hint)

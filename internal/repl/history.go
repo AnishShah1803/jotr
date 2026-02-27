@@ -27,6 +27,7 @@ func NewHistory() *History {
 	}
 	h.filePath = h.getHistoryPath()
 	h.load()
+	h.position = len(h.entries)
 	return h
 }
 
@@ -52,6 +53,13 @@ func (h *History) load() {
 		if line != "" {
 			h.entries = append(h.entries, line)
 		}
+	}
+
+	// Enforce maxHistorySize on load to avoid unbounded growth.
+	if len(h.entries) > maxHistorySize {
+		start := len(h.entries) - maxHistorySize
+		// Copy into a new slice to drop references to older entries.
+		h.entries = append([]string(nil), h.entries[start:]...)
 	}
 }
 

@@ -45,9 +45,14 @@ func (m *Model) executeCommand(input string) string {
 		}
 	})
 
-	m.rootCmd.SetArgs(args)
+	// Use a cloned root command with Run/RunE disabled to avoid
+	// re-entering the REPL when no subcommand is selected.
+	tmpRoot := *m.rootCmd
+	tmpRoot.Run = nil
+	tmpRoot.RunE = nil
+	tmpRoot.SetArgs(args)
 
-	execErr := m.rootCmd.Execute()
+	execErr := tmpRoot.Execute()
 
 	cmd.SetOut(origOut)
 	cmd.SetErr(origErr)
