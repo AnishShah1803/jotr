@@ -53,6 +53,13 @@ func (h *History) load() {
 			h.entries = append(h.entries, line)
 		}
 	}
+
+	// Enforce maxHistorySize on load to avoid unbounded growth.
+	if len(h.entries) > maxHistorySize {
+		start := len(h.entries) - maxHistorySize
+		// Copy into a new slice to drop references to older entries.
+		h.entries = append([]string(nil), h.entries[start:]...)
+	}
 }
 
 func (h *History) save() {
