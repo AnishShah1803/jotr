@@ -33,8 +33,7 @@ var rootCmd = &cobra.Command{
 	Long: `jotr is a command-line journaling and note-taking tool designed for daily use.
 It supports daily notes, task management, templates, search, and much more.
 
-When run without arguments, jotr launches an interactive REPL interface.
-Use 'jotr dashboard' for the multi-panel TUI interface.`,
+When run without arguments, jotr launches an interactive REPL interface.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		verbose, _ := cmd.Flags().GetBool("verbose")
 		timeout, _ := cmd.Flags().GetDuration("timeout")
