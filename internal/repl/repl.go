@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/AnishShah1803/jotr/internal/config"
 )
@@ -35,7 +36,14 @@ func (m *Model) executeCommand(input string) string {
 	cmd.SetOut(&outBuf)
 	cmd.SetErr(&errBuf)
 
-	cmd.ResetFlags()
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if f.Changed {
+			if setErr := f.Value.Set(f.DefValue); setErr != nil {
+				fmt.Fprintf(&errBuf, "warning: could not reset flag %q: %v\n", f.Name, setErr)
+			}
+			f.Changed = false
+		}
+	})
 
 	// Use a cloned root command with Run/RunE disabled to avoid
 	// re-entering the REPL when no subcommand is selected.
