@@ -138,6 +138,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.textInput.SetValue("")
 			m.lastOutput = output
 			m.showOutput = true
+			if m.quitting {
+				return m, tea.Quit
+			}
 			return m, nil
 
 		case tea.KeyUp:
