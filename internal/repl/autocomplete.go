@@ -49,6 +49,9 @@ func (a *Autocomplete) Complete(input string) string {
 		return a.completeCommand(lastPart)
 	}
 
+	if strings.HasSuffix(input, " ") {
+		return input
+	}
 	return input + " "
 }
 
