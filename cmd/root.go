@@ -8,33 +8,19 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/repl"
 	"github.com/AnishShah1803/jotr/internal/updater"
 	"github.com/AnishShah1803/jotr/internal/utils"
 	"github.com/AnishShah1803/jotr/internal/version"
 
-	// Note Management.
-	notecmd "github.com/AnishShah1803/jotr/cmd/note"
-
-	// Task Management.
-	taskcmd "github.com/AnishShah1803/jotr/cmd/task"
-
-	// Search and Navigation.
-	searchcmd "github.com/AnishShah1803/jotr/cmd/search"
-
-	// Visualization.
-	visualcmd "github.com/AnishShah1803/jotr/cmd/visual"
-
-	// System Commands.
-	systemcmd "github.com/AnishShah1803/jotr/cmd/system"
-
-	// Utility Commands.
-	utilcmd "github.com/AnishShah1803/jotr/cmd/util"
-
-	// Template Commands.
-	templatecmd "github.com/AnishShah1803/jotr/cmd/templatecmd"
-
-	// Index Commands.
 	indexcmd "github.com/AnishShah1803/jotr/cmd/index"
+	notecmd "github.com/AnishShah1803/jotr/cmd/note"
+	searchcmd "github.com/AnishShah1803/jotr/cmd/search"
+	systemcmd "github.com/AnishShah1803/jotr/cmd/system"
+	taskcmd "github.com/AnishShah1803/jotr/cmd/task"
+	templatecmd "github.com/AnishShah1803/jotr/cmd/templatecmd"
+	utilcmd "github.com/AnishShah1803/jotr/cmd/util"
+	visualcmd "github.com/AnishShah1803/jotr/cmd/visual"
 )
 
 var updateFlag bool
@@ -47,7 +33,8 @@ var rootCmd = &cobra.Command{
 	Long: `jotr is a command-line journaling and note-taking tool designed for daily use.
 It supports daily notes, task management, templates, search, and much more.
 
-When run without arguments, jotr launches the interactive dashboard.`,
+When run without arguments, jotr launches an interactive REPL interface.
+Use 'jotr dashboard' for the multi-panel TUI interface.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		verbose, _ := cmd.Flags().GetBool("verbose")
 		timeout, _ := cmd.Flags().GetDuration("timeout")
@@ -76,12 +63,10 @@ When run without arguments, jotr launches the interactive dashboard.`,
 		cmd.SetContext(ctx)
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Handle --update flag
 		if updateFlag {
 			return updater.CheckAndUpdate(true)
 		}
 
-		// If no subcommand, launch dashboard
 		ctx := cmd.Context()
 		cfg, err := config.LoadWithContext(ctx, "")
 		if err != nil {
@@ -90,10 +75,7 @@ When run without arguments, jotr launches the interactive dashboard.`,
 			return fmt.Errorf("config load failed: %w", err)
 		}
 
-		if err := visualcmd.LaunchDashboard(ctx, cfg); err != nil {
-			return fmt.Errorf("dashboard launch failed: %w", err)
-		}
-		return nil
+		return repl.LaunchREPL(ctx, cfg, cmd.Root())
 	},
 }
 
@@ -138,7 +120,6 @@ func init() {
 	rootCmd.AddCommand(visualcmd.CalendarCmd)
 	rootCmd.AddCommand(visualcmd.StreakCmd)
 	rootCmd.AddCommand(visualcmd.GraphCmd)
-	rootCmd.AddCommand(visualcmd.DashboardCmd)
 
 	// Productivity Features
 	rootCmd.AddCommand(systemcmd.AliasCmd)
@@ -165,5 +146,3 @@ func init() {
 	// Search Index
 	rootCmd.AddCommand(indexcmd.IndexCmd)
 }
-
-// launchDashboard is defined in visual/dashboard.go
