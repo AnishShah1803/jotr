@@ -96,7 +96,7 @@ func saveShortcuts(cfg *config.LoadedConfig, shortcuts map[string]string) error 
 
 var reservedCommands = []string{
 	"daily", "note", "search", "tags", "capture", "summary", "sync",
-	"template", "streak", "calendar", "dashboard", "bulk", "graph",
+	"template", "streak", "calendar", "bulk", "graph",
 	"alias", "check", "configure", "validate", "shortcut", "schedule",
 	"help", "version", "list", "quick", "stats", "archive", "git",
 	"links", "frontmatter", "monthly",
