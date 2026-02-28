@@ -211,3 +211,129 @@ func TestGetCompletions(t *testing.T) {
 		})
 	}
 }
+
+func TestGetSubCommands(t *testing.T) {
+	a := &Autocomplete{
+		commands: map[string]bool{
+			"template": true,
+			"note":     true,
+			"n":        true,
+		},
+		commandNames: []string{"template", "note"},
+		aliases:      map[string]string{"n": "note"},
+		subCommands: map[string][]string{
+			"template": {"create", "delete", "edit", "list"},
+		},
+		actionCommands: map[string][]string{
+			"note": {"create", "list", "open"},
+			"n":    {"create", "list", "open"},
+		},
+	}
+
+	tests := []struct {
+		parent   string
+		expected []string
+	}{
+		{"template", []string{"template create", "template delete", "template edit", "template list"}},
+		{"note", []string{"note create", "note list", "note open"}},
+		{"n", []string{"n create", "n list", "n open"}},
+		{"unknown", nil},
+		{"template create", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.parent, func(t *testing.T) {
+			result := a.GetSubCommands(tt.parent)
+			if len(result) != len(tt.expected) {
+				t.Errorf("GetSubCommands(%q) = %v, want %v", tt.parent, result, tt.expected)
+				return
+			}
+			for i, v := range result {
+				if v != tt.expected[i] {
+					t.Errorf("GetSubCommands(%q)[%d] = %q, want %q", tt.parent, i, v, tt.expected[i])
+				}
+			}
+		})
+	}
+}
+
+func TestGetSubCommandCompletions(t *testing.T) {
+	a := &Autocomplete{
+		commands: map[string]bool{
+			"template": true,
+			"note":     true,
+		},
+		commandNames: []string{"template", "note"},
+		aliases:      make(map[string]string),
+		subCommands: map[string][]string{
+			"template": {"create", "delete", "edit", "list"},
+		},
+		actionCommands: map[string][]string{
+			"note": {"create", "list", "open"},
+		},
+	}
+
+	tests := []struct {
+		parent   string
+		partial  string
+		expected []string
+	}{
+		{"template", "c", []string{"template create"}},
+		{"template", "l", []string{"template list"}},
+		{"template", "e", []string{"template edit"}},
+		{"template", "", []string{"template create", "template delete", "template edit", "template list"}},
+		{"note", "c", []string{"note create"}},
+		{"note", "l", []string{"note list"}},
+		{"unknown", "c", nil},
+		{"template create", "x", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.parent+"/"+tt.partial, func(t *testing.T) {
+			result := a.GetSubCommandCompletions(tt.parent, tt.partial)
+			if len(result) != len(tt.expected) {
+				t.Errorf("GetSubCommandCompletions(%q, %q) = %v, want %v", tt.parent, tt.partial, result, tt.expected)
+				return
+			}
+			for i, v := range result {
+				if v != tt.expected[i] {
+					t.Errorf("GetSubCommandCompletions(%q, %q)[%d] = %q, want %q", tt.parent, tt.partial, i, v, tt.expected[i])
+				}
+			}
+		})
+	}
+}
+
+func TestIsCommand(t *testing.T) {
+	a := &Autocomplete{
+		commands: map[string]bool{
+			"template": true,
+			"note":     true,
+			"n":        true,
+		},
+		commandNames:   []string{"template", "note"},
+		aliases:        map[string]string{"n": "note"},
+		subCommands:    make(map[string][]string),
+		actionCommands: make(map[string][]string),
+	}
+
+	tests := []struct {
+		name     string
+		expected bool
+	}{
+		{"template", true},
+		{"note", true},
+		{"n", true},
+		{"unknown", false},
+		{"template create", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := a.IsCommand(tt.name)
+			if result != tt.expected {
+				t.Errorf("IsCommand(%q) = %v, want %v", tt.name, result, tt.expected)
+			}
+		})
+	}
+}
