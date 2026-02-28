@@ -179,10 +179,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyTab:
 			current := m.textInput.Value()
 			if len(m.completions) > 0 {
-				m.textInput.SetValue(m.completions[0] + " ")
+				selected := m.completions[0]
+				fields := strings.Fields(selected)
+				lastWord := fields[len(fields)-1]
+				subCommands := m.autocomplete.GetSubCommands(lastWord)
+
+				if subCommands != nil {
+					m.textInput.SetValue(selected + " ")
+				} else {
+					m.textInput.SetValue(selected)
+				}
 				m.textInput.CursorEnd()
-				m.completions = []string{}
 				m.selectedIdx = 0
+				m.updateCompletions()
 			} else {
 				completed := m.autocomplete.Complete(current)
 				if completed != current {
@@ -213,16 +222,54 @@ type outputMsg string
 func (m *Model) updateCompletions() {
 	value := m.textInput.Value()
 	fields := strings.Fields(value)
+
 	if value == "" {
 		m.completions = m.autocomplete.GetAllCommands()
 		m.selectedIdx = 0
-	} else if len(fields) == 1 && !strings.HasSuffix(value, " ") {
+		return
+	}
+
+	if len(fields) == 1 && !strings.HasSuffix(value, " ") {
 		m.completions = m.autocomplete.GetCompletions(fields[0])
 		m.selectedIdx = 0
-	} else {
-		m.completions = []string{}
-		m.selectedIdx = 0
+		return
 	}
+
+	m.completions = m.getCompletionsForInput(fields, strings.HasSuffix(value, " "))
+	m.selectedIdx = 0
+}
+
+func (m *Model) getCompletionsForInput(fields []string, hasTrailingSpace bool) []string {
+	if len(fields) == 0 {
+		return []string{}
+	}
+
+	if hasTrailingSpace {
+		lastWord := fields[len(fields)-1]
+		subCommands := m.autocomplete.GetSubCommands(lastWord)
+		if subCommands != nil {
+			return subCommands
+		}
+		return []string{strings.Join(fields, " ")}
+	}
+
+	for i := len(fields) - 1; i >= 0; i-- {
+		currentWord := fields[i]
+		parentWord := ""
+
+		if i > 0 {
+			parentWord = fields[i-1]
+		}
+
+		if parentWord != "" {
+			subs := m.autocomplete.GetSubCommandCompletions(parentWord, currentWord)
+			if subs != nil {
+				return subs
+			}
+		}
+	}
+
+	return []string{}
 }
 
 func (m Model) View() string {
@@ -269,8 +316,8 @@ func (m Model) View() string {
 	b.WriteString(strings.Repeat(" ", inset))
 	b.WriteString(promptStyle.Render("❯ "))
 	b.WriteString(inputStyle.Render(m.textInput.View()))
-	input := strings.TrimSpace(m.textInput.Value())
-	if !strings.Contains(input, " ") {
+
+	if len(m.completions) > 0 {
 		b.WriteString("\n")
 		b.WriteString(m.renderCompletions(inset))
 	}
