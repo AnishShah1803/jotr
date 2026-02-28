@@ -165,3 +165,49 @@ func TestLongestCommonPrefix(t *testing.T) {
 		})
 	}
 }
+
+func TestGetCompletions(t *testing.T) {
+	a := &Autocomplete{
+		commands: map[string]bool{
+			"calendar":  true,
+			"capture":   true,
+			"check":     true,
+			"config":    true,
+			"daily":     true,
+			"dashboard": true,
+			"search":    true,
+			"sync":      true,
+			"c":         true, // alias
+		},
+		commandNames: []string{"calendar", "capture", "check", "config", "daily", "dashboard", "search", "sync"},
+		aliases:      make(map[string]string),
+	}
+
+	tests := []struct {
+		input    string
+		expected []string
+	}{
+		{"c", []string{"calendar", "capture", "check", "config"}},
+		{"ca", []string{"calendar", "capture"}},
+		{"cal", []string{"calendar"}},
+		{"cale", []string{"calendar"}},
+		{"s", []string{"search", "sync"}},
+		{"se", []string{"search"}},
+		{"x", []string{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := a.GetCompletions(tt.input)
+			if len(result) != len(tt.expected) {
+				t.Errorf("GetCompletions(%q) = %v, want %v", tt.input, result, tt.expected)
+				return
+			}
+			for i, v := range result {
+				if v != tt.expected[i] {
+					t.Errorf("GetCompletions(%q)[%d] = %q, want %q", tt.input, i, v, tt.expected[i])
+				}
+			}
+		})
+	}
+}
