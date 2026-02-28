@@ -270,7 +270,7 @@ func (m Model) View() string {
 	b.WriteString(promptStyle.Render("❯ "))
 	b.WriteString(inputStyle.Render(m.textInput.View()))
 	input := strings.TrimSpace(m.textInput.Value())
-	if !strings.Contains(input, " ") && len(m.completions) > 0 {
+	if !strings.Contains(input, " ") {
 		b.WriteString("\n")
 		b.WriteString(m.renderCompletions(inset))
 	}
@@ -279,24 +279,20 @@ func (m Model) View() string {
 }
 
 func (m Model) renderCompletions(inset int) string {
-	if len(m.completions) == 0 {
-		return ""
-	}
-
 	const maxLines = 10
 	insetStr := strings.Repeat(" ", inset)
-	count := len(m.completions)
-	if count > maxLines {
-		count = maxLines
-	}
-	lines := make([]string, count)
+	lines := make([]string, maxLines)
 
-	for i := 0; i < count; i++ {
-		completion := m.completions[i]
-		if i == m.selectedIdx {
-			lines[i] = insetStr + selectedCompletionStyle.Render("  "+completion)
+	for i := 0; i < maxLines; i++ {
+		if i < len(m.completions) {
+			completion := m.completions[i]
+			if i == m.selectedIdx {
+				lines[i] = insetStr + selectedCompletionStyle.Render("  "+completion)
+			} else {
+				lines[i] = insetStr + completionStyle.Render("  "+completion)
+			}
 		} else {
-			lines[i] = insetStr + completionStyle.Render("  "+completion)
+			lines[i] = ""
 		}
 	}
 
