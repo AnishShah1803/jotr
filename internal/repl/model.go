@@ -162,6 +162,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textInput.SetValue(prev)
 				m.textInput.CursorEnd()
 			}
+			m.updateCompletions()
 			return m, nil
 
 		case tea.KeyDown:
@@ -172,6 +173,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.textInput.SetValue("")
 			}
+			m.updateCompletions()
 			return m, nil
 
 		case tea.KeyTab:
@@ -187,6 +189,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.textInput.SetValue(completed)
 					m.textInput.CursorEnd()
 				}
+				m.updateCompletions()
 			}
 			return m, nil
 
