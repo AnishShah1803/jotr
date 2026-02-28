@@ -7,11 +7,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Autocomplete provides command completion functionality for the REPL.
 type Autocomplete struct {
-	commands map[string]bool
-	aliases  map[string]string
+	commands     map[string]bool // all valid command names and aliases (for matching)
+	commandNames []string        // canonical command names only (for display)
+	aliases      map[string]string
 }
 
+// NewAutocomplete creates a new Autocomplete instance from the root command.
 func NewAutocomplete(rootCmd *cobra.Command) *Autocomplete {
 	a := &Autocomplete{
 		commands: make(map[string]bool),
@@ -19,13 +22,20 @@ func NewAutocomplete(rootCmd *cobra.Command) *Autocomplete {
 	}
 
 	a.buildIndex(rootCmd)
+	sort.Strings(a.commandNames)
 	return a
 }
 
 func (a *Autocomplete) buildIndex(cmd *cobra.Command) {
 	for _, subCmd := range cmd.Commands() {
 		name := subCmd.Name()
+		// Skip commands with empty names or hidden commands
+		if name == "" || subCmd.Hidden {
+			continue
+		}
 		a.commands[name] = true
+		// Only add canonical name to the display list
+		a.commandNames = append(a.commandNames, name)
 
 		for _, alias := range subCmd.Aliases {
 			a.aliases[alias] = name
@@ -36,6 +46,11 @@ func (a *Autocomplete) buildIndex(cmd *cobra.Command) {
 			a.buildIndex(subCmd)
 		}
 	}
+}
+
+// GetAllCommands returns all canonical command names in alphabetical order.
+func (a *Autocomplete) GetAllCommands() []string {
+	return a.commandNames
 }
 
 func (a *Autocomplete) Complete(input string) string {
@@ -107,13 +122,13 @@ func longestCommonPrefix(strs []string) string {
 	return prefix
 }
 
+// GetCompletions returns all canonical commands that start with the given prefix.
 func (a *Autocomplete) GetCompletions(partial string) []string {
 	var matches []string
-	for cmd := range a.commands {
+	for _, cmd := range a.commandNames {
 		if strings.HasPrefix(cmd, partial) {
 			matches = append(matches, cmd)
 		}
 	}
-	sort.Strings(matches)
 	return matches
 }
