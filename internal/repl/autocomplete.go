@@ -50,7 +50,9 @@ func (a *Autocomplete) buildIndex(cmd *cobra.Command) {
 
 // GetAllCommands returns all canonical command names in alphabetical order.
 func (a *Autocomplete) GetAllCommands() []string {
-	return a.commandNames
+	c := make([]string, len(a.commandNames))
+	copy(c, a.commandNames)
+	return c
 }
 
 func (a *Autocomplete) Complete(input string) string {
