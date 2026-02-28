@@ -179,10 +179,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyTab:
 			current := m.textInput.Value()
 			if len(m.completions) > 0 {
-				m.textInput.SetValue(m.completions[0] + " ")
+				selected := m.completions[0]
+				// Use the full selected completion path to detect sub-commands at any depth
+				subCommands := m.autocomplete.GetSubCommands(selected)
+
+				if subCommands != nil {
+					m.textInput.SetValue(selected + " ")
+				} else {
+					m.textInput.SetValue(selected)
+				}
 				m.textInput.CursorEnd()
-				m.completions = []string{}
 				m.selectedIdx = 0
+				m.updateCompletions()
 			} else {
 				completed := m.autocomplete.Complete(current)
 				if completed != current {
@@ -213,16 +221,51 @@ type outputMsg string
 func (m *Model) updateCompletions() {
 	value := m.textInput.Value()
 	fields := strings.Fields(value)
+
 	if value == "" {
 		m.completions = m.autocomplete.GetAllCommands()
 		m.selectedIdx = 0
-	} else if len(fields) == 1 && !strings.HasSuffix(value, " ") {
-		m.completions = m.autocomplete.GetCompletions(fields[0])
-		m.selectedIdx = 0
-	} else {
-		m.completions = []string{}
-		m.selectedIdx = 0
+		return
 	}
+
+	if len(fields) == 1 {
+		hasTrailingSpace := strings.HasSuffix(value, " ")
+		if !hasTrailingSpace || !m.autocomplete.IsCommand(fields[0]) {
+			m.completions = m.autocomplete.GetCompletions(fields[0])
+			m.selectedIdx = 0
+			return
+		}
+	}
+
+	m.completions = m.getCompletionsForInput(fields, strings.HasSuffix(value, " "))
+	m.selectedIdx = 0
+}
+
+func (m *Model) getCompletionsForInput(fields []string, hasTrailingSpace bool) []string {
+	if len(fields) == 0 {
+		return []string{}
+	}
+
+	if hasTrailingSpace {
+		// Complete sub-commands for the full current command path
+		parentPath := strings.Join(fields, " ")
+		subCommands := m.autocomplete.GetSubCommands(parentPath)
+		if subCommands != nil {
+			return subCommands
+		}
+		// No sub-commands available for this path; no completions to suggest
+		return []string{}
+	}
+
+	// Complete the last word against sub-commands of the full parent path
+	parentPath := strings.Join(fields[:len(fields)-1], " ")
+	partial := fields[len(fields)-1]
+	subs := m.autocomplete.GetSubCommandCompletions(parentPath, partial)
+	if subs != nil {
+		return subs
+	}
+
+	return []string{}
 }
 
 func (m Model) View() string {
@@ -269,8 +312,8 @@ func (m Model) View() string {
 	b.WriteString(strings.Repeat(" ", inset))
 	b.WriteString(promptStyle.Render("❯ "))
 	b.WriteString(inputStyle.Render(m.textInput.View()))
-	input := strings.TrimSpace(m.textInput.Value())
-	if !strings.Contains(input, " ") {
+
+	if len(m.completions) > 0 {
 		b.WriteString("\n")
 		b.WriteString(m.renderCompletions(inset))
 	}

@@ -7,52 +7,89 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Autocomplete provides command completion functionality for the REPL.
 type Autocomplete struct {
-	commands     map[string]bool // all valid command names and aliases (for matching)
-	commandNames []string        // canonical command names only (for display)
-	aliases      map[string]string
+	commands       map[string]bool
+	commandNames   []string
+	aliases        map[string]string
+	subCommands    map[string][]string
+	actionCommands map[string][]string
 }
 
-// NewAutocomplete creates a new Autocomplete instance from the root command.
 func NewAutocomplete(rootCmd *cobra.Command) *Autocomplete {
 	a := &Autocomplete{
-		commands: make(map[string]bool),
-		aliases:  make(map[string]string),
+		commands:       make(map[string]bool),
+		aliases:        make(map[string]string),
+		subCommands:    make(map[string][]string),
+		actionCommands: make(map[string][]string),
 	}
 
-	a.buildIndex(rootCmd)
+	// Commands that use args instead of sub-commands (action-style)
+	a.actionCommands["note"] = []string{"create", "open", "list"}
+	a.actionCommands["n"] = []string{"create", "open", "list"}
+	a.actionCommands["index"] = []string{"rebuild", "sync", "status"}
+	a.actionCommands["alias"] = []string{"add", "remove", "list", "resolve"}
+	a.actionCommands["schedule"] = []string{"add", "list", "delete"}
+	a.actionCommands["shortcut"] = []string{"add", "remove", "list"}
+	a.actionCommands["tags"] = []string{"list", "find", "stats"}
+	a.actionCommands["tag"] = []string{"list", "find", "stats"}
+	a.actionCommands["git"] = []string{"status", "commit", "history", "diff"}
+	a.actionCommands["bulk"] = []string{"rename", "tag"}
+
+	a.buildIndex(rootCmd, "")
 	sort.Strings(a.commandNames)
+
+	for parent := range a.subCommands {
+		sort.Strings(a.subCommands[parent])
+	}
+
 	return a
 }
 
-func (a *Autocomplete) buildIndex(cmd *cobra.Command) {
+func (a *Autocomplete) buildIndex(cmd *cobra.Command, parentPath string) {
 	for _, subCmd := range cmd.Commands() {
 		name := subCmd.Name()
-		// Skip commands with empty names or hidden commands
 		if name == "" || subCmd.Hidden {
 			continue
 		}
+
+		var fullPath string
+		if parentPath == "" {
+			fullPath = name
+		} else {
+			fullPath = parentPath + " " + name
+		}
+
 		a.commands[name] = true
-		// Only add canonical name to the display list
 		a.commandNames = append(a.commandNames, name)
+
+		// Use full parent path as key to support arbitrary depth without ambiguity
+		if parentPath != "" {
+			a.subCommands[parentPath] = append(a.subCommands[parentPath], name)
+		}
 
 		for _, alias := range subCmd.Aliases {
 			a.aliases[alias] = name
 			a.commands[alias] = true
+			if parentPath != "" {
+				a.subCommands[parentPath] = append(a.subCommands[parentPath], alias)
+			}
 		}
 
 		if subCmd.HasSubCommands() {
-			a.buildIndex(subCmd)
+			a.buildIndex(subCmd, fullPath)
 		}
 	}
 }
 
-// GetAllCommands returns all canonical command names in alphabetical order.
 func (a *Autocomplete) GetAllCommands() []string {
 	c := make([]string, len(a.commandNames))
 	copy(c, a.commandNames)
 	return c
+}
+
+// IsCommand reports whether name is a registered command or alias.
+func (a *Autocomplete) IsCommand(name string) bool {
+	return a.commands[name]
 }
 
 func (a *Autocomplete) Complete(input string) string {
@@ -124,12 +161,53 @@ func longestCommonPrefix(strs []string) string {
 	return prefix
 }
 
-// GetCompletions returns all canonical commands that start with the given prefix.
 func (a *Autocomplete) GetCompletions(partial string) []string {
 	var matches []string
 	for _, cmd := range a.commandNames {
 		if strings.HasPrefix(cmd, partial) {
 			matches = append(matches, cmd)
+		}
+	}
+	return matches
+}
+
+func (a *Autocomplete) GetSubCommands(parent string) []string {
+	var subs []string
+
+	if subList, ok := a.subCommands[parent]; ok {
+		subs = subList
+	} else if subList, ok := a.actionCommands[parent]; ok {
+		subs = subList
+	}
+
+	if subs == nil {
+		return nil
+	}
+
+	var fullCommands []string
+	for _, sub := range subs {
+		fullCommands = append(fullCommands, parent+" "+sub)
+	}
+	return fullCommands
+}
+
+func (a *Autocomplete) GetSubCommandCompletions(parent, partial string) []string {
+	var subNames []string
+
+	if subList, ok := a.subCommands[parent]; ok {
+		subNames = subList
+	} else if subList, ok := a.actionCommands[parent]; ok {
+		subNames = subList
+	}
+
+	if subNames == nil {
+		return nil
+	}
+
+	var matches []string
+	for _, sub := range subNames {
+		if strings.HasPrefix(sub, partial) {
+			matches = append(matches, parent+" "+sub)
 		}
 	}
 	return matches
