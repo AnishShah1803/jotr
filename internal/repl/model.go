@@ -27,20 +27,22 @@ type Model struct {
 	quitting     bool
 	lastOutput   string
 	showOutput   bool
+	completions  []string
+	selectedIdx  int
 }
 
-const replAsciiArt = `      ░░      
-     ░░▒░     
-     ░░░▒░    
-    ░░░░▒▒    
-   ░░░░░░▒█░  
-   ░░░░░░▒██░ 
-  ░░░░░░▒▒██▒ 
+const replAsciiArt = `      ░░
+     ░░▒░
+     ░░░▒░
+    ░░░░▒▒
+   ░░░░░░▒█░
+   ░░░░░░▒██░
+  ░░░░░░▒▒██▒
   ░ ░░░░▒░████
   ░░ ░░▒▒▒████
    ░  ▒▒░▒███▒
    ░░ ░░▒████▌
-    ▒░░▒███▛  
+    ▒░░▒███▛
       ▀▀▀▀    `
 
 const replAsciiArtHeight = 13
@@ -73,6 +75,13 @@ var (
 
 	inputStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("252"))
+
+	completionStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("245"))
+
+	selectedCompletionStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("51")).
+				Bold(true)
 )
 
 func NewModel(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Command) Model {
@@ -94,15 +103,15 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Comm
 		height:       24,
 		ready:        false,
 		quitting:     false,
+		completions:  []string{},
+		selectedIdx:  0,
 	}
 }
 
-// Init initializes the REPL.
 func (m Model) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-// Update handles messages for the REPL.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
@@ -125,6 +134,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 			m.textInput.SetValue("")
+			m.completions = []string{}
+			m.selectedIdx = 0
 			return m, nil
 
 		case tea.KeyEnter:
@@ -138,6 +149,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.textInput.SetValue("")
 			m.lastOutput = output
 			m.showOutput = true
+			m.completions = []string{}
+			m.selectedIdx = 0
 			if m.quitting {
 				return m, tea.Quit
 			}
@@ -163,10 +176,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.KeyTab:
 			current := m.textInput.Value()
-			completed := m.autocomplete.Complete(current)
-			if completed != current {
-				m.textInput.SetValue(completed)
+			if len(m.completions) > 0 {
+				m.textInput.SetValue(m.completions[0] + " ")
 				m.textInput.CursorEnd()
+				m.completions = []string{}
+				m.selectedIdx = 0
+			} else {
+				completed := m.autocomplete.Complete(current)
+				if completed != current {
+					m.textInput.SetValue(completed)
+					m.textInput.CursorEnd()
+				}
 			}
 			return m, nil
 
@@ -181,10 +201,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	m.textInput, cmd = m.textInput.Update(msg)
+	m.updateCompletions()
 	return m, cmd
 }
 
 type outputMsg string
+
+func (m *Model) updateCompletions() {
+	input := strings.TrimSpace(m.textInput.Value())
+	if !strings.Contains(input, " ") && len(input) > 0 {
+		m.completions = m.autocomplete.GetCompletions(input)
+		m.selectedIdx = 0
+	} else if input == "" {
+		m.completions = m.autocomplete.GetAllCommands()
+		m.selectedIdx = 0
+	} else {
+		m.completions = []string{}
+		m.selectedIdx = 0
+	}
+}
 
 func (m Model) View() string {
 	if !m.ready {
@@ -230,8 +265,34 @@ func (m Model) View() string {
 	b.WriteString(strings.Repeat(" ", inset))
 	b.WriteString(promptStyle.Render("❯ "))
 	b.WriteString(inputStyle.Render(m.textInput.View()))
+	input := strings.TrimSpace(m.textInput.Value())
+	if !strings.Contains(input, " ") {
+		b.WriteString("\n")
+		b.WriteString(m.renderCompletions(inset))
+	}
 
 	return b.String()
+}
+
+func (m Model) renderCompletions(inset int) string {
+	const maxLines = 10
+	insetStr := strings.Repeat(" ", inset)
+	lines := make([]string, maxLines)
+
+	for i := 0; i < maxLines; i++ {
+		if i < len(m.completions) {
+			completion := m.completions[i]
+			if i == m.selectedIdx {
+				lines[i] = insetStr + selectedCompletionStyle.Render("  "+completion)
+			} else {
+				lines[i] = insetStr + completionStyle.Render("  "+completion)
+			}
+		} else {
+			lines[i] = ""
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func renderLogo() string {
@@ -281,10 +342,8 @@ func (m Model) renderHeader() (string, int) {
 	ver := versionStyle.Render(version.GetVersion())
 	hint := helpStyle.Render(helpHint)
 
-	// Compute required width for horizontal layout: left padding + logo + space + version.
 	requiredWidth := leftPad + lipgloss.Width(logo) + lipgloss.Width(ver) + 2
 
-	// If the terminal is too narrow, stack logo and version vertically to avoid negative padding.
 	if m.width < requiredWidth {
 		header := leftPadStr + logo + "\n" + leftPadStr + ver
 
