@@ -23,7 +23,7 @@ jobs:
           persist-credentials: false
       - uses: anomalyco/opencode/github@latest
         env:
-          OPENCODE_CHUTES_APIKEY: ${{ secrets.CHUTES_API_KEY }}
+          CHUTES_API_KEY: ${{ secrets.CHUTES_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           model: chutes/zai-org/GLM-5-TEE
