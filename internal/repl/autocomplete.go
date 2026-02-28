@@ -23,11 +23,19 @@ func NewAutocomplete(rootCmd *cobra.Command) *Autocomplete {
 		actionCommands: make(map[string][]string),
 	}
 
-	// Commands that use args instead of sub-commands
+	// Commands that use args instead of sub-commands (action-style)
 	a.actionCommands["note"] = []string{"create", "open", "list"}
 	a.actionCommands["n"] = []string{"create", "open", "list"}
+	a.actionCommands["index"] = []string{"rebuild", "sync", "status"}
+	a.actionCommands["alias"] = []string{"add", "remove", "list", "resolve"}
+	a.actionCommands["schedule"] = []string{"add", "list", "delete"}
+	a.actionCommands["shortcut"] = []string{"add", "remove", "list"}
+	a.actionCommands["tags"] = []string{"list", "find", "stats"}
+	a.actionCommands["tag"] = []string{"list", "find", "stats"}
+	a.actionCommands["git"] = []string{"status", "commit", "history", "diff"}
+	a.actionCommands["bulk"] = []string{"rename", "tag"}
 
-	a.buildIndex(rootCmd)
+	a.buildIndex(rootCmd, "")
 	sort.Strings(a.commandNames)
 
 	for parent := range a.subCommands {
@@ -37,32 +45,38 @@ func NewAutocomplete(rootCmd *cobra.Command) *Autocomplete {
 	return a
 }
 
-func (a *Autocomplete) buildIndex(cmd *cobra.Command) {
-	parentName := cmd.Name()
-
+func (a *Autocomplete) buildIndex(cmd *cobra.Command, parentPath string) {
 	for _, subCmd := range cmd.Commands() {
 		name := subCmd.Name()
 		if name == "" || subCmd.Hidden {
 			continue
 		}
 
+		var fullPath string
+		if parentPath == "" {
+			fullPath = name
+		} else {
+			fullPath = parentPath + " " + name
+		}
+
 		a.commands[name] = true
 		a.commandNames = append(a.commandNames, name)
 
-		if parentName != "" {
-			a.subCommands[parentName] = append(a.subCommands[parentName], name)
+		// Use full parent path as key to support arbitrary depth without ambiguity
+		if parentPath != "" {
+			a.subCommands[parentPath] = append(a.subCommands[parentPath], name)
 		}
 
 		for _, alias := range subCmd.Aliases {
 			a.aliases[alias] = name
 			a.commands[alias] = true
-			if parentName != "" {
-				a.subCommands[parentName] = append(a.subCommands[parentName], alias)
+			if parentPath != "" {
+				a.subCommands[parentPath] = append(a.subCommands[parentPath], alias)
 			}
 		}
 
 		if subCmd.HasSubCommands() {
-			a.buildIndex(subCmd)
+			a.buildIndex(subCmd, fullPath)
 		}
 	}
 }
@@ -71,6 +85,11 @@ func (a *Autocomplete) GetAllCommands() []string {
 	c := make([]string, len(a.commandNames))
 	copy(c, a.commandNames)
 	return c
+}
+
+// IsCommand reports whether name is a registered command or alias.
+func (a *Autocomplete) IsCommand(name string) bool {
+	return a.commands[name]
 }
 
 func (a *Autocomplete) Complete(input string) string {

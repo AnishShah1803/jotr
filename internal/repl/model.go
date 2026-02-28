@@ -180,9 +180,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			current := m.textInput.Value()
 			if len(m.completions) > 0 {
 				selected := m.completions[0]
-				fields := strings.Fields(selected)
-				lastWord := fields[len(fields)-1]
-				subCommands := m.autocomplete.GetSubCommands(lastWord)
+				// Use the full selected completion path to detect sub-commands at any depth
+				subCommands := m.autocomplete.GetSubCommands(selected)
 
 				if subCommands != nil {
 					m.textInput.SetValue(selected + " ")
@@ -229,10 +228,13 @@ func (m *Model) updateCompletions() {
 		return
 	}
 
-	if len(fields) == 1 && !strings.HasSuffix(value, " ") {
-		m.completions = m.autocomplete.GetCompletions(fields[0])
-		m.selectedIdx = 0
-		return
+	if len(fields) == 1 {
+		hasTrailingSpace := strings.HasSuffix(value, " ")
+		if !hasTrailingSpace || !m.autocomplete.IsCommand(fields[0]) {
+			m.completions = m.autocomplete.GetCompletions(fields[0])
+			m.selectedIdx = 0
+			return
+		}
 	}
 
 	m.completions = m.getCompletionsForInput(fields, strings.HasSuffix(value, " "))
@@ -245,28 +247,22 @@ func (m *Model) getCompletionsForInput(fields []string, hasTrailingSpace bool) [
 	}
 
 	if hasTrailingSpace {
-		lastWord := fields[len(fields)-1]
-		subCommands := m.autocomplete.GetSubCommands(lastWord)
+		// Complete sub-commands for the full current command path
+		parentPath := strings.Join(fields, " ")
+		subCommands := m.autocomplete.GetSubCommands(parentPath)
 		if subCommands != nil {
 			return subCommands
 		}
-		return []string{strings.Join(fields, " ")}
+		// No sub-commands available for this path; no completions to suggest
+		return []string{}
 	}
 
-	for i := len(fields) - 1; i >= 0; i-- {
-		currentWord := fields[i]
-		parentWord := ""
-
-		if i > 0 {
-			parentWord = fields[i-1]
-		}
-
-		if parentWord != "" {
-			subs := m.autocomplete.GetSubCommandCompletions(parentWord, currentWord)
-			if subs != nil {
-				return subs
-			}
-		}
+	// Complete the last word against sub-commands of the full parent path
+	parentPath := strings.Join(fields[:len(fields)-1], " ")
+	partial := fields[len(fields)-1]
+	subs := m.autocomplete.GetSubCommandCompletions(parentPath, partial)
+	if subs != nil {
+		return subs
 	}
 
 	return []string{}
