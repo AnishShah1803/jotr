@@ -23,10 +23,10 @@ jobs:
           persist-credentials: false
       - uses: anomalyco/opencode/github@latest
         env:
-          NANO_GPT_API_KEY: ${{ secrets.NANO_GPT_API_KEY }}
+          OPENCODE_CHUTES_APIKEY: ${{ secrets.CHUTES_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: nano-gpt/zai-org/glm-5:thinking
+          model: chutes/zai-org/GLM-5-TEE
           use_github_token: true
           prompt: |
             Review this pull request:
