@@ -211,12 +211,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 type outputMsg string
 
 func (m *Model) updateCompletions() {
-	input := strings.TrimSpace(m.textInput.Value())
-	if !strings.Contains(input, " ") && len(input) > 0 {
-		m.completions = m.autocomplete.GetCompletions(input)
-		m.selectedIdx = 0
-	} else if input == "" {
+	value := m.textInput.Value()
+	fields := strings.Fields(value)
+	if value == "" {
 		m.completions = m.autocomplete.GetAllCommands()
+		m.selectedIdx = 0
+	} else if len(fields) == 1 && !strings.HasSuffix(value, " ") {
+		m.completions = m.autocomplete.GetCompletions(fields[0])
 		m.selectedIdx = 0
 	} else {
 		m.completions = []string{}
