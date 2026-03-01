@@ -24,26 +24,22 @@ func (m *Model) executeCommand(input string) string {
 		return "Goodbye!"
 	}
 
-	cmd, _, err := m.rootCmd.Find(args)
-	if err != nil {
+	if _, _, err := m.rootCmd.Find(args); err != nil {
 		return fmt.Sprintf("Command not found: %s\nType 'help' for available commands.", args[0])
 	}
 
-	origOut := cmd.OutOrStdout()
-	origErr := cmd.ErrOrStderr()
-
+	// Capture stdout and stderr using buffers
 	var outBuf, errBuf bytes.Buffer
-	cmd.SetOut(&outBuf)
-	cmd.SetErr(&errBuf)
 
-	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		if f.Changed {
-			if setErr := f.Value.Set(f.DefValue); setErr != nil {
-				fmt.Fprintf(&errBuf, "warning: could not reset flag %q: %v\n", f.Name, setErr)
-			}
-			f.Changed = false
-		}
-	})
+	// Set output on the original root command before cloning it so that
+	// subcommands, which traverse the parent chain to resolve their writer,
+	// write into our buffers rather than os.Stdout/os.Stderr.
+	m.rootCmd.SetOut(&outBuf)
+	m.rootCmd.SetErr(&errBuf)
+	defer func() {
+		m.rootCmd.SetOut(nil)
+		m.rootCmd.SetErr(nil)
+	}()
 
 	// Use a cloned root command with Run/RunE disabled to avoid
 	// re-entering the REPL when no subcommand is selected.
@@ -52,10 +48,27 @@ func (m *Model) executeCommand(input string) string {
 	tmpRoot.RunE = nil
 	tmpRoot.SetArgs(args)
 
-	execErr := tmpRoot.Execute()
+	// Reset any changed flags between REPL commands to prevent previous values
+	// from leaking into the next execution.  Find the target on the clone so the
+	// reset operates on the same command set that Execute will use.
+	subCmd, _, _ := tmpRoot.Find(args)
+	resetFlags := func(fs *pflag.FlagSet) {
+		fs.VisitAll(func(f *pflag.Flag) {
+			if f.Changed {
+				if setErr := f.Value.Set(f.DefValue); setErr != nil {
+					fmt.Fprintf(&errBuf, "warning: could not reset flag %q: %v\n", f.Name, setErr)
+				}
+				f.Changed = false
+			}
+		})
+	}
+	resetFlags(tmpRoot.Flags())
+	if subCmd != nil && subCmd != &tmpRoot {
+		resetFlags(subCmd.Flags())
+		resetFlags(subCmd.InheritedFlags())
+	}
 
-	cmd.SetOut(origOut)
-	cmd.SetErr(origErr)
+	execErr := tmpRoot.Execute()
 
 	var result strings.Builder
 
@@ -122,7 +135,6 @@ func LaunchREPL(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Co
 
 	p := tea.NewProgram(
 		&m,
-		tea.WithAltScreen(),
 	)
 
 	_, err := p.Run()

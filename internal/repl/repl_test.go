@@ -1,8 +1,12 @@
 package repl
 
 import (
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
 func newTestHistory(t *testing.T) *History {
@@ -335,5 +339,99 @@ func TestIsCommand(t *testing.T) {
 				t.Errorf("IsCommand(%q) = %v, want %v", tt.name, result, tt.expected)
 			}
 		})
+	}
+}
+
+func newTestRootCmd() *cobra.Command {
+	root := &cobra.Command{
+		Use:           "jotr",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+	}
+
+	echo := &cobra.Command{
+		Use: "echo",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			msg, _ := cmd.Flags().GetString("msg")
+			fmt.Fprintln(cmd.OutOrStdout(), msg)
+			return nil
+		},
+	}
+	echo.Flags().String("msg", "default", "message to echo")
+
+	dual := &cobra.Command{
+		Use: "dual",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Fprintln(cmd.OutOrStdout(), "stdout-line")
+			fmt.Fprintln(cmd.ErrOrStderr(), "stderr-line")
+			return nil
+		},
+	}
+
+	root.AddCommand(echo, dual)
+	return root
+}
+
+func newTestModel(t *testing.T, rootCmd *cobra.Command) *Model {
+	t.Helper()
+	return &Model{
+		rootCmd:      rootCmd,
+		history:      newTestHistory(t),
+		autocomplete: NewAutocomplete(rootCmd),
+		width:        80,
+		height:       24,
+	}
+}
+
+func TestExecuteCommand_UnknownCommand(t *testing.T) {
+	root := newTestRootCmd()
+	m := newTestModel(t, root)
+
+	out := m.executeCommand("unknown")
+	if out == "" {
+		t.Error("expected non-empty output for unknown command")
+	}
+}
+
+func TestExecuteCommand_CapturesStdout(t *testing.T) {
+	root := newTestRootCmd()
+	m := newTestModel(t, root)
+
+	out := m.executeCommand("echo")
+	if !strings.Contains(out, "default") {
+		t.Errorf("expected output to contain 'default', got: %q", out)
+	}
+}
+
+func TestExecuteCommand_CombinedStdoutStderr(t *testing.T) {
+	root := newTestRootCmd()
+	m := newTestModel(t, root)
+
+	out := m.executeCommand("dual")
+	if !strings.Contains(out, "stdout-line") {
+		t.Errorf("expected output to contain 'stdout-line', got: %q", out)
+	}
+	if !strings.Contains(out, "stderr-line") {
+		t.Errorf("expected output to contain 'stderr-line', got: %q", out)
+	}
+}
+
+func TestExecuteCommand_FlagResetAcrossRuns(t *testing.T) {
+	root := newTestRootCmd()
+	m := newTestModel(t, root)
+
+	// First run sets the flag to a custom value.
+	out := m.executeCommand("echo --msg=custom")
+	if !strings.Contains(out, "custom") {
+		t.Errorf("expected first run output to contain 'custom', got: %q", out)
+	}
+
+	// Second run omits the flag; it must revert to the default, not reuse 'custom'.
+	out = m.executeCommand("echo")
+	if strings.Contains(out, "custom") {
+		t.Errorf("expected second run output NOT to contain 'custom' (flag should be reset), got: %q", out)
+	}
+	if !strings.Contains(out, "default") {
+		t.Errorf("expected second run output to contain 'default', got: %q", out)
 	}
 }
