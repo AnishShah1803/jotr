@@ -129,7 +129,7 @@ func TestAutocompleteComplete(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"da", "da"},
+		{"da", "daily "},
 		{"dai", "daily "},
 		{"s", "s"},
 		{"search", "search "},
