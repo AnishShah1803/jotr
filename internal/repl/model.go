@@ -25,7 +25,6 @@ type Model struct {
 	height       int
 	ready        bool
 	quitting     bool
-	streamBuf    string
 	completions  []string
 	selectedIdx  int
 }
@@ -102,7 +101,6 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Comm
 		height:       24,
 		ready:        false,
 		quitting:     false,
-		streamBuf:    "",
 		completions:  []string{},
 		selectedIdx:  0,
 	}
@@ -111,13 +109,9 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Comm
 }
 
 func (m Model) Init() tea.Cmd {
-	print("\033[2J\033[H")
-	header, _ := m.renderHeader()
-	headerBlock := "\n" + header
-
 	return tea.Batch(
 		textinput.Blink,
-		tea.Println(headerBlock),
+		tea.ClearScreen,
 	)
 }
 
@@ -126,6 +120,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		wasReady := m.ready
 		m.width = msg.Width
 		m.height = msg.Height
 		m.textInput.Width = m.width - 10
@@ -133,6 +128,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.textInput.Width = 20
 		}
 		m.ready = true
+		if !wasReady {
+			header, _ := m.renderHeader()
+			return m, tea.Println("\n" + header)
+		}
 		return m, nil
 
 	case tea.KeyMsg:
@@ -308,13 +307,6 @@ func (m Model) View() string {
 	var b strings.Builder
 
 	inset := 2
-
-	if m.streamBuf != "" {
-		insetStr := strings.Repeat(" ", inset)
-		for _, line := range strings.Split(m.streamBuf, "\n") {
-			b.WriteString(insetStr + line + "\n")
-		}
-	}
 
 	separator := strings.Repeat(" ", inset) + strings.Repeat("─", 40)
 	b.WriteString(separatorStyle.Render(separator))
