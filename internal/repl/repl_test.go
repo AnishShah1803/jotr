@@ -117,11 +117,10 @@ func TestHistoryNavigation(t *testing.T) {
 func TestAutocompleteComplete(t *testing.T) {
 	a := &Autocomplete{
 		commands: map[string]bool{
-			"daily":     true,
-			"dashboard": true,
-			"d":         true,
-			"search":    true,
-			"sync":      true,
+			"daily":  true,
+			"d":      true,
+			"search": true,
+			"sync":   true,
 		},
 		aliases: make(map[string]string),
 	}
@@ -130,7 +129,7 @@ func TestAutocompleteComplete(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"da", "da"},
+		{"da", "daily "},
 		{"dai", "daily "},
 		{"s", "s"},
 		{"search", "search "},
@@ -153,7 +152,7 @@ func TestLongestCommonPrefix(t *testing.T) {
 		strs     []string
 		expected string
 	}{
-		{[]string{"daily", "dashboard", "d"}, "d"},
+		{[]string{"daily", "d"}, "d"},
 		{[]string{"search", "sync", "summary"}, "s"},
 		{[]string{"daily", "daily"}, "daily"},
 		{[]string{}, ""},
@@ -173,17 +172,16 @@ func TestLongestCommonPrefix(t *testing.T) {
 func TestGetCompletions(t *testing.T) {
 	a := &Autocomplete{
 		commands: map[string]bool{
-			"calendar":  true,
-			"capture":   true,
-			"check":     true,
-			"config":    true,
-			"daily":     true,
-			"dashboard": true,
-			"search":    true,
-			"sync":      true,
-			"c":         true, // alias
+			"calendar": true,
+			"capture":  true,
+			"check":    true,
+			"config":   true,
+			"daily":    true,
+			"search":   true,
+			"sync":     true,
+			"c":        true, // alias
 		},
-		commandNames: []string{"calendar", "capture", "check", "config", "daily", "dashboard", "search", "sync"},
+		commandNames: []string{"calendar", "capture", "check", "config", "daily", "search", "sync"},
 		aliases:      make(map[string]string),
 	}
 

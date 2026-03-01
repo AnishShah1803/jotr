@@ -53,7 +53,7 @@ jotr configure
 # Start taking notes
 jotr daily                    # Open today's daily note
 jotr capture "Important idea" # Quick capture to daily note  
-jotr dashboard               # Launch interactive TUI
+jotr                         # Launch interactive REPL
 ```
 
 **That's it!** You're ready to streamline your note-taking workflow.
@@ -255,10 +255,7 @@ Example configuration:
 | `calendar` | Show calendar view | `cal` |
 | `template` | Manage templates | `tmpl` |
 | `list` | List recent notes | `ls` |
-| `quick` | Quick actions menu | `q` |
 | `bulk` | Bulk operations | |
-| `check` | Health check | |
-| `dashboard` | Interactive TUI dashboard | `dash` |
 | `configure` | Configuration wizard | `config`, `cfg` |
 | `graph` | Generate graph visualization | |
 | `version` | Show version | |
