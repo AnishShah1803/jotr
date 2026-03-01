@@ -25,8 +25,7 @@ type Model struct {
 	height       int
 	ready        bool
 	quitting     bool
-	lastOutput   string
-	showOutput   bool
+	streamBuf    string
 	completions  []string
 	selectedIdx  int
 }
@@ -92,7 +91,7 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Comm
 	ti.CharLimit = 500
 	ti.Width = 60
 
-	return Model{
+	m := Model{
 		ctx:          ctx,
 		config:       cfg,
 		rootCmd:      rootCmd,
@@ -103,13 +102,23 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Comm
 		height:       24,
 		ready:        false,
 		quitting:     false,
+		streamBuf:    "",
 		completions:  []string{},
 		selectedIdx:  0,
 	}
+
+	return m
 }
 
 func (m Model) Init() tea.Cmd {
-	return textinput.Blink
+	print("\033[2J\033[H")
+	header, _ := m.renderHeader()
+	headerBlock := "\n" + header
+
+	return tea.Batch(
+		textinput.Blink,
+		tea.Println(headerBlock),
+	)
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -145,16 +154,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			m.history.Add(input)
-			output := m.executeCommand(input)
+			cmdOutput := m.executeCommand(input)
 			m.textInput.SetValue("")
-			m.lastOutput = output
-			m.showOutput = true
 			m.completions = []string{}
 			m.selectedIdx = 0
-			if m.quitting {
-				return m, tea.Quit
+
+			inset := 2
+			insetStr := strings.Repeat(" ", inset)
+
+			var block strings.Builder
+			block.WriteString("\n")
+			block.WriteString(promptStyle.Render("❯ ") + inputStyle.Render(input))
+			if cmdOutput != "" {
+				trimmed := strings.TrimSpace(cmdOutput)
+				for _, line := range strings.Split(trimmed, "\n") {
+					block.WriteString("\n")
+					block.WriteString(insetStr + line)
+				}
 			}
-			return m, nil
+
+			if m.quitting {
+				return m, tea.Sequence(tea.Println(block.String()), tea.Quit)
+			}
+			return m, tea.Println(block.String())
 
 		case tea.KeyUp:
 			prev := m.history.Previous()
@@ -180,7 +202,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			current := m.textInput.Value()
 			if len(m.completions) > 0 {
 				selected := m.completions[0]
-				// Use the full selected completion path to detect sub-commands at any depth
+
 				subCommands := m.autocomplete.GetSubCommands(selected)
 
 				if subCommands != nil {
@@ -206,8 +228,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case outputMsg:
-		m.lastOutput = string(msg)
-		m.showOutput = true
+		chunk := string(msg)
+		if chunk != "" {
+			inset := 2
+			insetStr := strings.Repeat(" ", inset)
+			var block strings.Builder
+			for _, line := range strings.Split(strings.TrimSpace(chunk), "\n") {
+				block.WriteString(insetStr + line + "\n")
+			}
+			return m, tea.Println(strings.TrimRight(block.String(), "\n"))
+		}
 		return m, nil
 	}
 
@@ -247,17 +277,15 @@ func (m *Model) getCompletionsForInput(fields []string, hasTrailingSpace bool) [
 	}
 
 	if hasTrailingSpace {
-		// Complete sub-commands for the full current command path
 		parentPath := strings.Join(fields, " ")
 		subCommands := m.autocomplete.GetSubCommands(parentPath)
 		if subCommands != nil {
 			return subCommands
 		}
-		// No sub-commands available for this path; no completions to suggest
+
 		return []string{}
 	}
 
-	// Complete the last word against sub-commands of the full parent path
 	parentPath := strings.Join(fields[:len(fields)-1], " ")
 	partial := fields[len(fields)-1]
 	subs := m.autocomplete.GetSubCommandCompletions(parentPath, partial)
@@ -274,40 +302,23 @@ func (m Model) View() string {
 	}
 
 	if m.quitting {
-		return "\n  Goodbye!\n\n"
+		return ""
 	}
 
 	var b strings.Builder
 
-	topPad := m.height * 5 / 100
-	if topPad < 1 {
-		topPad = 1
-	}
-	b.WriteString(strings.Repeat("\n", topPad))
-
-	header, contentWidth := m.renderHeader()
-	b.WriteString(header)
-	b.WriteString("\n")
-
 	inset := 2
-	separatorLen := contentWidth - inset
-	if separatorLen < 10 {
-		separatorLen = 10
+
+	if m.streamBuf != "" {
+		insetStr := strings.Repeat(" ", inset)
+		for _, line := range strings.Split(m.streamBuf, "\n") {
+			b.WriteString(insetStr + line + "\n")
+		}
 	}
-	separator := strings.Repeat(" ", inset) + strings.Repeat("─", separatorLen)
+
+	separator := strings.Repeat(" ", inset) + strings.Repeat("─", 40)
 	b.WriteString(separatorStyle.Render(separator))
 	b.WriteString("\n")
-
-	gapPrompt := m.height * 2 / 100
-	if gapPrompt < 1 {
-		gapPrompt = 1
-	}
-	b.WriteString(strings.Repeat("\n", gapPrompt))
-
-	if m.showOutput && m.lastOutput != "" {
-		b.WriteString(m.lastOutput)
-		b.WriteString("\n\n")
-	}
 
 	b.WriteString(strings.Repeat(" ", inset))
 	b.WriteString(promptStyle.Render("❯ "))

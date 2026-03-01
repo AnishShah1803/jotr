@@ -24,26 +24,13 @@ func (m *Model) executeCommand(input string) string {
 		return "Goodbye!"
 	}
 
-	cmd, _, err := m.rootCmd.Find(args)
+	_, _, err := m.rootCmd.Find(args)
 	if err != nil {
 		return fmt.Sprintf("Command not found: %s\nType 'help' for available commands.", args[0])
 	}
 
-	origOut := cmd.OutOrStdout()
-	origErr := cmd.ErrOrStderr()
-
+	// Capture stdout and stderr using buffers
 	var outBuf, errBuf bytes.Buffer
-	cmd.SetOut(&outBuf)
-	cmd.SetErr(&errBuf)
-
-	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		if f.Changed {
-			if setErr := f.Value.Set(f.DefValue); setErr != nil {
-				fmt.Fprintf(&errBuf, "warning: could not reset flag %q: %v\n", f.Name, setErr)
-			}
-			f.Changed = false
-		}
-	})
 
 	// Use a cloned root command with Run/RunE disabled to avoid
 	// re-entering the REPL when no subcommand is selected.
@@ -52,10 +39,22 @@ func (m *Model) executeCommand(input string) string {
 	tmpRoot.RunE = nil
 	tmpRoot.SetArgs(args)
 
-	execErr := tmpRoot.Execute()
+	// Set output buffers on the cloned root command to capture all output
+	// This is critical: tmpRoot.Execute() uses tmpRoot's output, not the subcommand's
+	tmpRoot.SetOut(&outBuf)
+	tmpRoot.SetErr(&errBuf)
 
-	cmd.SetOut(origOut)
-	cmd.SetErr(origErr)
+	// Also set buffers on the original command for flags reset output
+	tmpRoot.Flags().VisitAll(func(f *pflag.Flag) {
+		if f.Changed {
+			if setErr := f.Value.Set(f.DefValue); setErr != nil {
+				fmt.Fprintf(&errBuf, "warning: could not reset flag %q: %v\n", f.Name, setErr)
+			}
+			f.Changed = false
+		}
+	})
+
+	execErr := tmpRoot.Execute()
 
 	var result strings.Builder
 
@@ -122,7 +121,6 @@ func LaunchREPL(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Co
 
 	p := tea.NewProgram(
 		&m,
-		tea.WithAltScreen(),
 	)
 
 	_, err := p.Run()
