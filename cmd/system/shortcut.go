@@ -98,7 +98,7 @@ var reservedCommands = []string{
 	"daily", "note", "search", "tags", "capture", "summary", "sync",
 	"template", "streak", "calendar", "bulk", "graph",
 	"alias", "check", "configure", "validate", "shortcut", "schedule",
-	"help", "version", "list", "quick", "stats", "archive", "git",
+	"help", "version", "list", "stats", "archive", "git",
 	"links", "frontmatter", "monthly",
 }
 

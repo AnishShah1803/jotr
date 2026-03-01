@@ -130,7 +130,7 @@ func init() {
 	// Utilities
 	rootCmd.AddCommand(utilcmd.BulkCmd)
 	rootCmd.AddCommand(utilcmd.GitCmd)
-	rootCmd.AddCommand(utilcmd.QuickCmd)
+
 	rootCmd.AddCommand(utilcmd.CheckCmd)
 	rootCmd.AddCommand(utilcmd.ValidateCmd)
 
