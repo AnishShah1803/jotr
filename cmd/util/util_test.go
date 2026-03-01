@@ -306,5 +306,3 @@ func TestRunValidation_NoConfig(t *testing.T) {
 	os.Setenv("HOME", tmpDir)
 	defer os.Setenv("HOME", origHome)
 }
-
-
