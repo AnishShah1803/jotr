@@ -228,7 +228,6 @@ func TestGetSubCommands(t *testing.T) {
 		},
 		actionCommands: map[string][]string{
 			"note": {"create", "list", "open"},
-			"n":    {"create", "list", "open"},
 		},
 	}
 
@@ -238,7 +237,7 @@ func TestGetSubCommands(t *testing.T) {
 	}{
 		{"template", []string{"template create", "template delete", "template edit", "template list"}},
 		{"note", []string{"note create", "note list", "note open"}},
-		{"n", []string{"n create", "n list", "n open"}},
+		{"n", []string{"note create", "note list", "note open"}},
 		{"unknown", nil},
 		{"template create", nil},
 	}
