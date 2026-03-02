@@ -317,7 +317,10 @@ func (a *Autocomplete) GetPathCompletions(cfg *config.LoadedConfig, partial stri
 
 	var completions []string
 	for _, entry := range entries {
-		relPath, _ := filepath.Rel(basePath, entry)
+		relPath, err := filepath.Rel(basePath, entry)
+		if err != nil {
+			continue
+		}
 		if info, err := os.Stat(entry); err == nil && info.IsDir() {
 			completions = append(completions, relPath+"/")
 		} else {

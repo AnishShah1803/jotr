@@ -2,11 +2,15 @@ package repl
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	"github.com/AnishShah1803/jotr/internal/config"
 )
 
 func newTestHistory(t *testing.T) *History {
@@ -431,4 +435,201 @@ func TestExecuteCommand_FlagResetAcrossRuns(t *testing.T) {
 	if !strings.Contains(out, "default") {
 		t.Errorf("expected second run output to contain 'default', got: %q", out)
 	}
+}
+
+// newTestAutocomplete returns an Autocomplete pre-loaded with a small fixture
+// suitable for testing resolve, resolvePath, GetParamCompletions,
+// GetParamsForCommand, and GetPathCompletions.
+func newTestAutocomplete() *Autocomplete {
+	return &Autocomplete{
+		commands: map[string]bool{
+			"note": true, "n": true,
+			"tags": true, "tag": true,
+			"read": true, "daily": true,
+		},
+		commandNames: []string{"note", "tags", "read", "daily"},
+		aliases:      map[string]string{"n": "note", "tag": "tags"},
+		subCommands:  make(map[string][]string),
+		actionCommands: map[string][]string{
+			"note": {"create", "open", "list"},
+			"tags": {"list", "find", "stats"},
+		},
+		paramCommands: map[string][]string{
+			"note":        {"name=", "template="},
+			"note create": {"path=", "file="},
+			"tags":        {"name="},
+			"read":        {"file=", "path=", "lines=", "format="},
+			"daily":       {"date=", "open="},
+		},
+	}
+}
+
+func TestResolve(t *testing.T) {
+	a := newTestAutocomplete()
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"n", "note"},
+		{"tag", "tags"},
+		{"note", "note"},
+		{"unknown", "unknown"},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := a.resolve(tt.input)
+			if got != tt.expected {
+				t.Errorf("resolve(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestResolvePath(t *testing.T) {
+	a := newTestAutocomplete()
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"n", "note"},
+		{"tag", "tags"},
+		{"n create", "note create"},
+		{"tag find", "tags find"},
+		{"note open", "note open"},
+		{"unknown", "unknown"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := a.resolvePath(tt.input)
+			if got != tt.expected {
+				t.Errorf("resolvePath(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetParamCompletions(t *testing.T) {
+	a := newTestAutocomplete()
+	tests := []struct {
+		cmd       string
+		wantLen   int
+		wantFirst string
+	}{
+		{"note", 2, "note name="},
+		{"n", 2, "note name="}, // alias resolves to note
+		{"tags", 1, "tags name="},
+		{"tag", 1, "tags name="}, // alias resolves to tags
+		{"daily", 2, "daily date="},
+		{"unknown", 0, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.cmd, func(t *testing.T) {
+			got := a.GetParamCompletions(tt.cmd)
+			if len(got) != tt.wantLen {
+				t.Errorf("GetParamCompletions(%q) len = %d, want %d (got %v)", tt.cmd, len(got), tt.wantLen, got)
+				return
+			}
+			if tt.wantLen > 0 && got[0] != tt.wantFirst {
+				t.Errorf("GetParamCompletions(%q)[0] = %q, want %q", tt.cmd, got[0], tt.wantFirst)
+			}
+		})
+	}
+}
+
+func TestGetParamsForCommand(t *testing.T) {
+	a := newTestAutocomplete()
+	tests := []struct {
+		cmd  string
+		want []string
+	}{
+		{"note", []string{"name=", "template="}},
+		{"n", []string{"name=", "template="}}, // alias
+		{"note create", []string{"path=", "file="}},
+		{"n create", []string{"path=", "file="}}, // alias path
+		{"tags", []string{"name="}},
+		{"tag", []string{"name="}}, // alias
+		{"unknown", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.cmd, func(t *testing.T) {
+			got := a.GetParamsForCommand(tt.cmd)
+			if len(got) != len(tt.want) {
+				t.Errorf("GetParamsForCommand(%q) = %v, want %v", tt.cmd, got, tt.want)
+				return
+			}
+			for i, v := range got {
+				if v != tt.want[i] {
+					t.Errorf("GetParamsForCommand(%q)[%d] = %q, want %q", tt.cmd, i, v, tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestGetPathCompletions(t *testing.T) {
+	a := newTestAutocomplete()
+
+	t.Run("nil config returns nil", func(t *testing.T) {
+		got := a.GetPathCompletions(nil, "")
+		if got != nil {
+			t.Errorf("expected nil for nil config, got %v", got)
+		}
+	})
+
+	// Set up a temporary directory tree:
+	// <base>/notes/work.md
+	// <base>/notes/personal.md
+	// <base>/diary/ (directory)
+	base := t.TempDir()
+	notesDir := filepath.Join(base, "notes")
+	if err := os.MkdirAll(notesDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(base, "diary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"notes/work.md", "notes/personal.md"} {
+		if err := os.WriteFile(filepath.Join(base, f), []byte(""), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cfg := &config.LoadedConfig{}
+	cfg.Paths.BaseDir = base
+
+	t.Run("top-level listing", func(t *testing.T) {
+		got := a.GetPathCompletions(cfg, "")
+		sort.Strings(got)
+		want := []string{"diary/", "notes/"}
+		if len(got) != len(want) {
+			t.Fatalf("GetPathCompletions top-level = %v, want %v", got, want)
+		}
+		for i, v := range got {
+			if v != want[i] {
+				t.Errorf("GetPathCompletions top-level[%d] = %q, want %q", i, v, want[i])
+			}
+		}
+	})
+
+	t.Run("subdir listing", func(t *testing.T) {
+		got := a.GetPathCompletions(cfg, "notes/")
+		sort.Strings(got)
+		want := []string{"notes/personal.md", "notes/work.md"}
+		if len(got) != len(want) {
+			t.Fatalf("GetPathCompletions notes/ = %v, want %v", got, want)
+		}
+		for i, v := range got {
+			if v != want[i] {
+				t.Errorf("GetPathCompletions notes/[%d] = %q, want %q", i, v, want[i])
+			}
+		}
+	})
+
+	t.Run("no matches returns empty or nil", func(t *testing.T) {
+		got := a.GetPathCompletions(cfg, "nonexistent/")
+		if len(got) != 0 {
+			t.Errorf("expected no completions for nonexistent path, got %v", got)
+		}
+	})
 }
