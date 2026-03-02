@@ -1,10 +1,14 @@
 package repl
 
 import (
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/AnishShah1803/jotr/internal/config"
 )
 
 type Autocomplete struct {
@@ -13,6 +17,7 @@ type Autocomplete struct {
 	aliases        map[string]string
 	subCommands    map[string][]string
 	actionCommands map[string][]string
+	paramCommands  map[string][]string
 }
 
 func NewAutocomplete(rootCmd *cobra.Command) *Autocomplete {
@@ -21,19 +26,27 @@ func NewAutocomplete(rootCmd *cobra.Command) *Autocomplete {
 		aliases:        make(map[string]string),
 		subCommands:    make(map[string][]string),
 		actionCommands: make(map[string][]string),
+		paramCommands:  make(map[string][]string),
 	}
 
-	// Commands that use args instead of sub-commands (action-style)
 	a.actionCommands["note"] = []string{"create", "open", "list"}
-	a.actionCommands["n"] = []string{"create", "open", "list"}
+
 	a.actionCommands["index"] = []string{"rebuild", "sync", "status"}
 	a.actionCommands["alias"] = []string{"add", "remove", "list", "resolve"}
 	a.actionCommands["schedule"] = []string{"add", "list", "delete"}
 	a.actionCommands["shortcut"] = []string{"add", "remove", "list"}
 	a.actionCommands["tags"] = []string{"list", "find", "stats"}
-	a.actionCommands["tag"] = []string{"list", "find", "stats"}
+
 	a.actionCommands["git"] = []string{"status", "commit", "history", "diff"}
 	a.actionCommands["bulk"] = []string{"rename", "tag"}
+
+	a.paramCommands["read"] = []string{"file=", "path=", "lines=", "format="}
+	a.paramCommands["daily"] = []string{"date=", "open="}
+	a.paramCommands["note"] = []string{"name=", "template="}
+	a.paramCommands["note create"] = []string{"path=", "file="}
+	a.paramCommands["search"] = []string{"query=", "path=", "limit="}
+	a.paramCommands["tags"] = []string{"name="}
+	a.paramCommands["capture"] = []string{"content="}
 
 	a.buildIndex(rootCmd, "")
 	sort.Strings(a.commandNames)
@@ -62,7 +75,6 @@ func (a *Autocomplete) buildIndex(cmd *cobra.Command, parentPath string) {
 		a.commands[name] = true
 		a.commandNames = append(a.commandNames, name)
 
-		// Use full parent path as key to support arbitrary depth without ambiguity
 		if parentPath != "" {
 			a.subCommands[parentPath] = append(a.subCommands[parentPath], name)
 		}
@@ -81,13 +93,30 @@ func (a *Autocomplete) buildIndex(cmd *cobra.Command, parentPath string) {
 	}
 }
 
+// resolve returns the canonical command name for a given alias, or the name itself
+// if it is not registered as an alias.
+func (a *Autocomplete) resolve(name string) string {
+	if canonical, ok := a.aliases[name]; ok {
+		return canonical
+	}
+	return name
+}
+
+// resolvePath resolves the first word of a (possibly multi-word) command path.
+// e.g. "n create" → "note create", "tags" → "tags".
+func (a *Autocomplete) resolvePath(path string) string {
+	if idx := strings.Index(path, " "); idx != -1 {
+		return a.resolve(path[:idx]) + path[idx:]
+	}
+	return a.resolve(path)
+}
+
 func (a *Autocomplete) GetAllCommands() []string {
 	c := make([]string, len(a.commandNames))
 	copy(c, a.commandNames)
 	return c
 }
 
-// IsCommand reports whether name is a registered command or alias.
 func (a *Autocomplete) IsCommand(name string) bool {
 	return a.commands[name]
 }
@@ -172,6 +201,7 @@ func (a *Autocomplete) GetCompletions(partial string) []string {
 }
 
 func (a *Autocomplete) GetSubCommands(parent string) []string {
+	parent = a.resolvePath(parent)
 	var subs []string
 
 	if subList, ok := a.subCommands[parent]; ok {
@@ -192,6 +222,7 @@ func (a *Autocomplete) GetSubCommands(parent string) []string {
 }
 
 func (a *Autocomplete) GetSubCommandCompletions(parent, partial string) []string {
+	parent = a.resolvePath(parent)
 	var subNames []string
 
 	if subList, ok := a.subCommands[parent]; ok {
@@ -200,15 +231,102 @@ func (a *Autocomplete) GetSubCommandCompletions(parent, partial string) []string
 		subNames = subList
 	}
 
-	if subNames == nil {
-		return nil
-	}
-
 	var matches []string
 	for _, sub := range subNames {
 		if strings.HasPrefix(sub, partial) {
 			matches = append(matches, parent+" "+sub)
 		}
 	}
+
+	if params, ok := a.paramCommands[parent]; ok {
+		for _, p := range params {
+			if strings.HasPrefix(p, partial) {
+				matches = append(matches, parent+" "+p)
+			}
+		}
+	}
+
+	if len(matches) == 0 {
+		return nil
+	}
 	return matches
+}
+
+func (a *Autocomplete) IsParamCommand(cmdName string) bool {
+	cmdName = a.resolve(cmdName)
+	_, ok := a.paramCommands[cmdName]
+	return ok
+}
+
+func (a *Autocomplete) GetParamCompletions(cmdName string) []string {
+	cmdName = a.resolve(cmdName)
+	if params, ok := a.paramCommands[cmdName]; ok {
+		var fullParams []string
+		for _, p := range params {
+			fullParams = append(fullParams, cmdName+" "+p)
+		}
+		return fullParams
+	}
+	return nil
+}
+
+// GetParamsForCommand returns the raw param tokens (e.g. ["path=", "file="]) for
+// a given command path, or nil if none are registered.
+func (a *Autocomplete) GetParamsForCommand(cmdName string) []string {
+	cmdName = a.resolvePath(cmdName)
+	if params, ok := a.paramCommands[cmdName]; ok {
+		return params
+	}
+	return nil
+}
+
+func (a *Autocomplete) GetParamValueCompletions(paramName string, partial string, cfg *config.LoadedConfig) []string {
+	if paramName == "path" || paramName == "file" {
+		return a.GetPathCompletions(cfg, partial)
+	}
+	if paramName == "format" {
+		options := []string{"pretty", "raw"}
+		var matches []string
+		for _, opt := range options {
+			if strings.HasPrefix(opt, partial) {
+				matches = append(matches, opt)
+			}
+		}
+		return matches
+	}
+	return nil
+}
+
+func (a *Autocomplete) GetPathCompletions(cfg *config.LoadedConfig, partial string) []string {
+	if cfg == nil {
+		return nil
+	}
+
+	basePath := cfg.Paths.BaseDir
+	searchPath := partial
+
+	if idx := strings.LastIndex(partial, "/"); idx != -1 {
+		searchPath = partial[:idx]
+	}
+
+	fullPath := filepath.Join(basePath, searchPath)
+	entries, err := filepath.Glob(fullPath + "/*")
+	if err != nil {
+		return nil
+	}
+
+	var completions []string
+	for _, entry := range entries {
+		relPath, err := filepath.Rel(basePath, entry)
+		if err != nil {
+			continue
+		}
+		if info, err := os.Stat(entry); err == nil && info.IsDir() {
+			completions = append(completions, relPath+"/")
+		} else {
+			completions = append(completions, relPath)
+		}
+	}
+
+	return completions
 }

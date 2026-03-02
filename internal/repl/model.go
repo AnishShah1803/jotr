@@ -30,18 +30,18 @@ type Model struct {
 }
 
 const replAsciiArt = `      ░░
-     ░░▒░
-     ░░░▒░
-    ░░░░▒▒
-   ░░░░░░▒█░
-   ░░░░░░▒██░
-  ░░░░░░▒▒██▒
-  ░ ░░░░▒░████
-  ░░ ░░▒▒▒████
-   ░  ▒▒░▒███▒
-   ░░ ░░▒████▌
-    ▒░░▒███▛
-      ▀▀▀▀    `
+      ░░▒░
+      ░░░▒░
+     ░░░░▒▒
+    ░░░░░░▒█░
+    ░░░░░░▒██░
+   ░░░░░░▒▒██▒
+   ░ ░░░░▒░████
+   ░░ ░░▒▒▒████
+    ░  ▒▒░▒███▒
+    ░░ ░░▒████▌
+     ▒░░▒███▛
+       ▀▀▀▀    `
 
 const replAsciiArtHeight = 13
 
@@ -258,12 +258,26 @@ func (m *Model) updateCompletions() {
 	}
 
 	if len(fields) == 1 {
-		hasTrailingSpace := strings.HasSuffix(value, " ")
-		if !hasTrailingSpace || !m.autocomplete.IsCommand(fields[0]) {
-			m.completions = m.autocomplete.GetCompletions(fields[0])
-			m.selectedIdx = 0
-			return
+		cmdName := fields[0]
+
+		if m.autocomplete.IsCommand(cmdName) {
+			subCommands := m.autocomplete.GetSubCommands(cmdName)
+			if subCommands != nil && len(subCommands) > 0 {
+				m.completions = subCommands
+				m.selectedIdx = 0
+				return
+			}
+
+			if m.autocomplete.IsParamCommand(cmdName) {
+				m.completions = m.autocomplete.GetParamCompletions(cmdName)
+				m.selectedIdx = 0
+				return
+			}
 		}
+
+		m.completions = m.autocomplete.GetCompletions(cmdName)
+		m.selectedIdx = 0
+		return
 	}
 
 	m.completions = m.getCompletionsForInput(fields, strings.HasSuffix(value, " "))
@@ -275,24 +289,103 @@ func (m *Model) getCompletionsForInput(fields []string, hasTrailingSpace bool) [
 		return []string{}
 	}
 
-	if hasTrailingSpace {
-		parentPath := strings.Join(fields, " ")
-		subCommands := m.autocomplete.GetSubCommands(parentPath)
-		if subCommands != nil {
-			return subCommands
+	// Split fields into the command prefix (no `=`) and already-used param tokens.
+	cmdFields := []string{}
+	usedParams := map[string]bool{}
+	for _, f := range fields {
+		if strings.Contains(f, "=") {
+			key := strings.SplitN(f, "=", 2)[0]
+			usedParams[key+"="] = true
+		} else {
+			cmdFields = append(cmdFields, f)
 		}
+	}
 
+	// If the last field is a partial param token, treat it as the partial being typed.
+	var partial string
+	var partialIsParam bool
+	if !hasTrailingSpace && len(fields) > 0 {
+		last := fields[len(fields)-1]
+		if strings.Contains(last, "=") {
+			// e.g. "note create path=" — user is typing the param key up to/including =
+			partialIsParam = true
+			key := strings.SplitN(last, "=", 2)[0]
+			// Remove it from usedParams so it's still offered as a completion.
+			usedParams[key+"="] = false
+			partial = key + "="
+		} else {
+			// Last field has no `=`: it's either a partial subcommand name or partial param key.
+			if len(cmdFields) > 0 {
+				partial = cmdFields[len(cmdFields)-1]
+				cmdFields = cmdFields[:len(cmdFields)-1]
+			}
+		}
+	}
+
+	cmdPath := strings.Join(cmdFields, " ")
+
+	// No params typed yet — delegate to subcommand completion.
+	if !partialIsParam && len(usedParams) == 0 {
+		if hasTrailingSpace {
+			subs := m.autocomplete.GetSubCommands(cmdPath)
+			if subs != nil {
+				return subs
+			}
+		} else {
+			subs := m.autocomplete.GetSubCommandCompletions(cmdPath, partial)
+			if subs != nil {
+				return subs
+			}
+		}
+	}
+
+	// Resolve the param set for the deepest matching command path.
+	params := m.autocomplete.GetParamsForCommand(cmdPath)
+	if params == nil {
+		for i := len(cmdFields); i > 0; i-- {
+			p := strings.Join(cmdFields[:i], " ")
+			if pp := m.autocomplete.GetParamsForCommand(p); pp != nil {
+				params = pp
+				break
+			}
+		}
+	}
+	if params == nil {
 		return []string{}
 	}
 
-	parentPath := strings.Join(fields[:len(fields)-1], " ")
-	partial := fields[len(fields)-1]
-	subs := m.autocomplete.GetSubCommandCompletions(parentPath, partial)
-	if subs != nil {
-		return subs
+	// Build the already-committed portion of the input for prefixing suggestions.
+	var committedPrefix string
+	if hasTrailingSpace {
+		committedPrefix = strings.Join(fields, " ")
+	} else {
+		committedPrefix = strings.Join(fields[:len(fields)-1], " ")
 	}
 
-	return []string{}
+	// Remove already-used params from the available set.
+	var remaining []string
+	for _, p := range params {
+		if !usedParams[p] {
+			remaining = append(remaining, p)
+		}
+	}
+
+	if hasTrailingSpace {
+		var result []string
+		for _, p := range remaining {
+			result = append(result, committedPrefix+" "+p)
+		}
+		return result
+	}
+
+	// Filter remaining by prefix match on the partial token.
+	var result []string
+	for _, p := range remaining {
+		if strings.HasPrefix(p, partial) {
+			result = append(result, committedPrefix+" "+p)
+		}
+	}
+	return result
 }
 
 func (m Model) View() string {
