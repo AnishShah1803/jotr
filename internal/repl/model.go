@@ -242,14 +242,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.textInput.CursorEnd()
 					m.updateCompletions()
 				} else {
-					// Reached blank state — exit history nav, transition to completion browsing.
+					// Reached blank state — exit history nav, restore empty input.
+					// The next ↓ press will enter completion browsing.
 					m.inHistoryNav = false
 					m.textInput.SetValue("")
 					m.updateCompletions()
-					if len(m.completions) > 0 {
-						m.browsingCompletions = true
-						m.selectedIdx = 0
-					}
 				}
 			} else if len(m.completions) > 0 {
 				// Not in history nav — enter completion browsing directly.
@@ -503,7 +500,9 @@ func (m Model) renderCompletions(inset int) string {
 		ci := m.completionsOffset + i
 		if ci < len(m.completions) {
 			completion := m.completions[ci]
-			if ci == m.selectedIdx {
+			if ci == m.selectedIdx && m.browsingCompletions {
+				lines[i] = insetStr + selectedCompletionStyle.Render("> "+completion)
+			} else if ci == m.selectedIdx {
 				lines[i] = insetStr + selectedCompletionStyle.Render("  "+completion)
 			} else {
 				lines[i] = insetStr + completionStyle.Render("  "+completion)
