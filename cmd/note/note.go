@@ -44,16 +44,22 @@ Actions:
   create [type]     Create a new note
   open [query]      Open an existing note
   list              List all notes
+  rename [query]    Rename an existing note
+  delete [query]    Delete a note
+  move [query]      Move a note to a subfolder
   
 Examples:
   jotr note create           # Create new note
   jotr note create work      # Create note in work folder
   jotr note open MyNote      # Open note by name
-  jotr note list             # List all notes`,
+  jotr note list             # List all notes
+  jotr note rename MyNote    # Rename a note
+  jotr note delete MyNote    # Delete a note
+  jotr note move MyNote      # Move a note`,
 	Aliases: []string{"n"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			return fmt.Errorf("action required: create, open, or list")
+			return fmt.Errorf("action required: create, open, list, rename, delete, or move")
 		}
 
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
@@ -78,6 +84,12 @@ Examples:
 			return openNote(cmd.Context(), cfg, query)
 		case "list":
 			return listNotes(cmd.Context(), cfg)
+		case "rename":
+			return renameNote(cmd.Context(), cfg, args[1:])
+		case "delete":
+			return deleteNote(cmd.Context(), cfg, args[1:])
+		case "move":
+			return moveNote(cmd.Context(), cfg, args[1:])
 		default:
 			return fmt.Errorf("unknown action: %s", action)
 		}

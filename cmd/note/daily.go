@@ -34,6 +34,21 @@ var DailyCmd = &cobra.Command{
 		}
 
 		dateOption.SetTargetDate()
+		opt := ensureDailyContentDate(&dateOption)
+
+		if len(args) > 0 {
+			switch args[0] {
+			case "append":
+				return appendDailyNote(cmd.Context(), cfg, args[1:], opt)
+			case "prepend":
+				return prependDailyNote(cmd.Context(), cfg, args[1:], opt)
+			case "read":
+				return readDailyNote(cmd.Context(), cfg, opt)
+			default:
+				return fmt.Errorf("unknown daily action: %s (use append, prepend, or read)", args[0])
+			}
+		}
+
 		notePath := notes.BuildDailyNotePath(cfg.DiaryPath, dateOption.Date)
 
 		if outputOption.PathOnly {

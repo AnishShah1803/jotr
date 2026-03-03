@@ -102,6 +102,7 @@ func init() {
 	rootCmd.AddCommand(notecmd.DailyCmd)
 	rootCmd.AddCommand(notecmd.NoteCmd)
 	rootCmd.AddCommand(notecmd.CaptureCmd)
+	rootCmd.AddCommand(notecmd.ReadCmd)
 
 	// Task Management
 	rootCmd.AddCommand(taskcmd.SyncCmd)
@@ -114,6 +115,9 @@ func init() {
 	rootCmd.AddCommand(searchcmd.TagsCmd)
 	rootCmd.AddCommand(searchcmd.LinksCmd)
 	rootCmd.AddCommand(searchcmd.ListCmd)
+	rootCmd.AddCommand(searchcmd.FilesCmd)
+	rootCmd.AddCommand(searchcmd.WordcountCmd)
+	rootCmd.AddCommand(searchcmd.OutlineCmd)
 
 	// Visualization
 	rootCmd.AddCommand(visualcmd.CalendarCmd)
