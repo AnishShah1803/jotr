@@ -68,38 +68,9 @@ func init() {
 }
 
 func showLinks(ctx context.Context, cfg *config.LoadedConfig, noteName string) error {
-	var allNotes []string
-	indexPath := search.GetIndexPath(cfg.Paths.BaseDir)
-	if _, err := os.Stat(indexPath); err == nil {
-		if idx, err := search.Open(indexPath); err == nil {
-			defer idx.Close()
-			if paths, err := idx.GetIndexedPaths(ctx); err == nil {
-				for p := range paths {
-					allNotes = append(allNotes, p)
-				}
-			}
-		}
-	}
-
-	if len(allNotes) == 0 {
-		var err error
-		allNotes, err = notes.FindNotes(ctx, cfg.Paths.BaseDir)
-		if err != nil {
-			return err
-		}
-	}
-
-	var targetNote string
-
-	for _, note := range allNotes {
-		if strings.Contains(strings.ToLower(filepath.Base(note)), strings.ToLower(noteName)) {
-			targetNote = note
-			break
-		}
-	}
-
-	if targetNote == "" {
-		return fmt.Errorf("note not found: %s", noteName)
+	targetNote, err := pickNoteByName(ctx, cfg, noteName)
+	if err != nil {
+		return err
 	}
 
 	content, err := os.ReadFile(targetNote)

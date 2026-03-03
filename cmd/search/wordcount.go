@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -56,16 +55,11 @@ Examples:
 		}
 
 		if noteName != "" {
-			allNotes, err := notes.FindNotes(cmd.Context(), cfg.Paths.BaseDir)
+			notePath, err := pickNoteByName(cmd.Context(), cfg, noteName)
 			if err != nil {
 				return err
 			}
-			for _, np := range allNotes {
-				if strings.Contains(strings.ToLower(filepath.Base(np)), strings.ToLower(noteName)) {
-					return countFile(np, wordcountCmdFlags.wordsOnly, wordcountCmdFlags.charsOnly)
-				}
-			}
-			return fmt.Errorf("note not found: %s", noteName)
+			return countFile(notePath, wordcountCmdFlags.wordsOnly, wordcountCmdFlags.charsOnly)
 		}
 
 		allNotes, err := notes.FindNotes(cmd.Context(), cfg.Paths.BaseDir)
@@ -77,10 +71,11 @@ Examples:
 		for _, np := range allNotes {
 			content, err := os.ReadFile(np)
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "warning: skipping %s: %v\n", np, err)
 				continue
 			}
 			words := countWords(string(content))
-			chars := utf8.RuneCountInString(string(content))
+			chars := utf8.RuneCount(content)
 			totalWords += words
 			totalChars += chars
 
@@ -114,7 +109,7 @@ func countFile(path string, wordsOnly, charsOnly bool) error {
 	}
 
 	words := countWords(string(content))
-	chars := utf8.RuneCountInString(string(content))
+	chars := utf8.RuneCount(content)
 
 	name := filepath.Base(path)
 	if wordsOnly {

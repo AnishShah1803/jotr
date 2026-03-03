@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
-	"github.com/AnishShah1803/jotr/internal/notes"
 )
 
 var outlineCmdFlags = struct {
@@ -55,18 +54,11 @@ Examples:
 			return fmt.Errorf("note name required")
 		}
 
-		allNotes, err := notes.FindNotes(cmd.Context(), cfg.Paths.BaseDir)
+		notePath, err := pickNoteByName(cmd.Context(), cfg, noteName)
 		if err != nil {
 			return err
 		}
-
-		for _, np := range allNotes {
-			if strings.Contains(strings.ToLower(filepath.Base(np)), strings.ToLower(noteName)) {
-				return outlineFile(np, outlineCmdFlags.format, outlineCmdFlags.total)
-			}
-		}
-
-		return fmt.Errorf("note not found: %s", noteName)
+		return outlineFile(notePath, outlineCmdFlags.format, outlineCmdFlags.total)
 	},
 }
 

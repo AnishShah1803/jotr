@@ -14,6 +14,16 @@ import (
 	"github.com/AnishShah1803/jotr/internal/notes"
 )
 
+func quoteFrontmatterValue(v string) string {
+	needsQuoting := strings.ContainsAny(v, ":\n#") ||
+		strings.HasPrefix(v, " ") || strings.HasSuffix(v, " ") ||
+		len(v) > 0 && strings.ContainsAny(string(v[0]), "[]{},|>&*!?@`'\"")
+	if !needsQuoting {
+		return v
+	}
+	return `"` + strings.ReplaceAll(v, `"`, `\"`) + `"`
+}
+
 var FrontmatterCmd = &cobra.Command{
 	Use:   "frontmatter [action] [note-name]",
 	Short: "Manage note frontmatter",
@@ -175,7 +185,7 @@ func setFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName stri
 		for i := 1; i < len(lines); i++ {
 			if lines[i] == "---" {
 				if !updated {
-					newLines = append(newLines, fmt.Sprintf("%s: %s", key, value))
+					newLines = append(newLines, fmt.Sprintf("%s: %s", key, quoteFrontmatterValue(value)))
 				}
 
 				newLines = append(newLines, lines[i:]...)
@@ -184,7 +194,7 @@ func setFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName stri
 			}
 
 			if strings.HasPrefix(lines[i], key+":") {
-				newLines = append(newLines, fmt.Sprintf("%s: %s", key, value))
+				newLines = append(newLines, fmt.Sprintf("%s: %s", key, quoteFrontmatterValue(value)))
 				updated = true
 			} else {
 				newLines = append(newLines, lines[i])
@@ -192,7 +202,7 @@ func setFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName stri
 		}
 	} else {
 		newLines = append(newLines, "---")
-		newLines = append(newLines, fmt.Sprintf("%s: %s", key, value))
+		newLines = append(newLines, fmt.Sprintf("%s: %s", key, quoteFrontmatterValue(value)))
 		newLines = append(newLines, "---")
 		newLines = append(newLines, "")
 		newLines = append(newLines, lines...)
