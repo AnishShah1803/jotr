@@ -148,11 +148,47 @@ jotr archive                  # Archive completed tasks
 # Create and organize notes
 jotr note create "Project Architecture"
 jotr note open               # Fuzzy search and open any note
-jotr search "authentication" # Find notes mentioning auth
+jotr note rename "old name" "new name"  # Rename a note
+jotr note move "my note" work           # Move note to a subfolder
+jotr note delete "old note"             # Delete a note
+jotr search "authentication"            # Find notes mentioning auth
 
 # Work with tags and links
 jotr tags find work          # Find all work-related notes
+jotr links outgoing MyNote   # Show outgoing wiki-links in a note
+jotr links backlinks MyNote  # Show all notes that link to MyNote
 jotr graph                   # Visualize note relationships
+```
+
+### Daily Notes
+
+```bash
+jotr daily                              # Open today's daily note
+jotr daily append "Standup notes here"  # Append text without opening editor
+jotr daily prepend "Top of mind: ..."   # Prepend to today's note
+jotr daily read                         # Print today's note to stdout
+jotr daily --date 2024-01-15            # Work with a specific date
+```
+
+### Frontmatter
+
+```bash
+jotr frontmatter MyNote                   # Show all frontmatter fields
+jotr frontmatter get MyNote status        # Get a specific field
+jotr frontmatter set MyNote status=done   # Set a field
+jotr frontmatter remove MyNote status     # Remove a field
+```
+
+### Stats and Structure
+
+```bash
+jotr files                        # List all notes
+jotr files --folder work          # List notes in a subfolder
+jotr files --ext md --total       # Count notes by extension
+jotr wordcount --path work        # Word count across a folder
+jotr wordcount --file MyNote      # Word and character count for one note
+jotr outline --file MyNote        # Show heading structure of a note
+jotr outline --path work --total  # Summarise headings across a folder
 ```
 
 ### Task Tracking
@@ -243,12 +279,17 @@ Example configuration:
 | Command | Description | Aliases |
 | ------- | ----------- | ------- |
 | `daily` | Create/open daily note | `d` |
-| `note` | Create, open, list notes | `n` |  
+| `note` | Create, open, list, rename, move, delete notes | `n` |
 | `search` | Search across all notes | `find`, `grep` |
 | `capture` | Quick capture to daily note | `cap` |
 | `tags` | Manage tags | `tag` |
+| `links` | Show outgoing links or backlinks | |
+| `frontmatter` | View and edit note frontmatter | `fm` |
+| `files` | List notes with optional filters | |
+| `wordcount` | Word and character counts | `wc` |
+| `outline` | Show heading structure of notes | |
 | `summary` | Show task summary | `sum` |
-| `stats` | Show task statistics | `st` |  
+| `stats` | Show task statistics | `st` |
 | `sync` | Sync tasks to todo list | `s` |
 | `archive` | Archive completed tasks | `arc` |
 | `streak` | Show daily note streak | |
@@ -259,6 +300,70 @@ Example configuration:
 | `configure` | Configuration wizard | `config`, `cfg` |
 | `graph` | Generate graph visualization | |
 | `version` | Show version | |
+
+### Sub-commands
+
+**`note`**
+
+| Sub-command | Description |
+| ----------- | ----------- |
+| `note create [name]` | Create a new note |
+| `note open [query]` | Fuzzy-find and open a note |
+| `note list` | List all notes |
+| `note rename [query] [new-name]` | Rename a note (interactive if args omitted) |
+| `note move [query] [folder]` | Move a note to a folder (interactive if args omitted) |
+| `note delete [query]` | Delete a note with confirmation prompt |
+
+**`daily`**
+
+| Sub-command | Description |
+| ----------- | ----------- |
+| `daily` | Open today's daily note in editor |
+| `daily append [text]` | Append text to today's note |
+| `daily prepend [text]` | Prepend text to today's note |
+| `daily read` | Print today's note to stdout |
+
+**`links`**
+
+| Sub-command | Description |
+| ----------- | ----------- |
+| `links outgoing [note]` | Show wiki-links contained in a note |
+| `links backlinks [note]` | Show all notes that link to a note |
+
+**`frontmatter`** (alias: `fm`)
+
+| Sub-command | Description |
+| ----------- | ----------- |
+| `frontmatter list [note]` | Show all frontmatter fields |
+| `frontmatter get [note] [key]` | Get the value of a specific field |
+| `frontmatter set [note] key=value` | Set or update a field |
+| `frontmatter remove [note] [key]` | Remove a field |
+
+**`files`**
+
+| Flag | Description |
+| ---- | ----------- |
+| `--folder` | Filter by subfolder |
+| `--ext` | Filter by file extension |
+| `--total` | Print a total count instead of listing |
+
+**`wordcount`** (alias: `wc`)
+
+| Flag | Description |
+| ---- | ----------- |
+| `--file` | Target a single note by name |
+| `--path` | Target all notes under a folder |
+| `--words` | Show word count only |
+| `--characters` | Show character count only |
+
+**`outline`**
+
+| Flag | Description |
+| ---- | ----------- |
+| `--file` | Target a single note by name |
+| `--path` | Target all notes under a folder |
+| `--format` | Output format (`pretty` or `raw`) |
+| `--total` | Print heading counts instead of full outline |
 
 ## Contributing
 
