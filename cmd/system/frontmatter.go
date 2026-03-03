@@ -276,10 +276,23 @@ func removeFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName s
 
 	lines := strings.Split(string(content), "\n")
 	var newLines []string
-	for _, line := range lines {
-		if !strings.HasPrefix(line, key+":") {
-			newLines = append(newLines, line)
+
+	// Only strip the key within the frontmatter block.
+	if len(lines) > 0 && lines[0] == "---" {
+		newLines = append(newLines, lines[0])
+		inFrontmatter := true
+		for _, line := range lines[1:] {
+			if inFrontmatter && line == "---" {
+				inFrontmatter = false
+				newLines = append(newLines, line)
+			} else if inFrontmatter && strings.HasPrefix(line, key+":") {
+				// drop this line
+			} else {
+				newLines = append(newLines, line)
+			}
 		}
+	} else {
+		newLines = lines
 	}
 
 	newContent := strings.Join(newLines, "\n")

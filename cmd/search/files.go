@@ -52,8 +52,7 @@ Examples:
 			}
 
 			if filesCmdFlags.folder != "" {
-				if !strings.HasPrefix(relPath, filesCmdFlags.folder+"/") &&
-					!strings.HasPrefix(relPath, filesCmdFlags.folder+string(filepath.Separator)) {
+				if !strings.HasPrefix(relPath, filesCmdFlags.folder+string(filepath.Separator)) {
 					continue
 				}
 			}

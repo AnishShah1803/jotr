@@ -85,6 +85,8 @@ var (
 				Bold(true)
 )
 
+const completionsMaxLines = 10
+
 func NewModel(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Command) Model {
 	ti := textinput.New()
 	ti.Placeholder = "type a command..."
@@ -226,8 +228,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.browsingCompletions {
 				if m.selectedIdx < len(m.completions)-1 {
 					m.selectedIdx++
-					const maxLines = 10
-					if m.selectedIdx >= m.completionsOffset+maxLines {
+					if m.selectedIdx >= m.completionsOffset+completionsMaxLines {
 						m.completionsOffset++
 					}
 				}
@@ -348,7 +349,6 @@ func (m *Model) updateCompletions() {
 			m.selectedIdx = 0
 		}
 		// Clamp offset so the selected item is always visible.
-		const maxLines = 10
 		if m.completionsOffset > m.selectedIdx {
 			m.completionsOffset = m.selectedIdx
 		}
@@ -492,11 +492,10 @@ func (m Model) View() string {
 }
 
 func (m Model) renderCompletions(inset int) string {
-	const maxLines = 10
 	insetStr := strings.Repeat(" ", inset)
-	lines := make([]string, maxLines)
+	lines := make([]string, completionsMaxLines)
 
-	for i := 0; i < maxLines; i++ {
+	for i := 0; i < completionsMaxLines; i++ {
 		ci := m.completionsOffset + i
 		if ci < len(m.completions) {
 			completion := m.completions[ci]

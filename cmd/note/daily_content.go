@@ -13,7 +13,7 @@ import (
 	"github.com/AnishShah1803/jotr/internal/options"
 )
 
-func appendDailyNote(ctx context.Context, cfg *config.LoadedConfig, args []string, dateOpt *options.DateOption) error {
+func appendDailyNote(_ context.Context, cfg *config.LoadedConfig, args []string, dateOpt *options.DateOption) error {
 	notePath := notes.BuildDailyNotePath(cfg.DiaryPath, dateOpt.Date)
 
 	content := ""
@@ -46,7 +46,7 @@ func appendDailyNote(ctx context.Context, cfg *config.LoadedConfig, args []strin
 	return nil
 }
 
-func prependDailyNote(ctx context.Context, cfg *config.LoadedConfig, args []string, dateOpt *options.DateOption) error {
+func prependDailyNote(_ context.Context, cfg *config.LoadedConfig, args []string, dateOpt *options.DateOption) error {
 	notePath := notes.BuildDailyNotePath(cfg.DiaryPath, dateOpt.Date)
 
 	content := ""
@@ -96,7 +96,7 @@ func prependDailyNote(ctx context.Context, cfg *config.LoadedConfig, args []stri
 	return nil
 }
 
-func readDailyNote(ctx context.Context, cfg *config.LoadedConfig, dateOpt *options.DateOption) error {
+func readDailyNote(_ context.Context, cfg *config.LoadedConfig, dateOpt *options.DateOption) error {
 	notePath := notes.BuildDailyNotePath(cfg.DiaryPath, dateOpt.Date)
 
 	content, err := os.ReadFile(notePath)

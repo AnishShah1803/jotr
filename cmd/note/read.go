@@ -66,9 +66,10 @@ Examples:
 		if linesFlag > 0 {
 			lines := strings.Split(contentStr, "\n")
 			if len(lines) > linesFlag {
+				totalLines := len(lines)
 				lines = lines[:linesFlag]
 				contentStr = strings.Join(lines, "\n")
-				contentStr += fmt.Sprintf("\n\n%s (%d more lines)", lipgloss.NewStyle().Foreground(output.SecondaryColor).Render("..."), len(strings.Split(string(content), "\n"))-linesFlag)
+				contentStr += fmt.Sprintf("\n\n%s (%d more lines)", lipgloss.NewStyle().Foreground(output.SecondaryColor).Render("..."), totalLines-linesFlag)
 			}
 		}
 

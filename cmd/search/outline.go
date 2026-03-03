@@ -80,7 +80,7 @@ func outlineFile(path, format string, totalOnly bool) error {
 	var headings []string
 
 	for _, line := range lines {
-		if strings.HasPrefix(line, "#") {
+		if trimmed := strings.TrimLeft(line, "#"); strings.HasPrefix(line, "#") && len(trimmed) > 0 && trimmed[0] == ' ' {
 			headings = append(headings, line)
 		}
 	}
