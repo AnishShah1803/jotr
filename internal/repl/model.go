@@ -21,13 +21,15 @@ type Model struct {
 	textInput           textinput.Model
 	history             *History
 	autocomplete        *Autocomplete
-	width                int
-	height               int
+	width               int
+	height              int
 	ready               bool
 	quitting            bool
 	completions         []string
 	selectedIdx         int
+	completionsOffset   int
 	browsingCompletions bool
+	inHistoryNav        bool
 }
 
 const replAsciiArt = `      ░░
@@ -146,6 +148,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.completions = []string{}
 			m.selectedIdx = 0
 			m.browsingCompletions = false
+			m.inHistoryNav = false
+			m.history.Reset()
 			return m, nil
 
 		case tea.KeyEnter:
@@ -156,6 +160,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textInput.CursorEnd()
 				m.browsingCompletions = false
 				m.selectedIdx = 0
+				m.completionsOffset = 0
 				m.updateCompletions()
 				return m, nil
 			}
@@ -170,6 +175,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.completions = []string{}
 			m.selectedIdx = 0
 			m.browsingCompletions = false
+			m.inHistoryNav = false
 
 			inset := 2
 			insetStr := strings.Repeat(" ", inset)
@@ -196,6 +202,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.selectedIdx < 0 {
 					m.browsingCompletions = false
 					m.selectedIdx = 0
+					m.completionsOffset = 0
+				} else {
+					if m.selectedIdx < m.completionsOffset {
+						m.completionsOffset = m.selectedIdx
+					}
 				}
 				return m, nil
 			}
@@ -203,6 +214,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.textInput.Value() == "" {
 				prev := m.history.Previous()
 				if prev != "" {
+					m.inHistoryNav = true
 					m.textInput.SetValue(prev)
 					m.textInput.CursorEnd()
 				}
@@ -212,31 +224,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.KeyDown:
 			if m.browsingCompletions {
-				const maxLines = 10
-				maxIdx := len(m.completions) - 1
-				if maxIdx >= maxLines {
-					maxIdx = maxLines - 1
-				}
-				if m.selectedIdx < maxIdx {
+				if m.selectedIdx < len(m.completions)-1 {
 					m.selectedIdx++
+					const maxLines = 10
+					if m.selectedIdx >= m.completionsOffset+maxLines {
+						m.completionsOffset++
+					}
 				}
 				return m, nil
 			}
-			// Still in (or entering from) history navigation.
-			next := m.history.Next()
-			if next != "" {
-				m.textInput.SetValue(next)
-				m.textInput.CursorEnd()
-				m.updateCompletions()
-			} else {
-				// Reached blank state — transition into completion browsing.
-				m.textInput.SetValue("")
-				m.updateCompletions()
-				if len(m.completions) > 0 {
-					m.browsingCompletions = true
-					m.selectedIdx = 0
+
+			if m.inHistoryNav {
+				// Navigate forward through history.
+				next := m.history.Next()
+				if next != "" {
+					m.textInput.SetValue(next)
+					m.textInput.CursorEnd()
+					m.updateCompletions()
+				} else {
+					// Reached blank state — exit history nav, transition to completion browsing.
+					m.inHistoryNav = false
+					m.textInput.SetValue("")
+					m.updateCompletions()
+					if len(m.completions) > 0 {
+						m.browsingCompletions = true
+						m.selectedIdx = 0
+					}
 				}
 			}
+			// If not in history nav, ↓ does nothing.
 			return m, nil
 
 		case tea.KeyTab:
@@ -329,6 +345,14 @@ func (m *Model) updateCompletions() {
 		}
 		if m.selectedIdx < 0 {
 			m.selectedIdx = 0
+		}
+		// Clamp offset so the selected item is always visible.
+		const maxLines = 10
+		if m.completionsOffset > m.selectedIdx {
+			m.completionsOffset = m.selectedIdx
+		}
+		if m.completionsOffset < 0 {
+			m.completionsOffset = 0
 		}
 	}
 }
@@ -472,9 +496,10 @@ func (m Model) renderCompletions(inset int) string {
 	lines := make([]string, maxLines)
 
 	for i := 0; i < maxLines; i++ {
-		if i < len(m.completions) {
-			completion := m.completions[i]
-			if i == m.selectedIdx {
+		ci := m.completionsOffset + i
+		if ci < len(m.completions) {
+			completion := m.completions[ci]
+			if ci == m.selectedIdx {
 				lines[i] = insetStr + selectedCompletionStyle.Render("  "+completion)
 			} else {
 				lines[i] = insetStr + completionStyle.Render("  "+completion)
