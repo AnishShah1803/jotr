@@ -133,7 +133,7 @@ func (h *History) Next() string {
 		return ""
 	}
 
-	if h.position < len(h.entries)-1 {
+	if h.position < len(h.entries) {
 		h.position++
 	}
 

@@ -29,7 +29,7 @@ func NewAutocomplete(rootCmd *cobra.Command) *Autocomplete {
 		paramCommands:  make(map[string][]string),
 	}
 
-	a.actionCommands["note"] = []string{"create", "open", "list"}
+	a.actionCommands["note"] = []string{"create", "open", "list", "rename", "delete", "move"}
 
 	a.actionCommands["index"] = []string{"rebuild", "sync", "status"}
 	a.actionCommands["alias"] = []string{"add", "remove", "list", "resolve"}
@@ -40,13 +40,31 @@ func NewAutocomplete(rootCmd *cobra.Command) *Autocomplete {
 	a.actionCommands["git"] = []string{"status", "commit", "history", "diff"}
 	a.actionCommands["bulk"] = []string{"rename", "tag"}
 
+	a.actionCommands["links"] = []string{"outgoing", "backlinks"}
+	a.actionCommands["frontmatter"] = []string{"get", "set", "remove", "list"}
+	a.actionCommands["daily"] = []string{"append", "prepend", "read"}
+	a.actionCommands["files"] = []string{}
+	a.actionCommands["wordcount"] = []string{}
+	a.actionCommands["outline"] = []string{}
+
 	a.paramCommands["read"] = []string{"file=", "path=", "lines=", "format="}
 	a.paramCommands["daily"] = []string{"date=", "open="}
 	a.paramCommands["note"] = []string{"name=", "template="}
 	a.paramCommands["note create"] = []string{"path=", "file="}
-	a.paramCommands["search"] = []string{"query=", "path=", "limit="}
+	a.paramCommands["note rename"] = []string{"file=", "name="}
+	a.paramCommands["note delete"] = []string{"file="}
+	a.paramCommands["note move"] = []string{"file=", "to="}
+	a.paramCommands["search"] = []string{"query=", "path=", "limit=", "case", "format="}
+	a.paramCommands["search context"] = []string{"query=", "path=", "limit="}
 	a.paramCommands["tags"] = []string{"name="}
 	a.paramCommands["capture"] = []string{"content="}
+	a.paramCommands["links"] = []string{}
+	a.paramCommands["frontmatter"] = []string{}
+	a.paramCommands["daily append"] = []string{"content="}
+	a.paramCommands["daily prepend"] = []string{"content="}
+	a.paramCommands["files"] = []string{"folder=", "ext=", "total"}
+	a.paramCommands["wordcount"] = []string{"file=", "path=", "words", "characters"}
+	a.paramCommands["outline"] = []string{"file=", "path=", "format=", "total"}
 
 	a.buildIndex(rootCmd, "")
 	sort.Strings(a.commandNames)

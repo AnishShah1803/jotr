@@ -14,14 +14,34 @@ import (
 	"github.com/AnishShah1803/jotr/internal/notes"
 )
 
+func quoteFrontmatterValue(v string) string {
+	needsQuoting := strings.ContainsAny(v, ":\n#") ||
+		strings.HasPrefix(v, " ") || strings.HasSuffix(v, " ") ||
+		len(v) > 0 && strings.ContainsAny(string(v[0]), "[]{},|>&*!?@`'\"")
+	if !needsQuoting {
+		return v
+	}
+	return `"` + strings.ReplaceAll(v, `"`, `\"`) + `"`
+}
+
 var FrontmatterCmd = &cobra.Command{
-	Use:   "frontmatter [note-name]",
+	Use:   "frontmatter [action] [note-name]",
 	Short: "Manage note frontmatter",
 	Long: `View or edit frontmatter in notes.
 	
+Actions:
+  list [note]         Show all frontmatter fields (default)
+  get [note] [key]    Get a specific frontmatter value
+  set [note] key=val  Set a frontmatter key to a value
+  remove [note] [key] Remove a frontmatter key
+
 Examples:
-  jotr frontmatter MyNote        # Show frontmatter
-  jotr frontmatter MyNote --set status=done`,
+  jotr frontmatter MyNote              # Show frontmatter
+  jotr frontmatter list MyNote         # Same as above
+  jotr frontmatter get MyNote status   # Get 'status' field
+  jotr frontmatter set MyNote status=done
+  jotr frontmatter remove MyNote status
+  jotr frontmatter MyNote --set status=done  # Legacy flag syntax`,
 	Aliases: []string{"fm"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
@@ -33,14 +53,40 @@ Examples:
 			return err
 		}
 
-		noteName := args[0]
-		setValue, _ := cmd.Flags().GetString("set")
-
-		if setValue != "" {
-			return setFrontmatter(cmd.Context(), cfg, noteName, setValue)
+		action := args[0]
+		switch action {
+		case "list":
+			if len(args) < 2 {
+				return fmt.Errorf("note name required")
+			}
+			return showFrontmatter(cmd.Context(), cfg, args[1])
+		case "get":
+			if len(args) < 3 {
+				return fmt.Errorf("usage: frontmatter get <note> <key>")
+			}
+			return getFrontmatter(cmd.Context(), cfg, args[1], args[2])
+		case "set":
+			if len(args) < 3 {
+				return fmt.Errorf("usage: frontmatter set <note> key=value")
+			}
+			return setFrontmatter(cmd.Context(), cfg, args[1], args[2])
+		case "remove":
+			if len(args) < 3 {
+				return fmt.Errorf("usage: frontmatter remove <note> <key>")
+			}
+			return removeFrontmatter(cmd.Context(), cfg, args[1], args[2])
+		default:
+			setValue, _ := cmd.Flags().GetString("set")
+			if setValue != "" {
+				return setFrontmatter(cmd.Context(), cfg, action, setValue)
+			}
+			return showFrontmatter(cmd.Context(), cfg, action)
 		}
-		return showFrontmatter(cmd.Context(), cfg, noteName)
 	},
+}
+
+func init() {
+	FrontmatterCmd.Flags().String("set", "", "set a frontmatter key=value (legacy flag syntax)")
 }
 
 func showFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName string) error {
@@ -133,14 +179,13 @@ func setFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName stri
 
 	newLines := []string{}
 	if len(lines) > 0 && lines[0] == "---" {
-		// Has frontmatter, update it
 		newLines = append(newLines, "---")
 		updated := false
 
 		for i := 1; i < len(lines); i++ {
 			if lines[i] == "---" {
 				if !updated {
-					newLines = append(newLines, fmt.Sprintf("%s: %s", key, value))
+					newLines = append(newLines, fmt.Sprintf("%s: %s", key, quoteFrontmatterValue(value)))
 				}
 
 				newLines = append(newLines, lines[i:]...)
@@ -149,16 +194,15 @@ func setFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName stri
 			}
 
 			if strings.HasPrefix(lines[i], key+":") {
-				newLines = append(newLines, fmt.Sprintf("%s: %s", key, value))
+				newLines = append(newLines, fmt.Sprintf("%s: %s", key, quoteFrontmatterValue(value)))
 				updated = true
 			} else {
 				newLines = append(newLines, lines[i])
 			}
 		}
 	} else {
-		// No frontmatter, add it
 		newLines = append(newLines, "---")
-		newLines = append(newLines, fmt.Sprintf("%s: %s", key, value))
+		newLines = append(newLines, fmt.Sprintf("%s: %s", key, quoteFrontmatterValue(value)))
 		newLines = append(newLines, "---")
 		newLines = append(newLines, "")
 		newLines = append(newLines, lines...)
@@ -171,5 +215,101 @@ func setFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName stri
 
 	fmt.Printf("✓ Updated %s: %s = %s\n", filepath.Base(targetNote), key, value)
 
+	return nil
+}
+
+func getFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName string, key string) error {
+	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	if err != nil {
+		return err
+	}
+
+	var targetNote string
+	for _, note := range allNotes {
+		if strings.Contains(strings.ToLower(filepath.Base(note)), strings.ToLower(noteName)) {
+			targetNote = note
+			break
+		}
+	}
+
+	if targetNote == "" {
+		return fmt.Errorf("note not found: %s", noteName)
+	}
+
+	content, err := os.ReadFile(targetNote)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(content), "\n")
+
+	if len(lines) < 3 || lines[0] != "---" {
+		return fmt.Errorf("no frontmatter in %s", filepath.Base(targetNote))
+	}
+
+	for i := 1; i < len(lines); i++ {
+		if lines[i] == "---" {
+			break
+		}
+		if strings.HasPrefix(lines[i], key+":") {
+			parts := strings.SplitN(lines[i], ":", 2)
+			fmt.Printf("%s\n", strings.TrimSpace(parts[1]))
+			return nil
+		}
+	}
+
+	return fmt.Errorf("key not found: %s", key)
+}
+
+func removeFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName string, key string) error {
+	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	if err != nil {
+		return err
+	}
+
+	var targetNote string
+	for _, note := range allNotes {
+		if strings.Contains(strings.ToLower(filepath.Base(note)), strings.ToLower(noteName)) {
+			targetNote = note
+			break
+		}
+	}
+
+	if targetNote == "" {
+		return fmt.Errorf("note not found: %s", noteName)
+	}
+
+	content, err := os.ReadFile(targetNote)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(content), "\n")
+	var newLines []string
+
+	// Only strip the key within the frontmatter block.
+	if len(lines) > 0 && lines[0] == "---" {
+		newLines = append(newLines, lines[0])
+		inFrontmatter := true
+		for _, line := range lines[1:] {
+			if inFrontmatter && line == "---" {
+				inFrontmatter = false
+				newLines = append(newLines, line)
+			} else if inFrontmatter && strings.HasPrefix(line, key+":") {
+				// drop this line
+			} else {
+				newLines = append(newLines, line)
+			}
+		}
+	} else {
+		newLines = lines
+	}
+
+	newContent := strings.Join(newLines, "\n")
+	if err := os.WriteFile(targetNote, []byte(newContent), constants.FilePerm0644); err != nil {
+		return err
+	}
+
+	fmt.Printf("✓ Removed %s from %s\n", key, filepath.Base(targetNote))
 	return nil
 }

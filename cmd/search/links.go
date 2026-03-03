@@ -18,13 +18,19 @@ import (
 var linkRe = regexp.MustCompile(`\[\[([^\]]+)\]\]`)
 
 var LinksCmd = &cobra.Command{
-	Use:   "links [note-name]",
+	Use:   "links [action] [note-name]",
 	Short: "Show links and backlinks",
 	Long: `Show links in a note and backlinks to a note.
 	
+Actions:
+  outgoing [note]    Show outgoing wiki-links from a note (default)
+  backlinks [note]   Show notes that link to the given note
+
 Examples:
-  jotr links MyNote          # Show links in MyNote
-  jotr links --backlinks MyNote  # Show backlinks to MyNote`,
+  jotr links MyNote              # Show outgoing links in MyNote
+  jotr links outgoing MyNote    # Explicit outgoing links
+  jotr links backlinks MyNote   # Show backlinks to MyNote
+  jotr links --backlinks MyNote  # Flag-based backlinks (legacy)`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return fmt.Errorf("note name required")
@@ -35,52 +41,38 @@ Examples:
 			return err
 		}
 
-		noteName := args[0]
-		backlinks, _ := cmd.Flags().GetBool("backlinks")
-
-		if backlinks {
-			return showBacklinks(cmd.Context(), cfg, noteName)
+		action := args[0]
+		switch action {
+		case "outgoing":
+			if len(args) < 2 {
+				return fmt.Errorf("note name required")
+			}
+			return showLinks(cmd.Context(), cfg, args[1])
+		case "backlinks":
+			if len(args) < 2 {
+				return fmt.Errorf("note name required")
+			}
+			return showBacklinks(cmd.Context(), cfg, args[1])
+		default:
+			backlinks, _ := cmd.Flags().GetBool("backlinks")
+			if backlinks {
+				return showBacklinks(cmd.Context(), cfg, action)
+			}
+			return showLinks(cmd.Context(), cfg, action)
 		}
-		return showLinks(cmd.Context(), cfg, noteName)
 	},
 }
 
+func init() {
+	LinksCmd.Flags().Bool("backlinks", false, "show backlinks instead of outgoing links")
+}
+
 func showLinks(ctx context.Context, cfg *config.LoadedConfig, noteName string) error {
-	var allNotes []string
-	indexPath := search.GetIndexPath(cfg.Paths.BaseDir)
-	if _, err := os.Stat(indexPath); err == nil {
-		if idx, err := search.Open(indexPath); err == nil {
-			defer idx.Close()
-			if paths, err := idx.GetIndexedPaths(ctx); err == nil {
-				for p := range paths {
-					allNotes = append(allNotes, p)
-				}
-			}
-		}
+	targetNote, err := pickNoteByName(ctx, cfg, noteName)
+	if err != nil {
+		return err
 	}
 
-	if len(allNotes) == 0 {
-		var err error
-		allNotes, err = notes.FindNotes(ctx, cfg.Paths.BaseDir)
-		if err != nil {
-			return err
-		}
-	}
-
-	var targetNote string
-
-	for _, note := range allNotes {
-		if strings.Contains(strings.ToLower(filepath.Base(note)), strings.ToLower(noteName)) {
-			targetNote = note
-			break
-		}
-	}
-
-	if targetNote == "" {
-		return fmt.Errorf("note not found: %s", noteName)
-	}
-
-	// Read note content
 	content, err := os.ReadFile(targetNote)
 	if err != nil {
 		return err

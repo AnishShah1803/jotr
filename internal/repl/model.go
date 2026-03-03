@@ -15,18 +15,21 @@ import (
 )
 
 type Model struct {
-	ctx          context.Context
-	config       *config.LoadedConfig
-	rootCmd      *cobra.Command
-	textInput    textinput.Model
-	history      *History
-	autocomplete *Autocomplete
-	width        int
-	height       int
-	ready        bool
-	quitting     bool
-	completions  []string
-	selectedIdx  int
+	ctx                 context.Context
+	config              *config.LoadedConfig
+	rootCmd             *cobra.Command
+	textInput           textinput.Model
+	history             *History
+	autocomplete        *Autocomplete
+	width               int
+	height              int
+	ready               bool
+	quitting            bool
+	completions         []string
+	selectedIdx         int
+	completionsOffset   int
+	browsingCompletions bool
+	inHistoryNav        bool
 }
 
 const replAsciiArt = `      ░░
@@ -81,6 +84,8 @@ var (
 				Foreground(lipgloss.Color("51")).
 				Bold(true)
 )
+
+const completionsMaxLines = 10
 
 func NewModel(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Command) Model {
 	ti := textinput.New()
@@ -144,9 +149,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.textInput.SetValue("")
 			m.completions = []string{}
 			m.selectedIdx = 0
+			m.browsingCompletions = false
+			m.inHistoryNav = false
+			m.history.Reset()
 			return m, nil
 
 		case tea.KeyEnter:
+			if m.browsingCompletions && len(m.completions) > 0 {
+				// Accept the highlighted completion into the input; don't execute.
+				selected := m.completions[m.selectedIdx]
+				m.textInput.SetValue(selected)
+				m.textInput.CursorEnd()
+				m.browsingCompletions = false
+				m.selectedIdx = 0
+				m.completionsOffset = 0
+				m.updateCompletions()
+				return m, nil
+			}
 			input := strings.TrimSpace(m.textInput.Value())
 			if input == "" {
 				return m, nil
@@ -157,6 +176,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.textInput.SetValue("")
 			m.completions = []string{}
 			m.selectedIdx = 0
+			m.browsingCompletions = false
+			m.inHistoryNav = false
 
 			inset := 2
 			insetStr := strings.Repeat(" ", inset)
@@ -178,29 +199,68 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Println(block.String())
 
 		case tea.KeyUp:
-			prev := m.history.Previous()
-			if prev != "" {
-				m.textInput.SetValue(prev)
-				m.textInput.CursorEnd()
+			if m.browsingCompletions {
+				m.selectedIdx--
+				if m.selectedIdx < 0 {
+					m.browsingCompletions = false
+					m.selectedIdx = 0
+					m.completionsOffset = 0
+				} else {
+					if m.selectedIdx < m.completionsOffset {
+						m.completionsOffset = m.selectedIdx
+					}
+				}
+				return m, nil
 			}
-			m.updateCompletions()
+			// Only navigate history when input is empty.
+			if m.textInput.Value() == "" {
+				prev := m.history.Previous()
+				if prev != "" {
+					m.inHistoryNav = true
+					m.textInput.SetValue(prev)
+					m.textInput.CursorEnd()
+				}
+				m.updateCompletions()
+			}
 			return m, nil
 
 		case tea.KeyDown:
-			next := m.history.Next()
-			if next != "" {
-				m.textInput.SetValue(next)
-				m.textInput.CursorEnd()
-			} else {
-				m.textInput.SetValue("")
+			if m.browsingCompletions {
+				if m.selectedIdx < len(m.completions)-1 {
+					m.selectedIdx++
+					if m.selectedIdx >= m.completionsOffset+completionsMaxLines {
+						m.completionsOffset++
+					}
+				}
+				return m, nil
 			}
-			m.updateCompletions()
+
+			if m.inHistoryNav {
+				// Navigate forward through history.
+				next := m.history.Next()
+				if next != "" {
+					m.textInput.SetValue(next)
+					m.textInput.CursorEnd()
+					m.updateCompletions()
+				} else {
+					// Reached blank state — exit history nav, restore empty input.
+					// The next ↓ press will enter completion browsing.
+					m.inHistoryNav = false
+					m.textInput.SetValue("")
+					m.updateCompletions()
+				}
+			} else if len(m.completions) > 0 {
+				// Not in history nav — enter completion browsing directly.
+				m.browsingCompletions = true
+				m.selectedIdx = 0
+				m.completionsOffset = 0
+			}
 			return m, nil
 
 		case tea.KeyTab:
 			current := m.textInput.Value()
 			if len(m.completions) > 0 {
-				selected := m.completions[0]
+				selected := m.completions[m.selectedIdx]
 
 				subCommands := m.autocomplete.GetSubCommands(selected)
 
@@ -240,7 +300,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	prevValue := m.textInput.Value()
 	m.textInput, cmd = m.textInput.Update(msg)
+	// If the user typed a character while browsing completions, exit browsing mode.
+	if m.browsingCompletions && m.textInput.Value() != prevValue {
+		m.browsingCompletions = false
+	}
 	m.updateCompletions()
 	return m, cmd
 }
@@ -251,37 +316,46 @@ func (m *Model) updateCompletions() {
 	value := m.textInput.Value()
 	fields := strings.Fields(value)
 
+	var newCompletions []string
 	if value == "" {
-		m.completions = m.autocomplete.GetAllCommands()
-		m.selectedIdx = 0
-		return
-	}
-
-	if len(fields) == 1 {
+		newCompletions = m.autocomplete.GetAllCommands()
+	} else if len(fields) == 1 {
 		cmdName := fields[0]
-
 		if m.autocomplete.IsCommand(cmdName) {
 			subCommands := m.autocomplete.GetSubCommands(cmdName)
 			if subCommands != nil && len(subCommands) > 0 {
-				m.completions = subCommands
-				m.selectedIdx = 0
-				return
+				newCompletions = subCommands
+			} else if m.autocomplete.IsParamCommand(cmdName) {
+				newCompletions = m.autocomplete.GetParamCompletions(cmdName)
+			} else {
+				newCompletions = m.autocomplete.GetCompletions(cmdName)
 			}
-
-			if m.autocomplete.IsParamCommand(cmdName) {
-				m.completions = m.autocomplete.GetParamCompletions(cmdName)
-				m.selectedIdx = 0
-				return
-			}
+		} else {
+			newCompletions = m.autocomplete.GetCompletions(cmdName)
 		}
-
-		m.completions = m.autocomplete.GetCompletions(cmdName)
-		m.selectedIdx = 0
-		return
+	} else {
+		newCompletions = m.getCompletionsForInput(fields, strings.HasSuffix(value, " "))
 	}
 
-	m.completions = m.getCompletionsForInput(fields, strings.HasSuffix(value, " "))
-	m.selectedIdx = 0
+	m.completions = newCompletions
+	if !m.browsingCompletions {
+		m.selectedIdx = 0
+	} else {
+		// Clamp in case the list shrank.
+		if m.selectedIdx >= len(m.completions) {
+			m.selectedIdx = len(m.completions) - 1
+		}
+		if m.selectedIdx < 0 {
+			m.selectedIdx = 0
+		}
+		// Clamp offset so the selected item is always visible.
+		if m.completionsOffset > m.selectedIdx {
+			m.completionsOffset = m.selectedIdx
+		}
+		if m.completionsOffset < 0 {
+			m.completionsOffset = 0
+		}
+	}
 }
 
 func (m *Model) getCompletionsForInput(fields []string, hasTrailingSpace bool) []string {
@@ -418,14 +492,16 @@ func (m Model) View() string {
 }
 
 func (m Model) renderCompletions(inset int) string {
-	const maxLines = 10
 	insetStr := strings.Repeat(" ", inset)
-	lines := make([]string, maxLines)
+	lines := make([]string, completionsMaxLines)
 
-	for i := 0; i < maxLines; i++ {
-		if i < len(m.completions) {
-			completion := m.completions[i]
-			if i == m.selectedIdx {
+	for i := 0; i < completionsMaxLines; i++ {
+		ci := m.completionsOffset + i
+		if ci < len(m.completions) {
+			completion := m.completions[ci]
+			if ci == m.selectedIdx && m.browsingCompletions {
+				lines[i] = insetStr + selectedCompletionStyle.Render("> "+completion)
+			} else if ci == m.selectedIdx {
 				lines[i] = insetStr + selectedCompletionStyle.Render("  "+completion)
 			} else {
 				lines[i] = insetStr + completionStyle.Render("  "+completion)
@@ -443,7 +519,7 @@ func renderLogo() string {
 }
 
 func (m Model) renderHeader() (string, int) {
-	const helpHint = "tab to autocomplete · ↑/↓ for history · ctrl+c to quit"
+	const helpHint = "tab to autocomplete · ↑ history · ↓ scroll options · ctrl+c to quit"
 	const minWidthForArt = 50
 	const minHeightForArt = 15
 
