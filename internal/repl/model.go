@@ -251,8 +251,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.selectedIdx = 0
 					}
 				}
+			} else if len(m.completions) > 0 {
+				// Not in history nav — enter completion browsing directly.
+				m.browsingCompletions = true
+				m.selectedIdx = 0
+				m.completionsOffset = 0
 			}
-			// If not in history nav, ↓ does nothing.
 			return m, nil
 
 		case tea.KeyTab:
