@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -131,6 +132,11 @@ func parseInput(input string) []string {
 }
 
 func LaunchREPL(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Command) error {
+	// Set JOTR_REPL_MODE environment variable
+	origReplMode := os.Getenv("JOTR_REPL_MODE")
+	os.Setenv("JOTR_REPL_MODE", "true")
+	defer os.Setenv("JOTR_REPL_MODE", origReplMode)
+
 	m := NewModel(ctx, cfg, rootCmd)
 
 	p := tea.NewProgram(

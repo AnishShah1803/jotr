@@ -17,6 +17,10 @@ func renameNote(ctx context.Context, cfg *config.LoadedConfig, args []string) er
 }
 
 func renameNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []string, reader Reader) error {
+	if isReplMode() && len(args) < 2 {
+		return fmt.Errorf("usage: note rename <query> <new-name>")
+	}
+
 	query := ""
 	if len(args) > 0 {
 		query = args[0]
@@ -64,9 +68,19 @@ func deleteNote(ctx context.Context, cfg *config.LoadedConfig, args []string) er
 }
 
 func deleteNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []string, reader Reader) error {
+	force := false
 	query := ""
-	if len(args) > 0 {
-		query = args[0]
+
+	for _, arg := range args {
+		if arg == "--force" {
+			force = true
+		} else if query == "" {
+			query = arg
+		}
+	}
+
+	if isReplMode() && !force {
+		return fmt.Errorf("usage: note delete <query> --force")
 	}
 
 	targetNote, err := pickNote(ctx, cfg, query, reader)
@@ -75,16 +89,19 @@ func deleteNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []
 	}
 
 	relPath, _ := filepath.Rel(cfg.Paths.BaseDir, targetNote)
-	fmt.Printf("Delete %s? [y/N]: ", relPath)
 
-	input, err := reader.ReadString('\n')
-	if err != nil {
-		return fmt.Errorf("failed to read confirmation: %w", err)
-	}
-	confirm := strings.TrimSpace(strings.ToLower(input))
-	if confirm != "y" && confirm != "yes" {
-		fmt.Println("Aborted.")
-		return nil
+	if !force {
+		fmt.Printf("Delete %s? [y/N]: ", relPath)
+
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read confirmation: %w", err)
+		}
+		confirm := strings.TrimSpace(strings.ToLower(input))
+		if confirm != "y" && confirm != "yes" {
+			fmt.Println("Aborted.")
+			return nil
+		}
 	}
 
 	if err := os.Remove(targetNote); err != nil {
@@ -100,6 +117,10 @@ func moveNote(ctx context.Context, cfg *config.LoadedConfig, args []string) erro
 }
 
 func moveNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []string, reader Reader) error {
+	if isReplMode() && len(args) < 2 {
+		return fmt.Errorf("usage: note move <query> <destination>")
+	}
+
 	query := ""
 	if len(args) > 0 {
 		query = args[0]
@@ -171,6 +192,15 @@ func pickNote(ctx context.Context, cfg *config.LoadedConfig, query string, reade
 	}
 	if len(matches) == 1 {
 		return matches[0], nil
+	}
+
+	if isReplMode() {
+		fmt.Println("Multiple notes found:")
+		for i, p := range matches {
+			rel, _ := filepath.Rel(cfg.Paths.BaseDir, p)
+			fmt.Printf("%d. %s\n", i+1, rel)
+		}
+		return "", fmt.Errorf("multiple matches found, please be more specific")
 	}
 
 	fmt.Println("Multiple notes found:")

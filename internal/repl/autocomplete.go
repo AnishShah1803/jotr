@@ -52,7 +52,7 @@ func NewAutocomplete(rootCmd *cobra.Command) *Autocomplete {
 	a.paramCommands["note"] = []string{"name=", "template="}
 	a.paramCommands["note create"] = []string{"path=", "file="}
 	a.paramCommands["note rename"] = []string{"file=", "name="}
-	a.paramCommands["note delete"] = []string{"file="}
+	a.paramCommands["note delete"] = []string{"<query>", "--force"}
 	a.paramCommands["note move"] = []string{"file=", "to="}
 	a.paramCommands["search"] = []string{"query=", "path=", "limit=", "case", "format="}
 	a.paramCommands["search context"] = []string{"query=", "path=", "limit="}
@@ -65,6 +65,7 @@ func NewAutocomplete(rootCmd *cobra.Command) *Autocomplete {
 	a.paramCommands["files"] = []string{"folder=", "ext=", "total"}
 	a.paramCommands["wordcount"] = []string{"file=", "path=", "words", "characters"}
 	a.paramCommands["outline"] = []string{"file=", "path=", "format=", "total"}
+	a.paramCommands["configure"] = []string{"--base-dir=", "--diary-dir=", "--todo-file=", "--pdp-file="}
 
 	a.buildIndex(rootCmd, "")
 	sort.Strings(a.commandNames)
