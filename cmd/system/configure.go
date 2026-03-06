@@ -81,7 +81,6 @@ func validateBaseDir(baseDir string) error {
 	return nil
 }
 
-
 // applyDefaults sets default configuration values for fields not explicitly configured.
 func applyDefaults(cfg *config.Config) {
 	cfg.Format.TaskSection = "Important Things"
