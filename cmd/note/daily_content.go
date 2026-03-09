@@ -20,6 +20,9 @@ func appendDailyNote(_ context.Context, cfg *config.LoadedConfig, args []string,
 	if len(args) > 0 {
 		content = strings.Join(args, " ")
 	} else {
+		if isReplMode() {
+			return fmt.Errorf("content argument required in REPL mode: use 'daily append \"your content here\"'")
+		}
 		fmt.Print("Content to append: ")
 		input, err := defaultReader.ReadString('\n')
 		if err != nil {
@@ -53,6 +56,9 @@ func prependDailyNote(_ context.Context, cfg *config.LoadedConfig, args []string
 	if len(args) > 0 {
 		content = strings.Join(args, " ")
 	} else {
+		if isReplMode() {
+			return fmt.Errorf("content argument required in REPL mode: use 'daily prepend \"your content here\"'")
+		}
 		fmt.Print("Content to prepend: ")
 		input, err := defaultReader.ReadString('\n')
 		if err != nil {

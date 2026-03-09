@@ -78,7 +78,10 @@ func SelectTemplateForIntegration(templateList []*templates.Template) *templates
 		}
 	}
 
-	choice := utils.PromptChoice("Select template", 1, index-1)
+	choice, err := utils.PromptChoice("Select template", 1, index-1)
+	if err != nil {
+		return nil
+	}
 
 	return flat[choice-1]
 }
