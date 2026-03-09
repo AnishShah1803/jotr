@@ -151,6 +151,7 @@ jotr note open               # Fuzzy search and open any note
 jotr note rename "old name" "new name"  # Rename a note
 jotr note move "my note" work           # Move note to a subfolder
 jotr note delete "old note"             # Delete a note
+jotr note delete "old note" --force     # Delete without confirmation
 jotr search "authentication"            # Find notes mentioning auth
 
 # Work with tags and links
@@ -256,7 +257,13 @@ Task sections respect your configuration and provide consistent organization.
 
 ## Configuration
 
-jotr uses a JSON config at `~/.config/jotr/config.json`. Run `jotr configure` for interactive setup, or see [config.template.json](config.template.json) for all options.
+jotr uses a JSON config at `~/.config/jotr/config.json`. Run `jotr configure` for interactive setup, or use flags for non-interactive configuration:
+
+```bash
+jotr configure --base-dir ~/Notes --diary-dir Diary --todo-file todo
+```
+
+See [config.template.json](config.template.json) for all configuration options.
 
 Example configuration:
 
@@ -312,7 +319,7 @@ Example configuration:
 | `note list` | List all notes |
 | `note rename [query] [new-name]` | Rename a note (interactive if args omitted) |
 | `note move [query] [folder]` | Move a note to a folder (interactive if args omitted) |
-| `note delete [query]` | Delete a note with confirmation prompt |
+| `note delete [query]` | Delete a note (use `--force` to skip confirmation) |
 
 **`daily`**
 

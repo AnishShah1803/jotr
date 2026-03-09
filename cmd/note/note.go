@@ -35,6 +35,11 @@ func SetReader(r Reader) {
 	defaultReader = r
 }
 
+// isReplMode checks if we're running in REPL mode
+func isReplMode() bool {
+	return os.Getenv("JOTR_REPL_MODE") == "true"
+}
+
 var NoteCmd = &cobra.Command{
 	Use:   "note [action]",
 	Short: "Create, open, or manage notes",
@@ -175,7 +180,17 @@ func openNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, query str
 		return notes.OpenInEditor(matches[0])
 	}
 
-	// Multiple matches - show list and prompt
+	// Multiple matches
+	if isReplMode() {
+		fmt.Println("Multiple notes found:")
+		for i, notePath := range matches {
+			relPath, _ := filepath.Rel(cfg.Paths.BaseDir, notePath)
+			fmt.Printf("%d. %s\n", i+1, relPath)
+		}
+		return fmt.Errorf("multiple matches found, please be more specific")
+	}
+
+	// In interactive mode, show list and prompt
 	fmt.Println("Multiple notes found:")
 
 	for i, notePath := range matches {

@@ -806,3 +806,111 @@ func TestOpenNoteWithReader_EmptyNotes(t *testing.T) {
 		t.Errorf("openNoteWithReader() error = %v, want message containing 'no notes found'", err)
 	}
 }
+
+// TestIsReplMode tests the isReplMode function
+func TestIsReplMode(t *testing.T) {
+	// Test with REPL mode disabled (default)
+	os.Unsetenv("JOTR_REPL_MODE")
+	if isReplMode() {
+		t.Error("isReplMode() should return false when JOTR_REPL_MODE is not set")
+	}
+
+	// Test with REPL mode explicitly disabled
+	os.Setenv("JOTR_REPL_MODE", "false")
+	defer os.Unsetenv("JOTR_REPL_MODE")
+	if isReplMode() {
+		t.Error("isReplMode() should return false when JOTR_REPL_MODE=false")
+	}
+
+	// Test with REPL mode enabled
+	os.Setenv("JOTR_REPL_MODE", "true")
+	if !isReplMode() {
+		t.Error("isReplMode() should return true when JOTR_REPL_MODE=true")
+	}
+}
+
+// TestDeleteNoteReplModeWithForce tests note delete with --force flag in REPL mode
+func TestDeleteNoteReplModeWithForce(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "jotr-note-test-")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create a test note
+	noteName := "TestNote"
+	notePath := filepath.Join(tmpDir, noteName+".md")
+	content := "# " + noteName + "\n\nTest content"
+
+	ctx := context.Background()
+	if err := notes.WriteNote(ctx, notePath, content); err != nil {
+		t.Fatalf("Failed to create note: %v", err)
+	}
+
+	cfg := createTestConfig(t, tmpDir)
+
+	// Set REPL mode
+	os.Setenv("JOTR_REPL_MODE", "true")
+	defer os.Unsetenv("JOTR_REPL_MODE")
+
+	// Test delete with --force flag and query - should succeed
+	err = deleteNoteWithReader(ctx, cfg, []string{noteName, "--force"}, newMockReader())
+	if err != nil {
+		t.Errorf("deleteNoteWithReader() with --force should succeed, got: %v", err)
+	}
+
+	// Verify note was deleted
+	if utils.FileExists(notePath) {
+		t.Error("Expected note to be deleted, but it still exists")
+	}
+}
+
+// TestDeleteNoteReplModeWithoutForce tests note delete without --force flag in REPL mode should fail
+func TestDeleteNoteReplModeWithoutForce(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "jotr-note-test-")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	cfg := createTestConfig(t, tmpDir)
+
+	// Set REPL mode
+	os.Setenv("JOTR_REPL_MODE", "true")
+	defer os.Unsetenv("JOTR_REPL_MODE")
+
+	// Test delete without --force flag - should fail
+	err = deleteNoteWithReader(context.Background(), cfg, []string{"somequery"}, newMockReader())
+	if err == nil {
+		t.Error("deleteNoteWithReader() without --force should fail in REPL mode")
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "requires --force flag") {
+		t.Errorf("deleteNoteWithReader() error = %v, want message containing 'requires --force flag'", err)
+	}
+}
+
+// TestDeleteNoteReplModeWithoutQuery tests note delete without query in REPL mode should fail
+func TestDeleteNoteReplModeWithoutQuery(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "jotr-note-test-")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	cfg := createTestConfig(t, tmpDir)
+
+	// Set REPL mode
+	os.Setenv("JOTR_REPL_MODE", "true")
+	defer os.Unsetenv("JOTR_REPL_MODE")
+
+	// Test delete with --force but no query - should fail
+	err = deleteNoteWithReader(context.Background(), cfg, []string{"--force"}, newMockReader())
+	if err == nil {
+		t.Error("deleteNoteWithReader() without query should fail in REPL mode")
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "requires a <query> argument") {
+		t.Errorf("deleteNoteWithReader() error = %v, want message containing 'requires a <query> argument'", err)
+	}
+}
