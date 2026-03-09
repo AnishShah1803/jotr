@@ -79,8 +79,13 @@ func deleteNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []
 		}
 	}
 
-	if isReplMode() && !force {
-		return fmt.Errorf("usage: note delete <query> --force")
+	if isReplMode() {
+		if !force {
+			return fmt.Errorf("note delete requires --force flag in REPL mode\nUsage: note delete <query> --force")
+		}
+		if query == "" {
+			return fmt.Errorf("note delete requires a <query> argument\nUsage: note delete <query> --force")
+		}
 	}
 
 	targetNote, err := pickNote(ctx, cfg, query, reader)

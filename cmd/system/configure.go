@@ -133,7 +133,7 @@ func runConfigWizard(cmd *cobra.Command) error {
 
 	// In REPL mode, flags must be provided
 	if inReplMode && !flagsProvided {
-		return fmt.Errorf("configure command requires flags in REPL mode\n\nUsage:\n  configure --base-dir <path> [--diary-dir <name>] [--todo-file <path>] [--pdp-file <path>]")
+		return fmt.Errorf("configure command requires flags in REPL mode, use: configure --base-dir <path> [--diary-dir <name>] [--todo-file <path>] [--pdp-file <path>]")
 	}
 
 	// If flags provided, use flag-based configuration

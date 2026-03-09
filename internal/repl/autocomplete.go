@@ -52,7 +52,7 @@ func NewAutocomplete(rootCmd *cobra.Command) *Autocomplete {
 	a.paramCommands["note"] = []string{"name=", "template="}
 	a.paramCommands["note create"] = []string{"path=", "file="}
 	a.paramCommands["note rename"] = []string{"file=", "name="}
-	a.paramCommands["note delete"] = []string{"<query>", "--force"}
+	a.paramCommands["note delete"] = []string{"--force", "<query>"}
 	a.paramCommands["note move"] = []string{"file=", "to="}
 	a.paramCommands["search"] = []string{"query=", "path=", "limit=", "case", "format="}
 	a.paramCommands["search context"] = []string{"query=", "path=", "limit="}
