@@ -33,7 +33,7 @@ Examples:
   jotr bookmark add yesterday "daily:-1"
   jotr bookmark list
   jotr bookmark resolve work`,
-	Aliases: []string{"alias"},
+
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return fmt.Errorf("action required: add, remove, list, or resolve")
