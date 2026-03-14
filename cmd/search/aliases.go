@@ -31,7 +31,7 @@ Examples:
   jotr aliases list
   jotr aliases find shortname
   jotr aliases stats`,
-	Aliases: []string{"alias"},
+
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
 		if err != nil {
