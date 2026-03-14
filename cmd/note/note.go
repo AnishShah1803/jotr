@@ -16,7 +16,6 @@ import (
 // defaultReader is the production reader using stdin.
 var defaultReader = utils.DefaultStdinReader
 
-
 var NoteCmd = &cobra.Command{
 	Use:   "note [action]",
 	Short: "Create, open, or manage notes",
@@ -87,7 +86,7 @@ func createNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, noteTyp
 	if utils.IsReplMode() {
 		return fmt.Errorf("cannot prompt in REPL mode: provide note name as argument (e.g., 'note create [name]')")
 	}
-	
+
 	fmt.Print("Note name: ")
 
 	input, err := reader.ReadString('\n')

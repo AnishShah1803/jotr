@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-
 // PromptUser prompts the user with the given message and returns the input.
 // This is a safer alternative to fmt.Scanln that handles empty input and trimming.
 // Returns an empty string if the user provides no input.
