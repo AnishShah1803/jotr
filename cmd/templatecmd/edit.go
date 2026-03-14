@@ -40,7 +40,10 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		fmt.Printf("%d. %s\n", i+1, tmpl.Filename)
 	}
 
-	choice := utils.PromptChoice("Select template to edit", 1, len(templateList))
+	choice, err := utils.PromptChoice("Select template to edit", 1, len(templateList))
+	if err != nil {
+		return err
+	}
 
 	selected := templateList[choice-1]
 	templatePath := filepath.Join(cfg.TemplatesPath, selected.Filename)

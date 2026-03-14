@@ -6,7 +6,10 @@ func CollectVariableValues(vars []Variable) (map[string]string, error) {
 	values := make(map[string]string)
 
 	for _, v := range vars {
-		value := utils.PromptUserRequired(v.Prompt)
+		value, err := utils.PromptUserRequired(v.Prompt)
+		if err != nil {
+			return nil, err
+		}
 		values[v.Name] = value
 	}
 
@@ -17,7 +20,10 @@ func CollectPromptValues(prompts []Prompt) ([]string, error) {
 	var values []string
 
 	for _, p := range prompts {
-		value := utils.PromptUserRequired(p.Question)
+		value, err := utils.PromptUserRequired(p.Question)
+		if err != nil {
+			return nil, err
+		}
 		values = append(values, value)
 	}
 

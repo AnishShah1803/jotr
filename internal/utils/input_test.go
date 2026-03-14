@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"testing"
 )
 
@@ -184,4 +185,125 @@ func TestPromptUser_EmptyInput(t *testing.T) {
 	// The function should not panic and should return an empty string
 	fmt.Println("Input functions require stdin mocking for unit testing")
 	fmt.Println("Manual testing: go run -tags=test ./cmd/util/quick_test.go")
+}
+
+func TestIsReplMode(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		want     bool
+	}{
+		{
+			name:     "REPL mode enabled",
+			envValue: "true",
+			want:     true,
+		},
+		{
+			name:     "REPL mode disabled",
+			envValue: "false",
+			want:     false,
+		},
+		{
+			name:     "REPL mode unset",
+			envValue: "",
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Save original env value
+			original := os.Getenv("JOTR_REPL_MODE")
+			defer func() {
+				if original == "" {
+					os.Unsetenv("JOTR_REPL_MODE")
+				} else {
+					os.Setenv("JOTR_REPL_MODE", original)
+				}
+			}()
+
+			// Set test env value
+			if tt.envValue == "" {
+				os.Unsetenv("JOTR_REPL_MODE")
+			} else {
+				os.Setenv("JOTR_REPL_MODE", tt.envValue)
+			}
+
+			if got := IsReplMode(); got != tt.want {
+				t.Errorf("IsReplMode() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPromptUser_ReplMode(t *testing.T) {
+	// Save original env
+	original := os.Getenv("JOTR_REPL_MODE")
+	defer func() {
+		if original == "" {
+			os.Unsetenv("JOTR_REPL_MODE")
+		} else {
+			os.Setenv("JOTR_REPL_MODE", original)
+		}
+	}()
+
+	// Enable REPL mode
+	os.Setenv("JOTR_REPL_MODE", "true")
+
+	// Test PromptUser returns error
+	_, err := PromptUser("test: ")
+	if err == nil {
+		t.Error("PromptUser() should return error in REPL mode")
+	}
+	if err.Error() != "cannot prompt in REPL mode: provide required arguments directly" {
+		t.Errorf("PromptUser() error = %v, want specific REPL mode error", err)
+	}
+}
+
+func TestPromptYesNo_ReplMode(t *testing.T) {
+	// Save original env
+	original := os.Getenv("JOTR_REPL_MODE")
+	defer func() {
+		if original == "" {
+			os.Unsetenv("JOTR_REPL_MODE")
+		} else {
+			os.Setenv("JOTR_REPL_MODE", original)
+		}
+	}()
+
+	// Enable REPL mode
+	os.Setenv("JOTR_REPL_MODE", "true")
+
+	// Test PromptYesNo returns error
+	_, err := PromptYesNo("confirm? (y/n): ")
+	if err == nil {
+		t.Error("PromptYesNo() should return error in REPL mode")
+	}
+	if err.Error() != "cannot prompt in REPL mode: use appropriate flags (e.g., --force)" {
+		t.Errorf("PromptYesNo() error = %v, want specific REPL mode error", err)
+	}
+}
+
+func TestPromptChoice_ReplMode(t *testing.T) {
+	// Save original env
+	original := os.Getenv("JOTR_REPL_MODE")
+	defer func() {
+		if original == "" {
+			os.Unsetenv("JOTR_REPL_MODE")
+		} else {
+			os.Setenv("JOTR_REPL_MODE", original)
+		}
+	}()
+
+	// Enable REPL mode
+	os.Setenv("JOTR_REPL_MODE", "true")
+
+	// Test PromptChoice returns error
+	_, err := PromptChoice("select: ", 1, 3)
+	if err == nil {
+		t.Error("PromptChoice() should return error in REPL mode")
+	}
+	if err.Error() != "cannot prompt in REPL mode: provide specific selection as argument" {
+		t.Errorf("PromptChoice() error = %v, want specific REPL mode error", err)
+	}
 }

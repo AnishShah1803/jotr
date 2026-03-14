@@ -16,8 +16,8 @@ func renameNote(ctx context.Context, cfg *config.LoadedConfig, args []string) er
 	return renameNoteWithReader(ctx, cfg, args, defaultReader)
 }
 
-func renameNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []string, reader Reader) error {
-	if isReplMode() && len(args) < 2 {
+func renameNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []string, reader utils.StdinReader) error {
+	if utils.IsReplMode() && len(args) < 2 {
 		return fmt.Errorf("usage: note rename <query> <new-name>")
 	}
 
@@ -67,7 +67,7 @@ func deleteNote(ctx context.Context, cfg *config.LoadedConfig, args []string) er
 	return deleteNoteWithReader(ctx, cfg, args, defaultReader)
 }
 
-func deleteNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []string, reader Reader) error {
+func deleteNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []string, reader utils.StdinReader) error {
 	force := false
 	query := ""
 
@@ -79,7 +79,7 @@ func deleteNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []
 		}
 	}
 
-	if isReplMode() {
+	if utils.IsReplMode() {
 		if !force {
 			return fmt.Errorf("note delete requires --force flag in REPL mode\nUsage: note delete <query> --force")
 		}
@@ -121,8 +121,8 @@ func moveNote(ctx context.Context, cfg *config.LoadedConfig, args []string) erro
 	return moveNoteWithReader(ctx, cfg, args, defaultReader)
 }
 
-func moveNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []string, reader Reader) error {
-	if isReplMode() && len(args) < 2 {
+func moveNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []string, reader utils.StdinReader) error {
+	if utils.IsReplMode() && len(args) < 2 {
 		return fmt.Errorf("usage: note move <query> <destination>")
 	}
 
@@ -171,7 +171,7 @@ func moveNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []st
 	return nil
 }
 
-func pickNote(ctx context.Context, cfg *config.LoadedConfig, query string, reader Reader) (string, error) {
+func pickNote(ctx context.Context, cfg *config.LoadedConfig, query string, reader utils.StdinReader) (string, error) {
 	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to find notes: %w", err)
@@ -199,7 +199,7 @@ func pickNote(ctx context.Context, cfg *config.LoadedConfig, query string, reade
 		return matches[0], nil
 	}
 
-	if isReplMode() {
+	if utils.IsReplMode() {
 		fmt.Println("Multiple notes found:")
 		for i, p := range matches {
 			rel, _ := filepath.Rel(cfg.Paths.BaseDir, p)

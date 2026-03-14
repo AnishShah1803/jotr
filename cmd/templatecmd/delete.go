@@ -58,13 +58,12 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	if !forceDelete {
 		fmt.Printf("Delete template '%s'? (y/N): ", selected.Name)
 
-		var response string
-		if _, err := fmt.Scanln(&response); err != nil {
-			fmt.Println("Canceled")
-			return nil
+		confirmed, err := utils.PromptYesNo("")
+		if err != nil {
+			return fmt.Errorf("cannot prompt in REPL mode: use --force flag to skip confirmation")
 		}
 
-		if response != "y" && response != "Y" {
+		if !confirmed {
 			fmt.Println("Canceled")
 			return nil
 		}

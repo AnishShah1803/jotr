@@ -68,7 +68,11 @@ func runUpdate() error {
 
 		fmt.Print("\n❓ Do you want to update? [y/N]: ")
 
-		if !utils.PromptYesNo("") {
+		confirmed, err := utils.PromptYesNo("")
+		if err != nil {
+			return fmt.Errorf("cannot prompt in REPL mode: use --check flag to view available updates")
+		}
+		if !confirmed {
 			fmt.Println("Update canceled")
 			return nil
 		}

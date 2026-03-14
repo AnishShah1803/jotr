@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -10,21 +11,31 @@ import (
 // PromptUser prompts the user with the given message and returns the input.
 // This is a safer alternative to fmt.Scanln that handles empty input and trimming.
 // Returns an empty string if the user provides no input.
-func PromptUser(prompt string) string {
+// Returns an error if called in REPL mode.
+func PromptUser(prompt string) (string, error) {
+	if IsReplMode() {
+		return "", errors.New("cannot prompt in REPL mode: provide required arguments directly")
+	}
+
 	fmt.Print(prompt)
 
 	reader := bufio.NewReader(os.Stdin)
 	input, err := reader.ReadString('\n')
 	if err != nil {
-		return ""
+		return "", err
 	}
 
-	return strings.TrimSpace(input)
+	return strings.TrimSpace(input), nil
 }
 
 // PromptUserRequired prompts the user with the given message and returns the input.
 // Unlike PromptUser, this keeps prompting until non-empty input is received.
-func PromptUserRequired(prompt string) string {
+// Returns an error if called in REPL mode.
+func PromptUserRequired(prompt string) (string, error) {
+	if IsReplMode() {
+		return "", errors.New("cannot prompt in REPL mode: provide required arguments directly")
+	}
+
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
@@ -37,7 +48,7 @@ func PromptUserRequired(prompt string) string {
 
 		trimmed := strings.TrimSpace(input)
 		if trimmed != "" {
-			return trimmed
+			return trimmed, nil
 		}
 
 		fmt.Print("Input required, please try again: ")
@@ -47,7 +58,12 @@ func PromptUserRequired(prompt string) string {
 // PromptYesNo prompts the user with a yes/no question.
 // Returns true for "yes" (y/Y), false for "no" (n/N).
 // Keeps prompting until a valid response is received.
-func PromptYesNo(prompt string) bool {
+// Returns an error if called in REPL mode.
+func PromptYesNo(prompt string) (bool, error) {
+	if IsReplMode() {
+		return false, errors.New("cannot prompt in REPL mode: use appropriate flags (e.g., --force)")
+	}
+
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
@@ -60,10 +76,10 @@ func PromptYesNo(prompt string) bool {
 
 		trimmed := strings.ToLower(strings.TrimSpace(input))
 		if trimmed == "y" || trimmed == "yes" {
-			return true
+			return true, nil
 		}
 		if trimmed == "n" || trimmed == "no" || trimmed == "" {
-			return false
+			return false, nil
 		}
 
 		fmt.Print("Please enter 'y' or 'n': ")
@@ -72,7 +88,12 @@ func PromptYesNo(prompt string) bool {
 
 // PromptChoice prompts the user to choose from a list of options.
 // Returns the index of the chosen option (0-based), or -1 for invalid input.
-func PromptChoice(prompt string, min, max int) int {
+// Returns an error if called in REPL mode.
+func PromptChoice(prompt string, min, max int) (int, error) {
+	if IsReplMode() {
+		return -1, errors.New("cannot prompt in REPL mode: provide specific selection as argument")
+	}
+
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
@@ -85,7 +106,7 @@ func PromptChoice(prompt string, min, max int) int {
 
 		trimmed := strings.TrimSpace(input)
 		if trimmed == "" {
-			return -1
+			return -1, nil
 		}
 
 		var choice int
@@ -96,7 +117,7 @@ func PromptChoice(prompt string, min, max int) int {
 		}
 
 		if choice >= min && choice <= max {
-			return choice
+			return choice, nil
 		}
 
 		fmt.Printf("Please enter a number between %d and %d: ", min, max)

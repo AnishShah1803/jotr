@@ -79,7 +79,9 @@ func openInEditor(ctx context.Context, path string) error {
 	}
 
 	execCmd := exec.Command(editor, path)
-	execCmd.Stdin = os.Stdin
+	if !utils.IsReplMode() {
+		execCmd.Stdin = os.Stdin
+	}
 	execCmd.Stdout = os.Stdout
 	execCmd.Stderr = os.Stderr
 

@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -15,30 +13,8 @@ import (
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
-// Reader interface for testable input operations.
-type Reader interface {
-	ReadString(delim byte) (string, error)
-}
-
-// StdinReader wraps os.Stdin for production use.
-type StdinReader struct{}
-
-func (r StdinReader) ReadString(delim byte) (string, error) {
-	return bufio.NewReader(os.Stdin).ReadString(delim)
-}
-
 // defaultReader is the production reader using stdin.
-var defaultReader Reader = StdinReader{}
-
-// SetReader allows replacing the reader (for testing).
-func SetReader(r Reader) {
-	defaultReader = r
-}
-
-// isReplMode checks if we're running in REPL mode
-func isReplMode() bool {
-	return os.Getenv("JOTR_REPL_MODE") == "true"
-}
+var defaultReader = utils.DefaultStdinReader
 
 var NoteCmd = &cobra.Command{
 	Use:   "note [action]",
@@ -105,8 +81,12 @@ func createNote(ctx context.Context, cfg *config.LoadedConfig, noteType string) 
 	return createNoteWithReader(ctx, cfg, noteType, defaultReader)
 }
 
-func createNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, noteType string, reader Reader) error {
+func createNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, noteType string, reader utils.StdinReader) error {
 	// Prompt for note name
+	if utils.IsReplMode() {
+		return fmt.Errorf("cannot prompt in REPL mode: provide note name as argument (e.g., 'note create [name]')")
+	}
+
 	fmt.Print("Note name: ")
 
 	input, err := reader.ReadString('\n')
@@ -142,10 +122,10 @@ func createNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, noteTyp
 }
 
 func openNote(ctx context.Context, cfg *config.LoadedConfig, query string) error {
-	return openNoteWithReader(ctx, cfg, query, defaultReader)
+	return openNoteWithReader(ctx, cfg, query, utils.DefaultStdinReader)
 }
 
-func openNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, query string, reader Reader) error {
+func openNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, query string, reader utils.StdinReader) error {
 	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
 	if err != nil {
 		return fmt.Errorf("failed to find notes: %w", err)
@@ -181,13 +161,13 @@ func openNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, query str
 	}
 
 	// Multiple matches
-	if isReplMode() {
+	if utils.IsReplMode() {
 		fmt.Println("Multiple notes found:")
 		for i, notePath := range matches {
 			relPath, _ := filepath.Rel(cfg.Paths.BaseDir, notePath)
 			fmt.Printf("%d. %s\n", i+1, relPath)
 		}
-		return fmt.Errorf("multiple matches found, please be more specific")
+		return fmt.Errorf("cannot prompt in REPL mode: be more specific in your query")
 	}
 
 	// In interactive mode, show list and prompt

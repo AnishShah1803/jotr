@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -125,9 +124,12 @@ func findNoteByName(ctx context.Context, cfg *config.LoadedConfig, query string)
 		fmt.Printf("  %d. %s\n", i+1, relPath)
 	}
 
+	if utils.IsReplMode() {
+		return "", fmt.Errorf("cannot prompt in REPL mode: be more specific in your query")
+	}
+
 	fmt.Print("\nSelect note (1-", len(matches), "): ")
-	reader := bufio.NewReader(os.Stdin)
-	input, err := reader.ReadString('\n')
+	input, err := utils.DefaultStdinReader.ReadString('\n')
 	if err != nil {
 		return "", fmt.Errorf("failed to read selection: %w", err)
 	}
