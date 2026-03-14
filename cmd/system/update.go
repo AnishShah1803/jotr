@@ -70,7 +70,7 @@ func runUpdate() error {
 
 		confirmed, err := utils.PromptYesNo("")
 		if err != nil {
-			return fmt.Errorf("cannot prompt in REPL mode: use --check to view available updates")
+			return fmt.Errorf("cannot prompt in REPL mode: use --check flag to view available updates")
 		}
 		if !confirmed {
 			fmt.Println("Update canceled")

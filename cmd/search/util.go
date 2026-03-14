@@ -1,33 +1,17 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/notes"
+	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
-// Helper functions for REPL mode handling
-type stdinReader interface {
-	ReadString(delim byte) (string, error)
-}
-
-type osStdinReader struct{}
-
-func (r osStdinReader) ReadString(delim byte) (string, error) {
-	return bufio.NewReader(os.Stdin).ReadString(delim)
-}
-
-var defaultReader stdinReader = osStdinReader{}
-
-func isReplMode() bool {
-	return os.Getenv("JOTR_REPL_MODE") == "true"
-}
+// pickNoteByName finds a note matching query. If exactly one note matches,
 
 // pickNoteByName finds a note matching query. If exactly one note matches,
 // it is returned immediately. If multiple notes match, the user is prompted
@@ -65,13 +49,13 @@ func pickNoteByName(ctx context.Context, cfg *config.LoadedConfig, query string)
 		fmt.Printf("  %d. %s\n", i+1, rel)
 	}
 
-	if isReplMode() {
-		return "", fmt.Errorf("multiple matches found in REPL mode - please be more specific in your query")
+	if utils.IsReplMode() {
+		return "", fmt.Errorf("cannot prompt in REPL mode: be more specific in your query")
 	}
 
 	fmt.Print("\nSelect note (1-", len(matches), "): ")
 
-	input, err := defaultReader.ReadString('\n')
+	input, err := utils.DefaultStdinReader.ReadString('\n')
 	if err != nil {
 		return "", fmt.Errorf("failed to read selection: %w", err)
 	}

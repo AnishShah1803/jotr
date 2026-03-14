@@ -60,7 +60,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 
 		confirmed, err := utils.PromptYesNo("")
 		if err != nil {
-			return fmt.Errorf("cannot prompt in REPL mode: use --force to skip confirmation")
+			return fmt.Errorf("cannot prompt in REPL mode: use --force flag to skip confirmation")
 		}
 
 		if !confirmed {

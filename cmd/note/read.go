@@ -124,12 +124,12 @@ func findNoteByName(ctx context.Context, cfg *config.LoadedConfig, query string)
 		fmt.Printf("  %d. %s\n", i+1, relPath)
 	}
 
-	if isReplMode() {
-		return "", fmt.Errorf("multiple matches found in REPL mode - please be more specific in your query")
+	if utils.IsReplMode() {
+		return "", fmt.Errorf("cannot prompt in REPL mode: be more specific in your query")
 	}
 
 	fmt.Print("\nSelect note (1-", len(matches), "): ")
-	input, err := defaultReader.ReadString('\n')
+	input, err := utils.DefaultStdinReader.ReadString('\n')
 	if err != nil {
 		return "", fmt.Errorf("failed to read selection: %w", err)
 	}

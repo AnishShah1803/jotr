@@ -8,18 +8,14 @@ import (
 	"strings"
 )
 
-// isReplMode checks if the code is running in REPL mode.
-func isReplMode() bool {
-	return os.Getenv("JOTR_REPL_MODE") == "true"
-}
 
 // PromptUser prompts the user with the given message and returns the input.
 // This is a safer alternative to fmt.Scanln that handles empty input and trimming.
 // Returns an empty string if the user provides no input.
 // Returns an error if called in REPL mode.
 func PromptUser(prompt string) (string, error) {
-	if isReplMode() {
-		return "", errors.New("interactive prompts are not supported in REPL mode")
+	if IsReplMode() {
+		return "", errors.New("cannot prompt in REPL mode: provide required arguments directly")
 	}
 
 	fmt.Print(prompt)
@@ -37,8 +33,8 @@ func PromptUser(prompt string) (string, error) {
 // Unlike PromptUser, this keeps prompting until non-empty input is received.
 // Returns an error if called in REPL mode.
 func PromptUserRequired(prompt string) (string, error) {
-	if isReplMode() {
-		return "", errors.New("interactive prompts are not supported in REPL mode")
+	if IsReplMode() {
+		return "", errors.New("cannot prompt in REPL mode: provide required arguments directly")
 	}
 
 	reader := bufio.NewReader(os.Stdin)
@@ -65,8 +61,8 @@ func PromptUserRequired(prompt string) (string, error) {
 // Keeps prompting until a valid response is received.
 // Returns an error if called in REPL mode.
 func PromptYesNo(prompt string) (bool, error) {
-	if isReplMode() {
-		return false, errors.New("interactive prompts are not supported in REPL mode")
+	if IsReplMode() {
+		return false, errors.New("cannot prompt in REPL mode: use appropriate flags (e.g., --force)")
 	}
 
 	reader := bufio.NewReader(os.Stdin)
@@ -95,8 +91,8 @@ func PromptYesNo(prompt string) (bool, error) {
 // Returns the index of the chosen option (0-based), or -1 for invalid input.
 // Returns an error if called in REPL mode.
 func PromptChoice(prompt string, min, max int) (int, error) {
-	if isReplMode() {
-		return -1, errors.New("interactive prompts are not supported in REPL mode")
+	if IsReplMode() {
+		return -1, errors.New("cannot prompt in REPL mode: provide specific selection as argument")
 	}
 
 	reader := bufio.NewReader(os.Stdin)

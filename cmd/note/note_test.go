@@ -811,20 +811,20 @@ func TestOpenNoteWithReader_EmptyNotes(t *testing.T) {
 func TestIsReplMode(t *testing.T) {
 	// Test with REPL mode disabled (default)
 	os.Unsetenv("JOTR_REPL_MODE")
-	if isReplMode() {
+	if utils.IsReplMode() {
 		t.Error("isReplMode() should return false when JOTR_REPL_MODE is not set")
 	}
 
 	// Test with REPL mode explicitly disabled
 	os.Setenv("JOTR_REPL_MODE", "false")
 	defer os.Unsetenv("JOTR_REPL_MODE")
-	if isReplMode() {
+	if utils.IsReplMode() {
 		t.Error("isReplMode() should return false when JOTR_REPL_MODE=false")
 	}
 
 	// Test with REPL mode enabled
 	os.Setenv("JOTR_REPL_MODE", "true")
-	if !isReplMode() {
+	if !utils.IsReplMode() {
 		t.Error("isReplMode() should return true when JOTR_REPL_MODE=true")
 	}
 }

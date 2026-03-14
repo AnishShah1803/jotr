@@ -11,6 +11,7 @@ import (
 	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/notes"
 	"github.com/AnishShah1803/jotr/internal/options"
+	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
 func appendDailyNote(_ context.Context, cfg *config.LoadedConfig, args []string, dateOpt *options.DateOption) error {
@@ -20,11 +21,11 @@ func appendDailyNote(_ context.Context, cfg *config.LoadedConfig, args []string,
 	if len(args) > 0 {
 		content = strings.Join(args, " ")
 	} else {
-		if isReplMode() {
-			return fmt.Errorf("content argument required in REPL mode: use 'daily append \"your content here\"'")
+		if utils.IsReplMode() {
+			return fmt.Errorf("cannot prompt in REPL mode: provide content as argument (e.g., 'daily append \"text\"')")
 		}
 		fmt.Print("Content to append: ")
-		input, err := defaultReader.ReadString('\n')
+		input, err := utils.DefaultStdinReader.ReadString('\n')
 		if err != nil {
 			return fmt.Errorf("failed to read content: %w", err)
 		}
@@ -56,11 +57,11 @@ func prependDailyNote(_ context.Context, cfg *config.LoadedConfig, args []string
 	if len(args) > 0 {
 		content = strings.Join(args, " ")
 	} else {
-		if isReplMode() {
-			return fmt.Errorf("content argument required in REPL mode: use 'daily prepend \"your content here\"'")
+		if utils.IsReplMode() {
+			return fmt.Errorf("cannot prompt in REPL mode: provide content as argument (e.g., 'daily prepend \"text\"')")
 		}
 		fmt.Print("Content to prepend: ")
-		input, err := defaultReader.ReadString('\n')
+		input, err := utils.DefaultStdinReader.ReadString('\n')
 		if err != nil {
 			return fmt.Errorf("failed to read content: %w", err)
 		}

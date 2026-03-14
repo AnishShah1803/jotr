@@ -79,7 +79,7 @@ func openInEditor(ctx context.Context, path string) error {
 	}
 
 	execCmd := exec.Command(editor, path)
-	if os.Getenv("JOTR_REPL_MODE") != "true" {
+	if !utils.IsReplMode() {
 		execCmd.Stdin = os.Stdin
 	}
 	execCmd.Stdout = os.Stdout
