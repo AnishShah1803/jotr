@@ -17,22 +17,23 @@ import (
 )
 
 var AliasCmd = &cobra.Command{
-	Use:   "alias [action]",
-	Short: "Manage note aliases",
-	Long: `Create aliases for notes for quick access.
+	Use:   "bookmark [action]",
+	Short: "Bookmark notes for quick access",
+	Long: `Create bookmarks for notes for quick access.
 	
 Actions:
-  add [name] [target]    Add an alias
-  remove [name]          Remove an alias
-  list                   List all aliases
-  resolve [name]         Resolve an alias
+  add [name] [target]    Add a bookmark
+  remove [name]          Remove a bookmark
+  list                   List all bookmarks
+  resolve [name]         Resolve a bookmark
   
 Examples:
-  jotr alias add work "Work/Projects.md"
-  jotr alias add today "daily:0"
-  jotr alias add yesterday "daily:-1"
-  jotr alias list
-  jotr alias resolve work`,
+  jotr bookmark add work "Work/Projects.md"
+  jotr bookmark add today "daily:0"
+  jotr bookmark add yesterday "daily:-1"
+  jotr bookmark list
+  jotr bookmark resolve work`,
+	Aliases: []string{"alias"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return fmt.Errorf("action required: add, remove, list, or resolve")
@@ -48,19 +49,19 @@ Examples:
 		switch action {
 		case "add":
 			if len(args) < 3 {
-				return fmt.Errorf("usage: alias add [name] [target]")
+				return fmt.Errorf("usage: bookmark add [name] [target]")
 			}
 			return addAlias(cfg, args[1], args[2])
 		case "remove", "rm":
 			if len(args) < 2 {
-				return fmt.Errorf("usage: alias remove [name]")
+				return fmt.Errorf("usage: bookmark remove [name]")
 			}
 			return removeAlias(cfg, args[1])
 		case "list", "ls":
 			return listAliases(cfg)
 		case "resolve":
 			if len(args) < 2 {
-				return fmt.Errorf("usage: alias resolve [name]")
+				return fmt.Errorf("usage: bookmark resolve [name]")
 			}
 			return resolveAlias(cfg, args[1])
 		default:

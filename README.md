@@ -307,6 +307,7 @@ Example configuration:
 | `list` | List recent notes | `ls` |
 | `recents` | List recently modified notes | |
 | `bulk` | Bulk operations | |
+| `bookmark` | Bookmark notes for quick access | `alias` |
 | `configure` | Configuration wizard | `config`, `cfg` |
 | `graph` | Generate graph visualization | |
 | `version` | Show version | |
