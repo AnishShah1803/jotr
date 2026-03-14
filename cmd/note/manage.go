@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/AnishShah1803/jotr/internal/config"
@@ -68,11 +69,14 @@ func deleteNote(ctx context.Context, cfg *config.LoadedConfig, args []string) er
 }
 
 func deleteNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []string, reader utils.StdinReader) error {
+	permanent := false
 	force := false
 	query := ""
 
 	for _, arg := range args {
-		if arg == "--force" {
+		if arg == "--permanent" {
+			permanent = true
+		} else if arg == "--force" {
 			force = true
 		} else if query == "" {
 			query = arg
@@ -96,7 +100,11 @@ func deleteNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []
 	relPath, _ := filepath.Rel(cfg.Paths.BaseDir, targetNote)
 
 	if !force {
-		fmt.Printf("Delete %s? [y/N]: ", relPath)
+		if permanent {
+			fmt.Printf("Permanently delete %s? [y/N]: ", relPath)
+		} else {
+			fmt.Printf("Move %s to trash? [y/N]: ", relPath)
+		}
 
 		input, err := reader.ReadString('\n')
 		if err != nil {
@@ -109,11 +117,27 @@ func deleteNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []
 		}
 	}
 
-	if err := os.Remove(targetNote); err != nil {
-		return fmt.Errorf("failed to delete note: %w", err)
-	}
+	if permanent {
+		if err := os.Remove(targetNote); err != nil {
+			return fmt.Errorf("failed to delete note: %w", err)
+		}
+		fmt.Printf("✓ Permanently deleted: %s\n", relPath)
+	} else {
+		trashDir := filepath.Join(cfg.Paths.BaseDir, ".trash")
+		if err := notes.EnsureDir(trashDir); err != nil {
+			return fmt.Errorf("failed to create trash directory: %w", err)
+		}
 
-	fmt.Printf("✓ Deleted: %s\n", relPath)
+		trashPath := filepath.Join(trashDir, filepath.Base(targetNote))
+		if utils.FileExists(trashPath) {
+			return fmt.Errorf("note already exists in trash: %s", filepath.Base(targetNote))
+		}
+
+		if err := os.Rename(targetNote, trashPath); err != nil {
+			return fmt.Errorf("failed to move note to trash: %w", err)
+		}
+		fmt.Printf("✓ Moved to trash: %s\n", relPath)
+	}
 	return nil
 }
 
@@ -166,8 +190,81 @@ func moveNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []st
 		return fmt.Errorf("failed to move note: %w", err)
 	}
 
+	if err := updateLinksAfterMove(ctx, cfg, targetNote, newPath); err != nil {
+		fmt.Printf("Warning: failed to update links: %v\n", err)
+	}
+
 	relNew, _ := filepath.Rel(cfg.Paths.BaseDir, newPath)
 	fmt.Printf("✓ Moved to: %s\n", relNew)
+	return nil
+}
+
+func updateLinksAfterMove(ctx context.Context, cfg *config.LoadedConfig, oldPath string, newPath string) error {
+	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	if err != nil {
+		return err
+	}
+
+	oldName := strings.TrimSuffix(filepath.Base(oldPath), ".md")
+	newName := strings.TrimSuffix(filepath.Base(newPath), ".md")
+	oldRelDir, _ := filepath.Rel(cfg.Paths.BaseDir, filepath.Dir(oldPath))
+	newRelDir, _ := filepath.Rel(cfg.Paths.BaseDir, filepath.Dir(newPath))
+
+	wikiLinkPattern := regexp.MustCompile(`\[\[([^\]]+)\]\]`)
+	mdLinkPattern := regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+
+	for _, notePath := range allNotes {
+		if notePath == newPath {
+			continue
+		}
+
+		content, err := os.ReadFile(notePath)
+		if err != nil {
+			continue
+		}
+
+		updated := false
+		text := string(content)
+
+		text = wikiLinkPattern.ReplaceAllStringFunc(text, func(match string) string {
+			link := strings.TrimPrefix(strings.TrimSuffix(match, "]]"), "[[")
+			parts := strings.Split(link, "|")
+			target := strings.TrimSpace(parts[0])
+
+			if strings.HasSuffix(target, oldName) || target == oldRelDir+"/"+oldName {
+				updated = true
+				newLink := newRelDir + "/" + newName
+				if strings.Contains(link, "|") {
+					return "[[" + newLink + "|" + strings.TrimSpace(parts[1]) + "]]"
+				}
+				return "[[" + newLink + "]]"
+			}
+			return match
+		})
+
+		text = mdLinkPattern.ReplaceAllStringFunc(text, func(match string) string {
+			submatch := mdLinkPattern.FindStringSubmatch(match)
+			if len(submatch) < 3 {
+				return match
+			}
+			linkText := submatch[1]
+			linkURL := submatch[2]
+
+			if strings.HasSuffix(linkURL, oldName+".md") || strings.HasSuffix(linkURL, oldName) {
+				updated = true
+				newURL := newRelDir + "/" + newName + ".md"
+				return "[" + linkText + "](" + newURL + ")"
+			}
+			return match
+		})
+
+		if updated {
+			if err := os.WriteFile(notePath, []byte(text), 0o644); err != nil {
+				continue
+			}
+		}
+	}
+
 	return nil
 }
 

@@ -3,6 +3,8 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -28,6 +30,8 @@ Actions:
   rename [query]    Rename an existing note
   delete [query]    Delete a note
   move [query]      Move a note to a subfolder
+  random            Open a random note
+  unique            List notes with unique properties
   
 Examples:
   jotr note create           # Create new note
@@ -36,11 +40,13 @@ Examples:
   jotr note list             # List all notes
   jotr note rename MyNote    # Rename a note
   jotr note delete MyNote    # Delete a note
-  jotr note move MyNote      # Move a note`,
+  jotr note move MyNote      # Move a note
+  jotr note random           # Open a random note
+  jotr note unique           # List notes with unique properties`,
 	Aliases: []string{"n"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			return fmt.Errorf("action required: create, open, list, rename, delete, or move")
+			return fmt.Errorf("action required: create, open, list, rename, delete, move, random, or unique")
 		}
 
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
@@ -71,6 +77,10 @@ Examples:
 			return deleteNote(cmd.Context(), cfg, args[1:])
 		case "move":
 			return moveNote(cmd.Context(), cfg, args[1:])
+		case "random":
+			return randomNote(cmd.Context(), cfg)
+		case "unique":
+			return uniqueNotes(cmd.Context(), cfg)
 		default:
 			return fmt.Errorf("unknown action: %s", action)
 		}
@@ -214,6 +224,70 @@ func listNotes(ctx context.Context, cfg *config.LoadedConfig) error {
 	for _, notePath := range allNotes {
 		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, notePath)
 		fmt.Printf("  %s\n", relPath)
+	}
+
+	return nil
+}
+
+func randomNote(ctx context.Context, cfg *config.LoadedConfig) error {
+	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	if err != nil {
+		return fmt.Errorf("failed to find notes: %w", err)
+	}
+
+	if len(allNotes) == 0 {
+		return fmt.Errorf("no notes found")
+	}
+
+	randomIdx := rand.Intn(len(allNotes))
+	return notes.OpenInEditor(allNotes[randomIdx])
+}
+
+func uniqueNotes(ctx context.Context, cfg *config.LoadedConfig) error {
+	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	if err != nil {
+		return err
+	}
+
+	if len(allNotes) == 0 {
+		fmt.Println("No notes found")
+		return nil
+	}
+
+	sizeMap := make(map[int][]string)
+	lineCounts := make(map[string]int)
+
+	for _, note := range allNotes {
+		content, err := os.ReadFile(note)
+		if err != nil {
+			continue
+		}
+
+		size := len(content)
+		lineCount := strings.Count(string(content), "\n") + 1
+		lineCounts[note] = lineCount
+
+		sizeMap[size] = append(sizeMap[size], note)
+	}
+
+	var uniqueNotesList []string
+	for _, notePaths := range sizeMap {
+		if len(notePaths) == 1 {
+			uniqueNotesList = append(uniqueNotesList, notePaths[0])
+		}
+	}
+
+	if len(uniqueNotesList) == 0 {
+		fmt.Println("No unique notes found (all notes have duplicate content sizes)")
+		return nil
+	}
+
+	fmt.Printf("Found %d notes with unique properties:\n\n", len(uniqueNotesList))
+
+	for _, note := range uniqueNotesList {
+		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, note)
+		lineCount := lineCounts[note]
+		fmt.Printf("  %s (%d lines)\n", relPath, lineCount)
 	}
 
 	return nil
