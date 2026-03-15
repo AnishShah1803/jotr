@@ -103,6 +103,19 @@ func init() {
 	PropertiesCmd.AddCommand(propertiesListCmd, propertiesGetCmd, propertiesSetCmd, propertiesRemoveCmd, propertiesStatsCmd)
 }
 
+func findNoteByName(ctx context.Context, cfg *config.LoadedConfig, noteName string) (string, error) {
+	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	if err != nil {
+		return "", err
+	}
+	for _, note := range allNotes {
+		if strings.Contains(strings.ToLower(filepath.Base(note)), strings.ToLower(noteName)) {
+			return note, nil
+		}
+	}
+	return "", fmt.Errorf("note not found: %s", noteName)
+}
+
 func parsePropertyType(val string) (string, string) {
 	parts := strings.SplitN(val, ":", 2)
 	if len(parts) == 2 && isValidType(parts[0]) {
@@ -164,21 +177,9 @@ func formatPropertyValue(val string, propType string) string {
 }
 
 func showProperties(ctx context.Context, cfg *config.LoadedConfig, noteName string) error {
-	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	targetNote, err := findNoteByName(ctx, cfg, noteName)
 	if err != nil {
 		return err
-	}
-
-	var targetNote string
-	for _, note := range allNotes {
-		if strings.Contains(strings.ToLower(filepath.Base(note)), strings.ToLower(noteName)) {
-			targetNote = note
-			break
-		}
-	}
-
-	if targetNote == "" {
-		return fmt.Errorf("note not found: %s", noteName)
 	}
 
 	content, err := os.ReadFile(targetNote)
@@ -229,21 +230,9 @@ func setProperty(ctx context.Context, cfg *config.LoadedConfig, noteName string,
 		return fmt.Errorf("invalid format, use: key=value or key:type=value")
 	}
 
-	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	targetNote, err := findNoteByName(ctx, cfg, noteName)
 	if err != nil {
 		return err
-	}
-
-	var targetNote string
-	for _, note := range allNotes {
-		if strings.Contains(strings.ToLower(filepath.Base(note)), strings.ToLower(noteName)) {
-			targetNote = note
-			break
-		}
-	}
-
-	if targetNote == "" {
-		return fmt.Errorf("note not found: %s", noteName)
 	}
 
 	content, err := os.ReadFile(targetNote)
@@ -292,21 +281,9 @@ func setProperty(ctx context.Context, cfg *config.LoadedConfig, noteName string,
 }
 
 func getProperty(ctx context.Context, cfg *config.LoadedConfig, noteName string, key string) error {
-	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	targetNote, err := findNoteByName(ctx, cfg, noteName)
 	if err != nil {
 		return err
-	}
-
-	var targetNote string
-	for _, note := range allNotes {
-		if strings.Contains(strings.ToLower(filepath.Base(note)), strings.ToLower(noteName)) {
-			targetNote = note
-			break
-		}
-	}
-
-	if targetNote == "" {
-		return fmt.Errorf("note not found: %s", noteName)
 	}
 
 	content, err := os.ReadFile(targetNote)
@@ -335,21 +312,9 @@ func getProperty(ctx context.Context, cfg *config.LoadedConfig, noteName string,
 }
 
 func removeProperty(ctx context.Context, cfg *config.LoadedConfig, noteName string, key string) error {
-	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	targetNote, err := findNoteByName(ctx, cfg, noteName)
 	if err != nil {
 		return err
-	}
-
-	var targetNote string
-	for _, note := range allNotes {
-		if strings.Contains(strings.ToLower(filepath.Base(note)), strings.ToLower(noteName)) {
-			targetNote = note
-			break
-		}
-	}
-
-	if targetNote == "" {
-		return fmt.Errorf("note not found: %s", noteName)
 	}
 
 	content, err := os.ReadFile(targetNote)
@@ -367,8 +332,7 @@ func removeProperty(ctx context.Context, cfg *config.LoadedConfig, noteName stri
 			if inFrontmatter && line == "---" {
 				inFrontmatter = false
 				newLines = append(newLines, line)
-			} else if inFrontmatter && strings.HasPrefix(line, key+":") {
-			} else {
+			} else if !inFrontmatter || !strings.HasPrefix(line, key+":") {
 				newLines = append(newLines, line)
 			}
 		}

@@ -65,8 +65,7 @@ func listRecents(ctx context.Context, cfg *config.LoadedConfig, limit int, showT
 
 	var fileInfos []fileInfo
 	for _, note := range allNotes {
-		fullPath := filepath.Join(cfg.Paths.BaseDir, note)
-		stat, err := os.Stat(fullPath)
+		stat, err := os.Stat(note)
 		if err != nil {
 			continue
 		}
@@ -95,7 +94,7 @@ func listRecents(ctx context.Context, cfg *config.LoadedConfig, limit int, showT
 	}
 
 	for i, fi := range fileInfos {
-		relPath := fi.path
+		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, fi.path)
 		modTimeStr := fi.modTime.Format("2006-01-02 15:04:05")
 		fmt.Printf("%d. %s (%s)\n", i+1, relPath, modTimeStr)
 	}

@@ -3,7 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"strings"
@@ -318,7 +318,7 @@ func randomNote(ctx context.Context, cfg *config.LoadedConfig) error {
 		return fmt.Errorf("no notes found")
 	}
 
-	randomIdx := rand.Intn(len(allNotes))
+	randomIdx := rand.IntN(len(allNotes))
 	return notes.OpenInEditor(allNotes[randomIdx])
 }
 

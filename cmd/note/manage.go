@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/notes"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
@@ -231,7 +232,7 @@ func updateLinksAfterMove(ctx context.Context, cfg *config.LoadedConfig, oldPath
 			parts := strings.Split(link, "|")
 			target := strings.TrimSpace(parts[0])
 
-			if strings.HasSuffix(target, oldName) || target == oldRelDir+"/"+oldName {
+			if target == oldName || target == oldRelDir+"/"+oldName {
 				updated = true
 				newLink := newRelDir + "/" + newName
 				if strings.Contains(link, "|") {
@@ -259,8 +260,8 @@ func updateLinksAfterMove(ctx context.Context, cfg *config.LoadedConfig, oldPath
 		})
 
 		if updated {
-			if err := os.WriteFile(notePath, []byte(text), 0o644); err != nil {
-				continue
+			if err := os.WriteFile(notePath, []byte(text), constants.FilePerm0644); err != nil {
+				fmt.Printf("Warning: failed to update links in %s: %v\n", notePath, err)
 			}
 		}
 	}

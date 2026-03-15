@@ -294,9 +294,7 @@ func removeFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName s
 			if inFrontmatter && line == "---" {
 				inFrontmatter = false
 				newLines = append(newLines, line)
-			} else if inFrontmatter && strings.HasPrefix(line, key+":") {
-
-			} else {
+			} else if !inFrontmatter || !strings.HasPrefix(line, key+":") {
 				newLines = append(newLines, line)
 			}
 		}

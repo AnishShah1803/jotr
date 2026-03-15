@@ -256,6 +256,13 @@ func showOrphanedNotes(ctx context.Context, cfg *config.LoadedConfig) error {
 		return err
 	}
 
+	// Build a map from lowercase note name → absolute path for O(1) lookup.
+	noteByName := make(map[string]string, len(allNotes))
+	for _, note := range allNotes {
+		name := strings.ToLower(strings.TrimSuffix(filepath.Base(note), ".md"))
+		noteByName[name] = note
+	}
+
 	backlinkedNotes := make(map[string]bool)
 
 	for _, note := range allNotes {
@@ -267,12 +274,8 @@ func showOrphanedNotes(ctx context.Context, cfg *config.LoadedConfig) error {
 		matches := linkRe.FindAllStringSubmatch(string(content), -1)
 		for _, match := range matches {
 			if len(match) > 1 {
-				for _, targetNote := range allNotes {
-					targetName := strings.TrimSuffix(filepath.Base(targetNote), ".md")
-					if strings.EqualFold(match[1], targetName) {
-						backlinkedNotes[targetNote] = true
-						break
-					}
+				if targetNote, ok := noteByName[strings.ToLower(match[1])]; ok {
+					backlinkedNotes[targetNote] = true
 				}
 			}
 		}
