@@ -321,17 +321,20 @@ func (m *Model) updateCompletions() {
 		newCompletions = m.autocomplete.GetAllCommands()
 	} else if len(fields) == 1 {
 		cmdName := fields[0]
-		if m.autocomplete.IsCommand(cmdName) {
+		prefixMatches := m.autocomplete.GetCompletions(cmdName)
+		if m.autocomplete.IsCommand(cmdName) && len(prefixMatches) == 1 {
+			// Exact unambiguous match — show subcommands or params.
 			subCommands := m.autocomplete.GetSubCommands(cmdName)
 			if subCommands != nil && len(subCommands) > 0 {
 				newCompletions = subCommands
 			} else if m.autocomplete.IsParamCommand(cmdName) {
 				newCompletions = m.autocomplete.GetParamCompletions(cmdName)
 			} else {
-				newCompletions = m.autocomplete.GetCompletions(cmdName)
+				newCompletions = prefixMatches
 			}
 		} else {
-			newCompletions = m.autocomplete.GetCompletions(cmdName)
+			// Partial or ambiguous — show prefix matches.
+			newCompletions = prefixMatches
 		}
 	} else {
 		newCompletions = m.getCompletionsForInput(fields, strings.HasSuffix(value, " "))
@@ -405,10 +408,29 @@ func (m *Model) getCompletionsForInput(fields []string, hasTrailingSpace bool) [
 			if subs != nil {
 				return subs
 			}
+			// cmdPath may be a leaf subcommand — fall through to param lookup.
+			// Only echo the leaf if there are no params registered.
+			if parentPath, _, ok := strings.Cut(cmdPath, " "); ok {
+				if m.autocomplete.GetSubCommands(parentPath) != nil {
+					if m.autocomplete.GetParamsForCommand(cmdPath) == nil {
+						return []string{cmdPath}
+					}
+					// Has params — fall through to param section below.
+				}
+			}
 		} else {
 			subs := m.autocomplete.GetSubCommandCompletions(cmdPath, partial)
 			if subs != nil {
 				return subs
+			}
+			// Only echo the leaf if there are no params; otherwise fall through.
+			if parentPath, _, ok := strings.Cut(cmdPath, " "); ok {
+				if m.autocomplete.GetSubCommands(parentPath) != nil {
+					if m.autocomplete.GetParamsForCommand(cmdPath) == nil {
+						return []string{cmdPath}
+					}
+					// Has params — fall through to param section below.
+				}
 			}
 		}
 	}
