@@ -14,49 +14,56 @@ import (
 )
 
 var ShortcutCmd = &cobra.Command{
-	Use:   "shortcut [action]",
+	Use:   "shortcut",
 	Short: "Manage command shortcuts",
-	Long: `Create custom shortcuts for frequently used commands.
-	
-Actions:
-  add [name] [command]    Add a shortcut
-  remove [name]           Remove a shortcut
-  list                    List all shortcuts
-  
-Examples:
-  jotr shortcut add td "daily"
-  jotr shortcut add ws "search work"
-  jotr shortcut list
-  jotr shortcut remove td`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return fmt.Errorf("action required: add, remove, or list")
-		}
+		return cmd.Help()
+	},
+}
 
+var shortcutAddCmd = &cobra.Command{
+	Use:   "add [name] [command]",
+	Short: "Add a shortcut",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
 		if err != nil {
 			return err
 		}
-
-		action := args[0]
-
-		switch action {
-		case "add":
-			if len(args) < 3 {
-				return fmt.Errorf("usage: shortcut add [name] [command]")
-			}
-			return addShortcut(cfg, args[1], args[2])
-		case "remove", "rm":
-			if len(args) < 2 {
-				return fmt.Errorf("usage: shortcut remove [name]")
-			}
-			return removeShortcut(cfg, args[1])
-		case "list", "ls":
-			return listShortcuts(cfg)
-		default:
-			return fmt.Errorf("unknown action: %s", action)
-		}
+		return addShortcut(cfg, args[0], args[1])
 	},
+}
+
+var shortcutRemoveCmd = &cobra.Command{
+	Use:     "remove [name]",
+	Short:   "Remove a shortcut",
+	Aliases: []string{"rm"},
+	Args:    cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return removeShortcut(cfg, args[0])
+	},
+}
+
+var shortcutListCmd = &cobra.Command{
+	Use:     "list",
+	Short:   "List all shortcuts",
+	Aliases: []string{"ls"},
+	Args:    cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return listShortcuts(cfg)
+	},
+}
+
+func init() {
+	ShortcutCmd.AddCommand(shortcutAddCmd, shortcutRemoveCmd, shortcutListCmd)
 }
 
 func getShortcutFile(cfg *config.LoadedConfig) string {

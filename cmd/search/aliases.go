@@ -16,47 +16,54 @@ import (
 )
 
 var AliasesCmd = &cobra.Command{
-	Use:   "aliases [action]",
+	Use:   "aliases",
 	Short: "Manage note aliases",
-	Long: `Manage and track note aliases for cross-referencing.
-	
-Actions:
-  list              List all aliases and their notes
-  find [alias]      Find notes using a specific alias
-  stats             Show alias statistics
-  
-Aliases can be defined in frontmatter as 'aliases: [alias1, alias2]' or 'alias: alias1'.
-  
-Examples:
-  jotr aliases list
-  jotr aliases find shortname
-  jotr aliases stats`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return cmd.Help()
+	},
+}
 
+var aliasesListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List all aliases and their notes",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
 		if err != nil {
 			return err
 		}
-
-		action := "list"
-		if len(args) > 0 {
-			action = args[0]
-		}
-
-		switch action {
-		case "list":
-			return listAliases(cmd.Context(), cfg)
-		case "find":
-			if len(args) < 2 {
-				return fmt.Errorf("alias name required")
-			}
-			return findByAlias(cmd.Context(), cfg, args[1])
-		case "stats":
-			return aliasStats(cmd.Context(), cfg)
-		default:
-			return fmt.Errorf("unknown action: %s", action)
-		}
+		return listAliases(cmd.Context(), cfg)
 	},
+}
+
+var aliasesFindCmd = &cobra.Command{
+	Use:   "find <alias>",
+	Short: "Find notes using a specific alias",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return findByAlias(cmd.Context(), cfg, args[0])
+	},
+}
+
+var aliasesStatsCmd = &cobra.Command{
+	Use:   "stats",
+	Short: "Show alias statistics",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return aliasStats(cmd.Context(), cfg)
+	},
+}
+
+func init() {
+	AliasesCmd.AddCommand(aliasesListCmd)
+	AliasesCmd.AddCommand(aliasesFindCmd)
+	AliasesCmd.AddCommand(aliasesStatsCmd)
 }
 
 func extractAliases(content string) []string {

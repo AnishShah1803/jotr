@@ -19,65 +19,81 @@ import (
 var linkRe = regexp.MustCompile(`\[\[([^\]]+)\]\]`)
 
 var LinksCmd = &cobra.Command{
-	Use:   "links [action] [note-name]",
+	Use:   "links",
 	Short: "Show links and backlinks",
-	Long: `Show links in a note and backlinks to a note.
-	
-Actions:
-  outgoing [note]    Show outgoing wiki-links from a note (default)
-  backlinks [note]   Show notes that link to the given note
-  unresolved         List all unresolved (broken) wiki-links
-  orphans            List all orphaned notes (notes with no incoming links)
-  deadends           List all dead-end notes (notes with no outgoing links)
-  
-Examples:
-  jotr links MyNote              # Show outgoing links in MyNote
-  jotr links outgoing MyNote     # Explicit outgoing links
-  jotr links backlinks MyNote    # Show backlinks to MyNote
-  jotr links unresolved          # Show broken links
-  jotr links orphans             # Show orphaned notes
-  jotr links deadends            # Show notes with no outgoing links
-  jotr links --backlinks MyNote  # Flag-based backlinks (legacy)`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return cmd.Help()
+	},
+}
+
+var linksOutgoingCmd = &cobra.Command{
+	Use:   "outgoing <note-name>",
+	Short: "Show outgoing wiki-links from a note",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
 		if err != nil {
 			return err
 		}
+		return showLinks(cmd.Context(), cfg, args[0])
+	},
+}
 
-		if len(args) == 0 {
-			return fmt.Errorf("action required: outgoing, backlinks, unresolved, orphans, or deadends")
+var linksBacklinksCmd = &cobra.Command{
+	Use:   "backlinks <note-name>",
+	Short: "Show notes that link to a note",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
 		}
+		return showBacklinks(cmd.Context(), cfg, args[0])
+	},
+}
 
-		action := args[0]
-		switch action {
-		case "outgoing":
-			if len(args) < 2 {
-				return fmt.Errorf("note name required")
-			}
-			return showLinks(cmd.Context(), cfg, args[1])
-		case "backlinks":
-			if len(args) < 2 {
-				return fmt.Errorf("note name required")
-			}
-			return showBacklinks(cmd.Context(), cfg, args[1])
-		case "unresolved":
-			return showUnresolvedLinks(cmd.Context(), cfg)
-		case "orphans":
-			return showOrphanedNotes(cmd.Context(), cfg)
-		case "deadends":
-			return showDeadends(cmd.Context(), cfg)
-		default:
-			backlinks, _ := cmd.Flags().GetBool("backlinks")
-			if backlinks {
-				return showBacklinks(cmd.Context(), cfg, action)
-			}
-			return showLinks(cmd.Context(), cfg, action)
+var linksUnresolvedCmd = &cobra.Command{
+	Use:   "unresolved",
+	Short: "List all unresolved (broken) wiki-links",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
 		}
+		return showUnresolvedLinks(cmd.Context(), cfg)
+	},
+}
+
+var linksOrphansCmd = &cobra.Command{
+	Use:   "orphans",
+	Short: "List notes with no incoming links",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return showOrphanedNotes(cmd.Context(), cfg)
+	},
+}
+
+var linksDeadendsCmd = &cobra.Command{
+	Use:   "deadends",
+	Short: "List notes with no outgoing links",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return showDeadends(cmd.Context(), cfg)
 	},
 }
 
 func init() {
-	LinksCmd.Flags().Bool("backlinks", false, "show backlinks instead of outgoing links")
+	LinksCmd.AddCommand(linksOutgoingCmd)
+	LinksCmd.AddCommand(linksBacklinksCmd)
+	LinksCmd.AddCommand(linksUnresolvedCmd)
+	LinksCmd.AddCommand(linksOrphansCmd)
+	LinksCmd.AddCommand(linksDeadendsCmd)
 }
 
 func showLinks(ctx context.Context, cfg *config.LoadedConfig, noteName string) error {

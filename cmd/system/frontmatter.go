@@ -25,68 +25,68 @@ func quoteFrontmatterValue(v string) string {
 }
 
 var FrontmatterCmd = &cobra.Command{
-	Use:   "frontmatter [action] [note-name]",
-	Short: "Manage note frontmatter",
-	Long: `View or edit frontmatter in notes.
-	
-Actions:
-  list [note]         Show all frontmatter fields (default)
-  get [note] [key]    Get a specific frontmatter value
-  set [note] key=val  Set a frontmatter key to a value
-  remove [note] [key] Remove a frontmatter key
-
-Examples:
-  jotr frontmatter MyNote              # Show frontmatter
-  jotr frontmatter list MyNote         # Same as above
-  jotr frontmatter get MyNote status   # Get 'status' field
-  jotr frontmatter set MyNote status=done
-  jotr frontmatter remove MyNote status
-  jotr frontmatter MyNote --set status=done  # Legacy flag syntax`,
+	Use:     "frontmatter",
+	Short:   "Manage note frontmatter",
 	Aliases: []string{"fm"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return fmt.Errorf("note name required")
-		}
+		return cmd.Help()
+	},
+}
 
+var frontmatterListCmd = &cobra.Command{
+	Use:   "list [note]",
+	Short: "Show all frontmatter fields",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
 		if err != nil {
 			return err
 		}
+		return showFrontmatter(cmd.Context(), cfg, args[0])
+	},
+}
 
-		action := args[0]
-		switch action {
-		case "list":
-			if len(args) < 2 {
-				return fmt.Errorf("note name required")
-			}
-			return showFrontmatter(cmd.Context(), cfg, args[1])
-		case "get":
-			if len(args) < 3 {
-				return fmt.Errorf("usage: frontmatter get <note> <key>")
-			}
-			return getFrontmatter(cmd.Context(), cfg, args[1], args[2])
-		case "set":
-			if len(args) < 3 {
-				return fmt.Errorf("usage: frontmatter set <note> key=value")
-			}
-			return setFrontmatter(cmd.Context(), cfg, args[1], args[2])
-		case "remove":
-			if len(args) < 3 {
-				return fmt.Errorf("usage: frontmatter remove <note> <key>")
-			}
-			return removeFrontmatter(cmd.Context(), cfg, args[1], args[2])
-		default:
-			setValue, _ := cmd.Flags().GetString("set")
-			if setValue != "" {
-				return setFrontmatter(cmd.Context(), cfg, action, setValue)
-			}
-			return showFrontmatter(cmd.Context(), cfg, action)
+var frontmatterGetCmd = &cobra.Command{
+	Use:   "get [note] [key]",
+	Short: "Get a specific frontmatter value",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
 		}
+		return getFrontmatter(cmd.Context(), cfg, args[0], args[1])
+	},
+}
+
+var frontmatterSetCmd = &cobra.Command{
+	Use:   "set [note] key=value",
+	Short: "Set or update a frontmatter field",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return setFrontmatter(cmd.Context(), cfg, args[0], args[1])
+	},
+}
+
+var frontmatterRemoveCmd = &cobra.Command{
+	Use:   "remove [note] [key]",
+	Short: "Remove a frontmatter field",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return removeFrontmatter(cmd.Context(), cfg, args[0], args[1])
 	},
 }
 
 func init() {
-	FrontmatterCmd.Flags().String("set", "", "set a frontmatter key=value (legacy flag syntax)")
+	FrontmatterCmd.AddCommand(frontmatterListCmd, frontmatterGetCmd, frontmatterSetCmd, frontmatterRemoveCmd)
 }
 
 func showFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName string) error {
@@ -287,7 +287,6 @@ func removeFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName s
 	lines := strings.Split(string(content), "\n")
 	var newLines []string
 
-	// Only strip the key within the frontmatter block.
 	if len(lines) > 0 && lines[0] == "---" {
 		newLines = append(newLines, lines[0])
 		inFrontmatter := true
@@ -296,7 +295,7 @@ func removeFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName s
 				inFrontmatter = false
 				newLines = append(newLines, line)
 			} else if inFrontmatter && strings.HasPrefix(line, key+":") {
-				// drop this line
+
 			} else {
 				newLines = append(newLines, line)
 			}

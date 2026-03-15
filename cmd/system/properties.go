@@ -18,88 +18,89 @@ import (
 )
 
 var PropertiesCmd = &cobra.Command{
-	Use:   "properties [action] [note-name]",
-	Short: "Manage typed note properties",
-	Long: `View or edit typed properties in note frontmatter with type validation.
-
-Supported Types:
-  text       Plain text string
-  list       Comma-separated values or YAML array
-  number     Integer or floating-point number
-  checkbox   Boolean (true/false, yes/no, x/-)
-  date       Date in YYYY-MM-DD format
-  datetime   ISO 8601 datetime format
-
-Actions:
-  list [note]              Show all properties (default)
-  get [note] [key]         Get a specific property value
-  set [note] key=val       Set a property (auto-detect type)
-  set [note] key:type=val  Set a typed property
-  remove [note] [key]      Remove a property
-  stats                    Show vault-wide property statistics
-  stats [property]         Show statistics for a specific property
-  
-Flags:
-  --type string           Specify property type when setting
-  --counts                Sort by usage count (for stats)
-  
-Examples:
-  jotr properties MyNote
-  jotr properties get MyNote status
-  jotr properties set MyNote status=active
-  jotr properties set MyNote priority:number=5
-  jotr properties stats
-  jotr properties stats category --counts`,
+	Use:     "properties",
+	Short:   "Manage typed note properties",
 	Aliases: []string{"prop", "props"},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return fmt.Errorf("action required: list, get, set, remove, or stats")
-		}
+		return cmd.Help()
+	},
+}
 
+var propertiesListCmd = &cobra.Command{
+	Use:   "list [note]",
+	Short: "Show all properties with types",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
 		if err != nil {
 			return err
 		}
+		return showProperties(cmd.Context(), cfg, args[0])
+	},
+}
 
-		action := args[0]
-		switch action {
-		case "list":
-			if len(args) < 2 {
-				return fmt.Errorf("note name required")
-			}
-			return showProperties(cmd.Context(), cfg, args[1])
-		case "get":
-			if len(args) < 3 {
-				return fmt.Errorf("usage: properties get <note> <key>")
-			}
-			return getProperty(cmd.Context(), cfg, args[1], args[2])
-		case "set":
-			if len(args) < 3 {
-				return fmt.Errorf("usage: properties set <note> key=value")
-			}
-			propType, _ := cmd.Flags().GetString("type")
-			return setProperty(cmd.Context(), cfg, args[1], args[2], propType)
-		case "remove":
-			if len(args) < 3 {
-				return fmt.Errorf("usage: properties remove <note> <key>")
-			}
-			return removeProperty(cmd.Context(), cfg, args[1], args[2])
-		case "stats":
-			property := ""
-			if len(args) > 1 {
-				property = args[1]
-			}
-			counts, _ := cmd.Flags().GetBool("counts")
-			return showPropertyStats(cmd.Context(), cfg, property, counts)
-		default:
-			return showProperties(cmd.Context(), cfg, action)
+var propertiesGetCmd = &cobra.Command{
+	Use:   "get [note] [key]",
+	Short: "Get the value of a specific property",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
 		}
+		return getProperty(cmd.Context(), cfg, args[0], args[1])
+	},
+}
+
+var propertiesSetCmd = &cobra.Command{
+	Use:   "set [note] key=value",
+	Short: "Set property with auto type detection",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		propType, _ := cmd.Flags().GetString("type")
+		return setProperty(cmd.Context(), cfg, args[0], args[1], propType)
+	},
+}
+
+var propertiesRemoveCmd = &cobra.Command{
+	Use:   "remove [note] [key]",
+	Short: "Remove a property",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return removeProperty(cmd.Context(), cfg, args[0], args[1])
+	},
+}
+
+var propertiesStatsCmd = &cobra.Command{
+	Use:   "stats [property]",
+	Short: "Show vault-wide property statistics",
+	Args:  cobra.RangeArgs(0, 1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		property := ""
+		if len(args) > 0 {
+			property = args[0]
+		}
+		counts, _ := cmd.Flags().GetBool("counts")
+		return showPropertyStats(cmd.Context(), cfg, property, counts)
 	},
 }
 
 func init() {
-	PropertiesCmd.Flags().String("type", "", "property type (text, list, number, checkbox, date, datetime)")
-	PropertiesCmd.Flags().Bool("counts", false, "sort by usage count")
+	propertiesSetCmd.Flags().String("type", "", "property type (text, list, number, checkbox, date, datetime)")
+	propertiesStatsCmd.Flags().Bool("counts", false, "sort by usage count")
+	PropertiesCmd.AddCommand(propertiesListCmd, propertiesGetCmd, propertiesSetCmd, propertiesRemoveCmd, propertiesStatsCmd)
 }
 
 func parsePropertyType(val string) (string, string) {
@@ -367,7 +368,6 @@ func removeProperty(ctx context.Context, cfg *config.LoadedConfig, noteName stri
 				inFrontmatter = false
 				newLines = append(newLines, line)
 			} else if inFrontmatter && strings.HasPrefix(line, key+":") {
-				// drop this line
 			} else {
 				newLines = append(newLines, line)
 			}
