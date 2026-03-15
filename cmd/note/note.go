@@ -99,7 +99,6 @@ var noteDeleteCmd = &cobra.Command{
 		permanent, _ := cmd.Flags().GetBool("permanent")
 		force, _ := cmd.Flags().GetBool("force")
 
-
 		passArgs := make([]string, 0, len(args)+2)
 		passArgs = append(passArgs, args...)
 		if permanent {
