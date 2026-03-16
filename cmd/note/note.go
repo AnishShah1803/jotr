@@ -253,7 +253,7 @@ func openNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, query str
 	if utils.IsReplMode() {
 		fmt.Println("Multiple notes found:")
 		for i, notePath := range matches {
-			relPath, _ := filepath.Rel(cfg.Paths.BaseDir, notePath)
+			relPath := relPath(cfg.Paths.BaseDir, notePath)
 			fmt.Printf("%d. %s\n", i+1, relPath)
 		}
 		return fmt.Errorf("cannot prompt in REPL mode: be more specific in your query")
@@ -263,7 +263,7 @@ func openNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, query str
 	fmt.Println("Multiple notes found:")
 
 	for i, notePath := range matches {
-		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, notePath)
+		relPath := relPath(cfg.Paths.BaseDir, notePath)
 		fmt.Printf("%d. %s\n", i+1, relPath)
 	}
 
@@ -301,7 +301,7 @@ func listNotes(ctx context.Context, cfg *config.LoadedConfig) error {
 	fmt.Printf("Found %d notes:\n\n", len(allNotes))
 
 	for _, notePath := range allNotes {
-		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, notePath)
+		relPath := relPath(cfg.Paths.BaseDir, notePath)
 		fmt.Printf("  %s\n", relPath)
 	}
 
@@ -364,7 +364,7 @@ func uniqueNotes(ctx context.Context, cfg *config.LoadedConfig) error {
 	fmt.Printf("Found %d notes with unique properties:\n\n", len(uniqueNotesList))
 
 	for _, note := range uniqueNotesList {
-		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, note)
+		relPath := relPath(cfg.Paths.BaseDir, note)
 		lineCount := lineCounts[note]
 		fmt.Printf("  %s (%d lines)\n", relPath, lineCount)
 	}

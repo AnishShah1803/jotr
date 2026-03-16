@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
+
 	"sort"
 	"time"
 
@@ -94,7 +94,7 @@ func listRecents(ctx context.Context, cfg *config.LoadedConfig, limit int, showT
 	}
 
 	for i, fi := range fileInfos {
-		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, fi.path)
+		relPath := relPath(cfg.Paths.BaseDir, fi.path)
 		modTimeStr := fi.modTime.Format("2006-01-02 15:04:05")
 		fmt.Printf("%d. %s (%s)\n", i+1, relPath, modTimeStr)
 	}

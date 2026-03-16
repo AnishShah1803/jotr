@@ -45,7 +45,7 @@ func pickNoteByName(ctx context.Context, cfg *config.LoadedConfig, query string)
 
 	fmt.Println("Multiple notes found:")
 	for i, np := range matches {
-		rel, _ := filepath.Rel(cfg.Paths.BaseDir, np)
+		rel := relPath(cfg.Paths.BaseDir, np)
 		fmt.Printf("  %d. %s\n", i+1, rel)
 	}
 
@@ -69,4 +69,13 @@ func pickNoteByName(ctx context.Context, cfg *config.LoadedConfig, query string)
 	}
 
 	return matches[sel-1], nil
+}
+
+// relPath returns target relative to base, falling back to target on error.
+func relPath(base, target string) string {
+	rel, err := filepath.Rel(base, target)
+	if err != nil {
+		return target
+	}
+	return rel
 }

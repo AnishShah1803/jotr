@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
+
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -92,7 +92,7 @@ func SearchNotes(ctx context.Context, cfg *config.LoadedConfig, query string) er
 
 				if GetSearchFilesForTest() || searchOutputOption.FilesOnly {
 					for _, r := range results {
-						relPath, _ := filepath.Rel(cfg.Paths.BaseDir, r.Path)
+						relPath := relPath(cfg.Paths.BaseDir, r.Path)
 						fmt.Println(relPath)
 					}
 					return nil
@@ -101,7 +101,7 @@ func SearchNotes(ctx context.Context, cfg *config.LoadedConfig, query string) er
 				fmt.Printf("Found %d matches:\n\n", len(results))
 
 				for _, r := range results {
-					relPath, _ := filepath.Rel(cfg.Paths.BaseDir, r.Path)
+					relPath := relPath(cfg.Paths.BaseDir, r.Path)
 					fmt.Printf("📄 %s", relPath)
 					if r.Title != "" {
 						fmt.Printf(" (%s)", r.Title)
@@ -138,7 +138,7 @@ func SearchNotes(ctx context.Context, cfg *config.LoadedConfig, query string) er
 
 	if GetSearchFilesForTest() || searchOutputOption.FilesOnly {
 		for _, match := range matches {
-			relPath, _ := filepath.Rel(cfg.Paths.BaseDir, match.Path)
+			relPath := relPath(cfg.Paths.BaseDir, match.Path)
 			fmt.Println(relPath)
 		}
 		return nil
@@ -149,7 +149,7 @@ func SearchNotes(ctx context.Context, cfg *config.LoadedConfig, query string) er
 	queryLower := strings.ToLower(query)
 
 	for _, match := range matches {
-		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, match.Path)
+		relPath := relPath(cfg.Paths.BaseDir, match.Path)
 		fmt.Printf("📄 %s\n", relPath)
 
 		lines := strings.Split(string(match.Content), "\n")

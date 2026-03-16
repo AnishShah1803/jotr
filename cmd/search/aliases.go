@@ -3,7 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"path/filepath"
+
 	"regexp"
 	"sort"
 	"strings"
@@ -157,12 +157,12 @@ func listAliases(ctx context.Context, cfg *config.LoadedConfig) error {
 		fmt.Printf("  %s -> ", alias)
 
 		if len(paths) == 1 {
-			relPath, _ := filepath.Rel(cfg.Paths.BaseDir, paths[0])
+			relPath := relPath(cfg.Paths.BaseDir, paths[0])
 			fmt.Printf("%s\n", relPath)
 		} else {
 			fmt.Printf("%d notes\n", len(paths))
 			for _, path := range paths {
-				relPath, _ := filepath.Rel(cfg.Paths.BaseDir, path)
+				relPath := relPath(cfg.Paths.BaseDir, path)
 				fmt.Printf("    - %s\n", relPath)
 			}
 		}
@@ -206,7 +206,7 @@ func findByAlias(ctx context.Context, cfg *config.LoadedConfig, alias string) er
 	fmt.Printf("Found %d notes with alias '%s':\n\n", len(matches), alias)
 
 	for _, match := range matches {
-		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, match)
+		relPath := relPath(cfg.Paths.BaseDir, match)
 		fmt.Printf("  %s\n", relPath)
 	}
 

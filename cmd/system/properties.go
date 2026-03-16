@@ -108,12 +108,19 @@ func findNoteByName(ctx context.Context, cfg *config.LoadedConfig, noteName stri
 	if err != nil {
 		return "", err
 	}
+	var matches []string
 	for _, note := range allNotes {
 		if strings.Contains(strings.ToLower(filepath.Base(note)), strings.ToLower(noteName)) {
-			return note, nil
+			matches = append(matches, note)
 		}
 	}
-	return "", fmt.Errorf("note not found: %s", noteName)
+	if len(matches) == 0 {
+		return "", fmt.Errorf("note not found: %s", noteName)
+	}
+	if len(matches) > 1 {
+		fmt.Fprintf(os.Stderr, "Warning: %d notes match %q, using first match. Be more specific to target a different note.\n", len(matches), noteName)
+	}
+	return matches[0], nil
 }
 
 func parsePropertyType(val string) (string, string) {

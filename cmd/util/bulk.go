@@ -35,21 +35,8 @@ var bulkRenameCmd = &cobra.Command{
 	},
 }
 
-var bulkTagCmd = &cobra.Command{
-	Use:   "tag [tag]",
-	Short: "Add tag to all notes matching query",
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.LoadWithContext(cmd.Context(), "")
-		if err != nil {
-			return err
-		}
-		return bulkTag(cmd.Context(), cfg, args[0])
-	},
-}
-
 func init() {
-	BulkCmd.AddCommand(bulkRenameCmd, bulkTagCmd)
+	BulkCmd.AddCommand(bulkRenameCmd)
 }
 
 func bulkRename(ctx context.Context, cfg *config.LoadedConfig, oldText, newText string) error {
@@ -74,7 +61,10 @@ func bulkRename(ctx context.Context, cfg *config.LoadedConfig, oldText, newText 
 				continue
 			}
 
-			relPath, _ := filepath.Rel(cfg.Paths.BaseDir, notePath)
+			relPath, err := filepath.Rel(cfg.Paths.BaseDir, notePath)
+			if err != nil {
+				relPath = notePath
+			}
 			fmt.Printf("✓ Updated: %s\n", relPath)
 
 			modifiedCount++
@@ -82,13 +72,6 @@ func bulkRename(ctx context.Context, cfg *config.LoadedConfig, oldText, newText 
 	}
 
 	fmt.Printf("\n✓ Modified %d notes\n", modifiedCount)
-
-	return nil
-}
-
-func bulkTag(ctx context.Context, cfg *config.LoadedConfig, tag string) error {
-	fmt.Printf("Bulk tagging with #%s\n", tag)
-	fmt.Println("(This is a placeholder - implement with query filter)")
 
 	return nil
 }

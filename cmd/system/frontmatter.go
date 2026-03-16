@@ -11,7 +11,6 @@ import (
 
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/constants"
-	"github.com/AnishShah1803/jotr/internal/notes"
 )
 
 func quoteFrontmatterValue(v string) string {
@@ -90,22 +89,9 @@ func init() {
 }
 
 func showFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName string) error {
-	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	targetNote, err := findNoteByName(ctx, cfg, noteName)
 	if err != nil {
 		return err
-	}
-
-	var targetNote string
-
-	for _, note := range allNotes {
-		if strings.Contains(strings.ToLower(filepath.Base(note)), strings.ToLower(noteName)) {
-			targetNote = note
-			break
-		}
-	}
-
-	if targetNote == "" {
-		return fmt.Errorf("note not found: %s", noteName)
 	}
 
 	content, err := os.ReadFile(targetNote)
@@ -152,22 +138,9 @@ func setFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName stri
 	key := strings.TrimSpace(parts[0])
 	value := strings.TrimSpace(parts[1])
 
-	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	targetNote, err := findNoteByName(ctx, cfg, noteName)
 	if err != nil {
 		return err
-	}
-
-	var targetNote string
-
-	for _, note := range allNotes {
-		if strings.Contains(strings.ToLower(filepath.Base(note)), strings.ToLower(noteName)) {
-			targetNote = note
-			break
-		}
-	}
-
-	if targetNote == "" {
-		return fmt.Errorf("note not found: %s", noteName)
 	}
 
 	content, err := os.ReadFile(targetNote)
@@ -219,21 +192,9 @@ func setFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName stri
 }
 
 func getFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName string, key string) error {
-	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	targetNote, err := findNoteByName(ctx, cfg, noteName)
 	if err != nil {
 		return err
-	}
-
-	var targetNote string
-	for _, note := range allNotes {
-		if strings.Contains(strings.ToLower(filepath.Base(note)), strings.ToLower(noteName)) {
-			targetNote = note
-			break
-		}
-	}
-
-	if targetNote == "" {
-		return fmt.Errorf("note not found: %s", noteName)
 	}
 
 	content, err := os.ReadFile(targetNote)
@@ -262,21 +223,9 @@ func getFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName stri
 }
 
 func removeFrontmatter(ctx context.Context, cfg *config.LoadedConfig, noteName string, key string) error {
-	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	targetNote, err := findNoteByName(ctx, cfg, noteName)
 	if err != nil {
 		return err
-	}
-
-	var targetNote string
-	for _, note := range allNotes {
-		if strings.Contains(strings.ToLower(filepath.Base(note)), strings.ToLower(noteName)) {
-			targetNote = note
-			break
-		}
-	}
-
-	if targetNote == "" {
-		return fmt.Errorf("note not found: %s", noteName)
 	}
 
 	content, err := os.ReadFile(targetNote)

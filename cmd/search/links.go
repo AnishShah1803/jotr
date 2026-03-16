@@ -173,7 +173,7 @@ func showBacklinks(ctx context.Context, cfg *config.LoadedConfig, noteName strin
 						found = true
 					}
 
-					relPath, _ := filepath.Rel(cfg.Paths.BaseDir, note)
+					relPath := relPath(cfg.Paths.BaseDir, note)
 					fmt.Printf("\n  %s:%d\n", relPath, i+1)
 					fmt.Printf("    %s\n", strings.TrimSpace(line))
 				}
@@ -242,7 +242,7 @@ func showUnresolvedLinks(ctx context.Context, cfg *config.LoadedConfig) error {
 		notePaths := unresolvedLinks[link]
 		fmt.Printf("  [[%s]] - referenced in %d note(s):\n", link, len(notePaths))
 		for _, note := range notePaths {
-			relPath, _ := filepath.Rel(cfg.Paths.BaseDir, note)
+			relPath := relPath(cfg.Paths.BaseDir, note)
 			fmt.Printf("    - %s\n", relPath)
 		}
 	}
@@ -298,7 +298,7 @@ func showOrphanedNotes(ctx context.Context, cfg *config.LoadedConfig) error {
 	fmt.Printf("Found %d orphaned notes (no incoming links):\n\n", len(orphans))
 
 	for _, note := range orphans {
-		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, note)
+		relPath := relPath(cfg.Paths.BaseDir, note)
 		fmt.Printf("  %s\n", relPath)
 	}
 
@@ -335,7 +335,7 @@ func showDeadends(ctx context.Context, cfg *config.LoadedConfig) error {
 	fmt.Printf("Found %d notes with no outgoing links:\n\n", len(deadends))
 
 	for _, note := range deadends {
-		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, note)
+		relPath := relPath(cfg.Paths.BaseDir, note)
 		fmt.Printf("  %s\n", relPath)
 	}
 

@@ -98,7 +98,7 @@ func deleteNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []
 		return err
 	}
 
-	relPath, _ := filepath.Rel(cfg.Paths.BaseDir, targetNote)
+	relPath := relPath(cfg.Paths.BaseDir, targetNote)
 
 	if !force {
 		if permanent {
@@ -195,7 +195,7 @@ func moveNoteWithReader(ctx context.Context, cfg *config.LoadedConfig, args []st
 		fmt.Printf("Warning: failed to update links: %v\n", err)
 	}
 
-	relNew, _ := filepath.Rel(cfg.Paths.BaseDir, newPath)
+	relNew := relPath(cfg.Paths.BaseDir, newPath)
 	fmt.Printf("✓ Moved to: %s\n", relNew)
 	return nil
 }
@@ -251,7 +251,7 @@ func updateLinksAfterMove(ctx context.Context, cfg *config.LoadedConfig, oldPath
 			linkText := submatch[1]
 			linkURL := submatch[2]
 
-			if strings.HasSuffix(linkURL, oldName+".md") || strings.HasSuffix(linkURL, oldName) {
+			if filepath.Base(linkURL) == oldName+".md" || filepath.Base(linkURL) == oldName {
 				updated = true
 				newURL := newRelDir + "/" + newName + ".md"
 				return "[" + linkText + "](" + newURL + ")"
@@ -300,7 +300,7 @@ func pickNote(ctx context.Context, cfg *config.LoadedConfig, query string, reade
 	if utils.IsReplMode() {
 		fmt.Println("Multiple notes found:")
 		for i, p := range matches {
-			rel, _ := filepath.Rel(cfg.Paths.BaseDir, p)
+			rel := relPath(cfg.Paths.BaseDir, p)
 			fmt.Printf("%d. %s\n", i+1, rel)
 		}
 		return "", fmt.Errorf("multiple matches found, please be more specific")
@@ -308,7 +308,7 @@ func pickNote(ctx context.Context, cfg *config.LoadedConfig, query string, reade
 
 	fmt.Println("Multiple notes found:")
 	for i, p := range matches {
-		rel, _ := filepath.Rel(cfg.Paths.BaseDir, p)
+		rel := relPath(cfg.Paths.BaseDir, p)
 		fmt.Printf("%d. %s\n", i+1, rel)
 	}
 	fmt.Print("\nSelect note (1-", len(matches), "): ")

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
+
 	"regexp"
 	"sort"
 	"strings"
@@ -153,7 +153,7 @@ func findByTag(ctx context.Context, cfg *config.LoadedConfig, tag string) error 
 				fmt.Printf("Found %d notes with #%s:\n\n", len(results), tag)
 
 				for _, r := range results {
-					relPath, _ := filepath.Rel(cfg.Paths.BaseDir, r.Path)
+					relPath := relPath(cfg.Paths.BaseDir, r.Path)
 					fmt.Printf("  %s", relPath)
 					if r.Title != "" {
 						fmt.Printf(" (%s)", r.Title)
@@ -191,7 +191,7 @@ func findByTag(ctx context.Context, cfg *config.LoadedConfig, tag string) error 
 	fmt.Printf("Found %d notes with #%s:\n\n", len(matches), tag)
 
 	for _, match := range matches {
-		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, match)
+		relPath := relPath(cfg.Paths.BaseDir, match)
 		fmt.Printf("  %s\n", relPath)
 	}
 
