@@ -76,21 +76,6 @@ func TestBulkRename_NoMatch(t *testing.T) {
 	}
 }
 
-func TestBulkTag_Placeholder(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "jotr-bulk-test-")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	cfg := createTestUtilConfig(t, tmpDir)
-
-	err = bulkTag(context.Background(), cfg, "test-tag")
-	if err != nil {
-		t.Errorf("bulkTag should not error: %v", err)
-	}
-}
-
 func TestRunHealthCheck_ValidConfig(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "jotr-health-test-")
 	if err != nil {

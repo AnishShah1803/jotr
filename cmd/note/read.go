@@ -120,7 +120,7 @@ func findNoteByName(ctx context.Context, cfg *config.LoadedConfig, query string)
 
 	fmt.Println(lipgloss.NewStyle().Foreground(output.SecondaryColor).Render("Multiple notes found:"))
 	for i, notePath := range matches {
-		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, notePath)
+		relPath := relPath(cfg.Paths.BaseDir, notePath)
 		fmt.Printf("  %d. %s\n", i+1, relPath)
 	}
 

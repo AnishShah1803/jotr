@@ -15,44 +15,28 @@ import (
 )
 
 var BulkCmd = &cobra.Command{
-	Use:   "bulk [action]",
+	Use:   "bulk",
 	Short: "Bulk operations on notes",
-	Long: `Perform bulk operations on multiple notes.
-	
-Actions:
-  rename [old] [new]    Rename text across all notes
-  tag [tag]             Add tag to all notes matching query
-  
-Examples:
-  jotr bulk rename "old text" "new text"
-  jotr bulk tag meeting --query "team sync"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return fmt.Errorf("action required: rename or tag")
-		}
+		return cmd.Help()
+	},
+}
 
+var bulkRenameCmd = &cobra.Command{
+	Use:   "rename [old] [new]",
+	Short: "Rename text across all notes",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
 		if err != nil {
 			return err
 		}
-
-		action := args[0]
-
-		switch action {
-		case "rename":
-			if len(args) < 3 {
-				return fmt.Errorf("usage: bulk rename [old] [new]")
-			}
-			return bulkRename(cmd.Context(), cfg, args[1], args[2])
-		case "tag":
-			if len(args) < 2 {
-				return fmt.Errorf("usage: bulk tag [tag]")
-			}
-			return bulkTag(cmd.Context(), cfg, args[1])
-		default:
-			return fmt.Errorf("unknown action: %s", action)
-		}
+		return bulkRename(cmd.Context(), cfg, args[0], args[1])
 	},
+}
+
+func init() {
+	BulkCmd.AddCommand(bulkRenameCmd)
 }
 
 func bulkRename(ctx context.Context, cfg *config.LoadedConfig, oldText, newText string) error {
@@ -77,7 +61,10 @@ func bulkRename(ctx context.Context, cfg *config.LoadedConfig, oldText, newText 
 				continue
 			}
 
-			relPath, _ := filepath.Rel(cfg.Paths.BaseDir, notePath)
+			relPath, err := filepath.Rel(cfg.Paths.BaseDir, notePath)
+			if err != nil {
+				relPath = notePath
+			}
 			fmt.Printf("✓ Updated: %s\n", relPath)
 
 			modifiedCount++
@@ -85,15 +72,6 @@ func bulkRename(ctx context.Context, cfg *config.LoadedConfig, oldText, newText 
 	}
 
 	fmt.Printf("\n✓ Modified %d notes\n", modifiedCount)
-
-	return nil
-}
-
-func bulkTag(ctx context.Context, cfg *config.LoadedConfig, tag string) error {
-	// For now, just show what would be tagged
-	// In a real implementation, you'd prompt for confirmation
-	fmt.Printf("Bulk tagging with #%s\n", tag)
-	fmt.Println("(This is a placeholder - implement with query filter)")
 
 	return nil
 }

@@ -12,45 +12,67 @@ import (
 )
 
 var GitCmd = &cobra.Command{
-	Use:   "git [action]",
+	Use:   "git",
 	Short: "Git integration for notes",
-	Long: `Git integration for version control of notes.
-	
-Actions:
-  status        Show git status
-  commit        Commit changes
-  history       Show commit history
-  diff          Show diff
-  
-Examples:
-  jotr git status
-  jotr git commit
-  jotr git history`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return fmt.Errorf("action required: status, commit, history, or diff")
-		}
+		return cmd.Help()
+	},
+}
 
+var gitStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show git status",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
 		if err != nil {
 			return err
 		}
-
-		action := args[0]
-
-		switch action {
-		case "status":
-			return gitStatus(cfg)
-		case "commit":
-			return gitCommit(cfg)
-		case "history":
-			return gitHistory(cfg)
-		case "diff":
-			return gitDiff(cfg)
-		default:
-			return fmt.Errorf("unknown action: %s", action)
-		}
+		return gitStatus(cfg)
 	},
+}
+
+var gitCommitCmd = &cobra.Command{
+	Use:   "commit",
+	Short: "Commit changes",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return gitCommit(cfg)
+	},
+}
+
+var gitHistoryCmd = &cobra.Command{
+	Use:   "history",
+	Short: "Show commit history",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return gitHistory(cfg)
+	},
+}
+
+var gitDiffCmd = &cobra.Command{
+	Use:   "diff",
+	Short: "Show diff",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return gitDiff(cfg)
+	},
+}
+
+func init() {
+	GitCmd.AddCommand(gitStatusCmd, gitCommitCmd, gitHistoryCmd, gitDiffCmd)
 }
 
 func gitAvailable() bool {
@@ -87,7 +109,6 @@ func gitCommit(cfg *config.LoadedConfig) error {
 		return fmt.Errorf("git is not installed")
 	}
 
-	// Add all changes
 	addCmd := exec.Command("git", "add", ".")
 	addCmd.Dir = cfg.Paths.BaseDir
 
@@ -95,14 +116,12 @@ func gitCommit(cfg *config.LoadedConfig) error {
 		return fmt.Errorf("git add failed: %w", err)
 	}
 
-	// Commit with auto-generated message
 	message := fmt.Sprintf("Auto-commit: %s", time.Now().Format("2006-01-02"))
 	commitCmd := exec.Command("git", "commit", "-m", message)
 	commitCmd.Dir = cfg.Paths.BaseDir
 
 	output, err := commitCmd.CombinedOutput()
 	if err != nil {
-		// Check if there's nothing to commit
 		if strings.Contains(string(output), "nothing to commit") {
 			fmt.Println("✓ Nothing to commit")
 			return nil

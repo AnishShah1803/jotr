@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -18,53 +19,81 @@ import (
 var linkRe = regexp.MustCompile(`\[\[([^\]]+)\]\]`)
 
 var LinksCmd = &cobra.Command{
-	Use:   "links [action] [note-name]",
+	Use:   "links",
 	Short: "Show links and backlinks",
-	Long: `Show links in a note and backlinks to a note.
-	
-Actions:
-  outgoing [note]    Show outgoing wiki-links from a note (default)
-  backlinks [note]   Show notes that link to the given note
-
-Examples:
-  jotr links MyNote              # Show outgoing links in MyNote
-  jotr links outgoing MyNote    # Explicit outgoing links
-  jotr links backlinks MyNote   # Show backlinks to MyNote
-  jotr links --backlinks MyNote  # Flag-based backlinks (legacy)`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return fmt.Errorf("note name required")
-		}
+		return cmd.Help()
+	},
+}
 
+var linksOutgoingCmd = &cobra.Command{
+	Use:   "outgoing <note-name>",
+	Short: "Show outgoing wiki-links from a note",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
 		if err != nil {
 			return err
 		}
+		return showLinks(cmd.Context(), cfg, args[0])
+	},
+}
 
-		action := args[0]
-		switch action {
-		case "outgoing":
-			if len(args) < 2 {
-				return fmt.Errorf("note name required")
-			}
-			return showLinks(cmd.Context(), cfg, args[1])
-		case "backlinks":
-			if len(args) < 2 {
-				return fmt.Errorf("note name required")
-			}
-			return showBacklinks(cmd.Context(), cfg, args[1])
-		default:
-			backlinks, _ := cmd.Flags().GetBool("backlinks")
-			if backlinks {
-				return showBacklinks(cmd.Context(), cfg, action)
-			}
-			return showLinks(cmd.Context(), cfg, action)
+var linksBacklinksCmd = &cobra.Command{
+	Use:   "backlinks <note-name>",
+	Short: "Show notes that link to a note",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
 		}
+		return showBacklinks(cmd.Context(), cfg, args[0])
+	},
+}
+
+var linksUnresolvedCmd = &cobra.Command{
+	Use:   "unresolved",
+	Short: "List all unresolved (broken) wiki-links",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return showUnresolvedLinks(cmd.Context(), cfg)
+	},
+}
+
+var linksOrphansCmd = &cobra.Command{
+	Use:   "orphans",
+	Short: "List notes with no incoming links",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return showOrphanedNotes(cmd.Context(), cfg)
+	},
+}
+
+var linksDeadendsCmd = &cobra.Command{
+	Use:   "deadends",
+	Short: "List notes with no outgoing links",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return showDeadends(cmd.Context(), cfg)
 	},
 }
 
 func init() {
-	LinksCmd.Flags().Bool("backlinks", false, "show backlinks instead of outgoing links")
+	LinksCmd.AddCommand(linksOutgoingCmd)
+	LinksCmd.AddCommand(linksBacklinksCmd)
+	LinksCmd.AddCommand(linksUnresolvedCmd)
+	LinksCmd.AddCommand(linksOrphansCmd)
+	LinksCmd.AddCommand(linksDeadendsCmd)
 }
 
 func showLinks(ctx context.Context, cfg *config.LoadedConfig, noteName string) error {
@@ -94,7 +123,6 @@ func showLinks(ctx context.Context, cfg *config.LoadedConfig, noteName string) e
 			link := match[1]
 			if !seen[link] {
 				fmt.Printf("  [[%s]]\n", link)
-
 				seen[link] = true
 			}
 		}
@@ -142,11 +170,10 @@ func showBacklinks(ctx context.Context, cfg *config.LoadedConfig, noteName strin
 				if len(match) > 1 && strings.Contains(strings.ToLower(match[1]), strings.ToLower(noteName)) {
 					if !found {
 						fmt.Println("Backlinks found:")
-
 						found = true
 					}
 
-					relPath, _ := filepath.Rel(cfg.Paths.BaseDir, note)
+					relPath := relPath(cfg.Paths.BaseDir, note)
 					fmt.Printf("\n  %s:%d\n", relPath, i+1)
 					fmt.Printf("    %s\n", strings.TrimSpace(line))
 				}
@@ -156,6 +183,160 @@ func showBacklinks(ctx context.Context, cfg *config.LoadedConfig, noteName strin
 
 	if !found {
 		fmt.Printf("No backlinks found for '%s'\n", noteName)
+	}
+
+	return nil
+}
+
+func showUnresolvedLinks(ctx context.Context, cfg *config.LoadedConfig) error {
+	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	if err != nil {
+		return err
+	}
+
+	noteNames := make(map[string]bool)
+	for _, note := range allNotes {
+		base := strings.TrimSuffix(filepath.Base(note), ".md")
+		noteNames[strings.ToLower(base)] = true
+	}
+
+	unresolvedLinks := make(map[string][]string)
+
+	for _, note := range allNotes {
+		content, err := os.ReadFile(note)
+		if err != nil {
+			continue
+		}
+
+		matches := linkRe.FindAllStringSubmatch(string(content), -1)
+		seen := make(map[string]bool)
+
+		for _, match := range matches {
+			if len(match) > 1 {
+				link := match[1]
+				if !seen[link] {
+					linkLower := strings.ToLower(link)
+					if !noteNames[linkLower] {
+						unresolvedLinks[link] = append(unresolvedLinks[link], note)
+					}
+					seen[link] = true
+				}
+			}
+		}
+	}
+
+	if len(unresolvedLinks) == 0 {
+		fmt.Println("All links are resolved!")
+		return nil
+	}
+
+	keys := make([]string, 0, len(unresolvedLinks))
+	for k := range unresolvedLinks {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	fmt.Printf("Found %d unresolved links:\n\n", len(unresolvedLinks))
+
+	for _, link := range keys {
+		notePaths := unresolvedLinks[link]
+		fmt.Printf("  [[%s]] - referenced in %d note(s):\n", link, len(notePaths))
+		for _, note := range notePaths {
+			relPath := relPath(cfg.Paths.BaseDir, note)
+			fmt.Printf("    - %s\n", relPath)
+		}
+	}
+
+	return nil
+}
+
+func showOrphanedNotes(ctx context.Context, cfg *config.LoadedConfig) error {
+	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	if err != nil {
+		return err
+	}
+
+	// Build a map from lowercase note name → absolute path for O(1) lookup.
+	noteByName := make(map[string]string, len(allNotes))
+	for _, note := range allNotes {
+		name := strings.ToLower(strings.TrimSuffix(filepath.Base(note), ".md"))
+		noteByName[name] = note
+	}
+
+	backlinkedNotes := make(map[string]bool)
+
+	for _, note := range allNotes {
+		content, err := os.ReadFile(note)
+		if err != nil {
+			continue
+		}
+
+		matches := linkRe.FindAllStringSubmatch(string(content), -1)
+		for _, match := range matches {
+			if len(match) > 1 {
+				if targetNote, ok := noteByName[strings.ToLower(match[1])]; ok {
+					backlinkedNotes[targetNote] = true
+				}
+			}
+		}
+	}
+
+	var orphans []string
+	for _, note := range allNotes {
+		if !backlinkedNotes[note] {
+			orphans = append(orphans, note)
+		}
+	}
+
+	if len(orphans) == 0 {
+		fmt.Println("No orphaned notes found!")
+		return nil
+	}
+
+	sort.Strings(orphans)
+
+	fmt.Printf("Found %d orphaned notes (no incoming links):\n\n", len(orphans))
+
+	for _, note := range orphans {
+		relPath := relPath(cfg.Paths.BaseDir, note)
+		fmt.Printf("  %s\n", relPath)
+	}
+
+	return nil
+}
+
+func showDeadends(ctx context.Context, cfg *config.LoadedConfig) error {
+	allNotes, err := notes.FindNotes(ctx, cfg.Paths.BaseDir)
+	if err != nil {
+		return err
+	}
+
+	var deadends []string
+
+	for _, note := range allNotes {
+		content, err := os.ReadFile(note)
+		if err != nil {
+			continue
+		}
+
+		matches := linkRe.FindAllStringSubmatch(string(content), -1)
+		if len(matches) == 0 {
+			deadends = append(deadends, note)
+		}
+	}
+
+	if len(deadends) == 0 {
+		fmt.Println("No dead-end notes found!")
+		return nil
+	}
+
+	sort.Strings(deadends)
+
+	fmt.Printf("Found %d notes with no outgoing links:\n\n", len(deadends))
+
+	for _, note := range deadends {
+		relPath := relPath(cfg.Paths.BaseDir, note)
+		fmt.Printf("  %s\n", relPath)
 	}
 
 	return nil

@@ -114,6 +114,8 @@ func init() {
 	rootCmd.AddCommand(searchcmd.SearchCmd)
 	rootCmd.AddCommand(searchcmd.TagsCmd)
 	rootCmd.AddCommand(searchcmd.LinksCmd)
+	rootCmd.AddCommand(searchcmd.AliasesCmd)
+	rootCmd.AddCommand(searchcmd.RecentsCmd)
 	rootCmd.AddCommand(searchcmd.ListCmd)
 	rootCmd.AddCommand(searchcmd.FilesCmd)
 	rootCmd.AddCommand(searchcmd.WordcountCmd)
@@ -130,6 +132,7 @@ func init() {
 	rootCmd.AddCommand(systemcmd.ScheduleCmd)
 	rootCmd.AddCommand(systemcmd.MonthlyCmd)
 	rootCmd.AddCommand(systemcmd.FrontmatterCmd)
+	rootCmd.AddCommand(systemcmd.PropertiesCmd)
 
 	// Utilities
 	rootCmd.AddCommand(utilcmd.BulkCmd)

@@ -79,7 +79,7 @@ Examples:
 			totalWords += words
 			totalChars += chars
 
-			relPath, _ := filepath.Rel(cfg.Paths.BaseDir, np)
+			relPath := relPath(cfg.Paths.BaseDir, np)
 			if wordcountCmdFlags.wordsOnly {
 				fmt.Printf("%6d  %s\n", words, relPath)
 			} else if wordcountCmdFlags.charsOnly {

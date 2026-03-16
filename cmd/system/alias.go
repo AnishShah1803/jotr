@@ -17,56 +17,77 @@ import (
 )
 
 var AliasCmd = &cobra.Command{
-	Use:   "alias [action]",
-	Short: "Manage note aliases",
-	Long: `Create aliases for notes for quick access.
-	
-Actions:
-  add [name] [target]    Add an alias
-  remove [name]          Remove an alias
-  list                   List all aliases
-  resolve [name]         Resolve an alias
-  
-Examples:
-  jotr alias add work "Work/Projects.md"
-  jotr alias add today "daily:0"
-  jotr alias add yesterday "daily:-1"
-  jotr alias list
-  jotr alias resolve work`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return fmt.Errorf("action required: add, remove, list, or resolve")
-		}
+	Use:   "bookmark",
+	Short: "Bookmark notes for quick access",
+	Long: `Create bookmarks for notes for quick access.
 
+Examples:
+  jotr bookmark add work "Work/Projects.md"
+  jotr bookmark add today "daily:0"
+  jotr bookmark add yesterday "daily:-1"
+  jotr bookmark list
+  jotr bookmark resolve work`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return cmd.Help()
+	},
+}
+
+var bookmarkAddCmd = &cobra.Command{
+	Use:   "add [name] [target]",
+	Short: "Add a bookmark",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
 		if err != nil {
 			return err
 		}
-
-		action := args[0]
-
-		switch action {
-		case "add":
-			if len(args) < 3 {
-				return fmt.Errorf("usage: alias add [name] [target]")
-			}
-			return addAlias(cfg, args[1], args[2])
-		case "remove", "rm":
-			if len(args) < 2 {
-				return fmt.Errorf("usage: alias remove [name]")
-			}
-			return removeAlias(cfg, args[1])
-		case "list", "ls":
-			return listAliases(cfg)
-		case "resolve":
-			if len(args) < 2 {
-				return fmt.Errorf("usage: alias resolve [name]")
-			}
-			return resolveAlias(cfg, args[1])
-		default:
-			return fmt.Errorf("unknown action: %s", action)
-		}
+		return addAlias(cfg, args[0], args[1])
 	},
+}
+
+var bookmarkRemoveCmd = &cobra.Command{
+	Use:     "remove [name]",
+	Short:   "Remove a bookmark",
+	Aliases: []string{"rm"},
+	Args:    cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return removeAlias(cfg, args[0])
+	},
+}
+
+var bookmarkListCmd = &cobra.Command{
+	Use:     "list",
+	Short:   "List all bookmarks",
+	Aliases: []string{"ls"},
+	Args:    cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return listAliases(cfg)
+	},
+}
+
+var bookmarkResolveCmd = &cobra.Command{
+	Use:   "resolve [name]",
+	Short: "Resolve a bookmark to its path",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return resolveAlias(cfg, args[0])
+	},
+}
+
+func init() {
+	AliasCmd.AddCommand(bookmarkAddCmd, bookmarkRemoveCmd, bookmarkListCmd, bookmarkResolveCmd)
 }
 
 func getAliasFile(cfg *config.LoadedConfig) string {
@@ -192,7 +213,6 @@ func resolveAlias(cfg *config.LoadedConfig, name string) error {
 }
 
 func resolveAliasValue(cfg *config.LoadedConfig, value string) (string, error) {
-	// Handle dynamic daily aliases: daily:0, daily:-1, etc.
 	if strings.HasPrefix(value, "daily:") {
 		offsetStr := strings.TrimPrefix(value, "daily:")
 
@@ -206,7 +226,6 @@ func resolveAliasValue(cfg *config.LoadedConfig, value string) (string, error) {
 		return notePath, nil
 	}
 
-	// Regular path - resolve relative to base
 	if !filepath.IsAbs(value) {
 		return filepath.Join(cfg.Paths.BaseDir, value), nil
 	}

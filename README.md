@@ -290,8 +290,10 @@ Example configuration:
 | `search` | Search across all notes | `find`, `grep` |
 | `capture` | Quick capture to daily note | `cap` |
 | `tags` | Manage tags | `tag` |
-| `links` | Show outgoing links or backlinks | |
-| `frontmatter` | View and edit note frontmatter | `fm` |
+| `links` | Show outgoing links, backlinks, unresolved, orphans, deadends | |
+| `aliases` | List and search note aliases | |
+| `properties` | Manage typed note properties | `props` |
+| `frontmatter` | View and edit note frontmatter (legacy) | `fm` |
 | `files` | List notes with optional filters | |
 | `wordcount` | Word and character counts | `wc` |
 | `outline` | Show heading structure of notes | |
@@ -303,7 +305,9 @@ Example configuration:
 | `calendar` | Show calendar view | `cal` |
 | `template` | Manage templates | `tmpl` |
 | `list` | List recent notes | `ls` |
+| `recents` | List recently modified notes | |
 | `bulk` | Bulk operations | |
+| `bookmark` | Bookmark notes for quick access | |
 | `configure` | Configuration wizard | `config`, `cfg` |
 | `graph` | Generate graph visualization | |
 | `version` | Show version | |
@@ -319,7 +323,9 @@ Example configuration:
 | `note list` | List all notes |
 | `note rename [query] [new-name]` | Rename a note (interactive if args omitted) |
 | `note move [query] [folder]` | Move a note to a folder (interactive if args omitted) |
-| `note delete [query]` | Delete a note (use `--force` to skip confirmation) |
+| `note delete [query]` | Delete a note (use `--permanent` to skip trash) |
+| `note random` | Open a random note |
+| `note unique` | List notes with unique content sizes |
 
 **`daily`**
 
@@ -336,6 +342,36 @@ Example configuration:
 | ----------- | ----------- |
 | `links outgoing [note]` | Show wiki-links contained in a note |
 | `links backlinks [note]` | Show all notes that link to a note |
+| `links unresolved` | Show broken/unresolved wiki-links |
+| `links orphans` | List notes with no incoming links |
+| `links deadends` | List notes with no outgoing links |
+
+**`aliases`**
+
+| Sub-command | Description |
+| ----------- | ----------- |
+| `aliases list` | List all aliases in the vault |
+| `aliases find [name]` | Find notes by alias (case-insensitive) |
+| `aliases stats` | Show alias usage statistics |
+
+**`properties`** (alias: `props`)
+
+| Sub-command | Description |
+| ----------- | ----------- |
+| `properties list [note]` | Show all properties with types |
+| `properties get [note] [key]` | Get the value of a specific property |
+| `properties set [note] key=value` | Set property with auto type detection |
+| `properties set [note] key:type=value` | Set with explicit type (text, list, number, checkbox, date, datetime) |
+| `properties remove [note] [key]` | Remove a property |
+| `properties stats` | Show vault-wide property statistics |
+| `properties stats [property] [--counts]` | Show usage stats for specific property |
+
+**`recents`**
+
+| Flag | Description |
+| ---- | ----------- |
+| `--limit N` | Show top N recent notes (default: 10) |
+| `--total` | Show count only |
 
 **`frontmatter`** (alias: `fm`)
 

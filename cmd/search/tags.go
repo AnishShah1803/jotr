@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
+
 	"regexp"
 	"sort"
 	"strings"
@@ -23,50 +23,57 @@ var tagsCmdFlags = struct {
 	maxResults int
 }{}
 
-func init() {
-	TagsCmd.Flags().IntVarP(&tagsCmdFlags.maxResults, "max-results", "n", 0, "Maximum number of results (0 = unlimited)")
+var TagsCmd = &cobra.Command{
+	Use:     "tags",
+	Short:   "Manage tags (list, find, stats)",
+	Aliases: []string{"tag"},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return cmd.Help()
+	},
 }
 
-var TagsCmd = &cobra.Command{
-	Use:   "tags [action]",
-	Short: "Manage tags (list, find, stats)",
-	Long: `Manage tags across all notes.
-	
-Actions:
-  list              List all tags
-  find [tag]        Find notes with tag
-  stats             Show tag statistics
-  
-Examples:
-  jotr tags list
-  jotr tags find meeting
-  jotr tags stats`,
-	Aliases: []string{"tag"},
+var tagsListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List all tags",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
 		if err != nil {
 			return err
 		}
-
-		action := "list"
-		if len(args) > 0 {
-			action = args[0]
-		}
-
-		switch action {
-		case "list":
-			return listTags(cmd.Context(), cfg)
-		case "find":
-			if len(args) < 2 {
-				return fmt.Errorf("tag name required")
-			}
-			return findByTag(cmd.Context(), cfg, args[1])
-		case "stats":
-			return tagStats(cmd.Context(), cfg)
-		default:
-			return fmt.Errorf("unknown action: %s", action)
-		}
+		return listTags(cmd.Context(), cfg)
 	},
+}
+
+var tagsFindCmd = &cobra.Command{
+	Use:   "find <tag>",
+	Short: "Find notes with a tag",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return findByTag(cmd.Context(), cfg, args[0])
+	},
+}
+
+var tagsStatsCmd = &cobra.Command{
+	Use:   "stats",
+	Short: "Show tag statistics",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return tagStats(cmd.Context(), cfg)
+	},
+}
+
+func init() {
+	tagsFindCmd.Flags().IntVarP(&tagsCmdFlags.maxResults, "max-results", "n", 0, "Maximum number of results (0 = unlimited)")
+	TagsCmd.AddCommand(tagsListCmd)
+	TagsCmd.AddCommand(tagsFindCmd)
+	TagsCmd.AddCommand(tagsStatsCmd)
 }
 
 func extractTags(content string) []string {
@@ -146,7 +153,7 @@ func findByTag(ctx context.Context, cfg *config.LoadedConfig, tag string) error 
 				fmt.Printf("Found %d notes with #%s:\n\n", len(results), tag)
 
 				for _, r := range results {
-					relPath, _ := filepath.Rel(cfg.Paths.BaseDir, r.Path)
+					relPath := relPath(cfg.Paths.BaseDir, r.Path)
 					fmt.Printf("  %s", relPath)
 					if r.Title != "" {
 						fmt.Printf(" (%s)", r.Title)
@@ -184,7 +191,7 @@ func findByTag(ctx context.Context, cfg *config.LoadedConfig, tag string) error 
 	fmt.Printf("Found %d notes with #%s:\n\n", len(matches), tag)
 
 	for _, match := range matches {
-		relPath, _ := filepath.Rel(cfg.Paths.BaseDir, match)
+		relPath := relPath(cfg.Paths.BaseDir, match)
 		fmt.Printf("  %s\n", relPath)
 	}
 

@@ -13,41 +13,54 @@ import (
 )
 
 var IndexCmd = &cobra.Command{
-	Use:   "index [action]",
+	Use:   "index",
 	Short: "Manage the search index",
-	Long: `Manage the FTS5 search index for fast note searching.
-
-Actions:
-  rebuild   Rebuild the entire search index from scratch
-  sync      Sync the index with current notes (incremental)
-  status    Show index statistics
-
-Examples:
-  jotr index rebuild    # Full reindex of all notes
-  jotr index sync       # Update index with changes only
-  jotr index status     # Show index stats`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		action := "status"
-		if len(args) > 0 {
-			action = args[0]
-		}
+		return cmd.Help()
+	},
+}
 
+var indexRebuildCmd = &cobra.Command{
+	Use:   "rebuild",
+	Short: "Rebuild the entire search index from scratch",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
 		if err != nil {
 			return err
 		}
-
-		switch action {
-		case "rebuild":
-			return rebuildIndex(cmd.Context(), cfg)
-		case "sync":
-			return syncIndex(cmd.Context(), cfg)
-		case "status":
-			return indexStatus(cmd.Context(), cfg)
-		default:
-			return fmt.Errorf("unknown action: %s", action)
-		}
+		return rebuildIndex(cmd.Context(), cfg)
 	},
+}
+
+var indexSyncCmd = &cobra.Command{
+	Use:   "sync",
+	Short: "Sync the index with current notes (incremental)",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return syncIndex(cmd.Context(), cfg)
+	},
+}
+
+var indexStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show index statistics",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return indexStatus(cmd.Context(), cfg)
+	},
+}
+
+func init() {
+	IndexCmd.AddCommand(indexRebuildCmd, indexSyncCmd, indexStatusCmd)
 }
 
 func rebuildIndex(ctx context.Context, cfg *config.LoadedConfig) error {

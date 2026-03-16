@@ -14,64 +14,65 @@ import (
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
-// ScheduledNote represents a note scheduled for a future date.
 type ScheduledNote struct {
 	Date time.Time `json:"date"`
 	Text string    `json:"text"`
 	ID   string    `json:"id"`
 }
 
-// Constants for schedule command arguments.
 const (
-	scheduleArgMinAdd    = 3 // minimum args for "add" command (action, date, text).
-	scheduleArgMinDelete = 2 // minimum args for "delete" command (action, id).
-	hoursPerDay          = 24
+	hoursPerDay = 24
 )
 
-// ScheduleCmd manages scheduling notes for future dates.
 var ScheduleCmd = &cobra.Command{
-	Use:   "schedule [action]",
+	Use:   "schedule",
 	Short: "Schedule notes for future dates",
-	Long: `Schedule notes to be created on future dates.
-	
-Actions:
-  add [date] [text]    Schedule a note
-  list                 List scheduled notes
-  delete [id]          Delete scheduled note
-  
-Examples:
-  jotr schedule add 2025-02-01 "Q1 Review"
-  jotr schedule list
-  jotr schedule delete abc123`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return fmt.Errorf("action required: add, list, or delete")
-		}
+		return cmd.Help()
+	},
+}
 
+var scheduleAddCmd = &cobra.Command{
+	Use:   "add [date] [text]",
+	Short: "Schedule a note for a future date",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadWithContext(cmd.Context(), "")
 		if err != nil {
 			return err
 		}
-
-		action := args[0]
-
-		switch action {
-		case "add":
-			if len(args) < scheduleArgMinAdd {
-				return fmt.Errorf("usage: schedule add [date] [text]")
-			}
-			return addScheduledNote(cfg, args[1], args[2])
-		case "list":
-			return listScheduledNotes(cfg)
-		case "delete":
-			if len(args) < scheduleArgMinDelete {
-				return fmt.Errorf("usage: schedule delete [id]")
-			}
-			return deleteScheduledNote(cfg, args[1])
-		default:
-			return fmt.Errorf("unknown action: %s", action)
-		}
+		return addScheduledNote(cfg, args[0], args[1])
 	},
+}
+
+var scheduleListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List scheduled notes",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return listScheduledNotes(cfg)
+	},
+}
+
+var scheduleDeleteCmd = &cobra.Command{
+	Use:   "delete [id]",
+	Short: "Delete a scheduled note",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return deleteScheduledNote(cfg, args[0])
+	},
+}
+
+func init() {
+	ScheduleCmd.AddCommand(scheduleAddCmd, scheduleListCmd, scheduleDeleteCmd)
 }
 
 func getScheduleFile(cfg *config.LoadedConfig) string {

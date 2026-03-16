@@ -3,7 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"path/filepath"
+
 	"time"
 
 	"github.com/spf13/cobra"
@@ -54,7 +54,7 @@ func listRecentNotes(ctx context.Context, cfg *config.LoadedConfig) error {
 		fmt.Printf("Found %d notes:\n\n", len(allNotes))
 
 		for _, notePath := range allNotes {
-			relPath, _ := filepath.Rel(cfg.Paths.BaseDir, notePath)
+			relPath := relPath(cfg.Paths.BaseDir, notePath)
 			fmt.Printf("  %s\n", relPath)
 		}
 

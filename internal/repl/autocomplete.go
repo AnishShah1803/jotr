@@ -92,18 +92,19 @@ func (a *Autocomplete) buildIndex(cmd *cobra.Command, parentPath string) {
 		}
 
 		a.commands[name] = true
-		a.commandNames = append(a.commandNames, name)
+		if parentPath == "" {
+			a.commandNames = append(a.commandNames, name)
+		}
 
 		if parentPath != "" {
 			a.subCommands[parentPath] = append(a.subCommands[parentPath], name)
 		}
 
+		// Do not add aliases to commandNames or subCommands — they should not
+		// appear in autocomplete. Only register them in the aliases map for
+		// execution routing.
 		for _, alias := range subCmd.Aliases {
 			a.aliases[alias] = name
-			a.commands[alias] = true
-			if parentPath != "" {
-				a.subCommands[parentPath] = append(a.subCommands[parentPath], alias)
-			}
 		}
 
 		if subCmd.HasSubCommands() {
