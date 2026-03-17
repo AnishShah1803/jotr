@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"time"
-
 	cterm "github.com/charmbracelet/x/term"
 	"github.com/mattn/go-isatty"
 )
@@ -31,13 +29,18 @@ func PromptPathWithCompletion(prompt string, r *bufio.Reader) (string, error) {
 	return readPathRaw(prompt)
 }
 
-func readPathRaw(prompt string) (string, error) {
+func readPathRaw(prompt string) (result string, err error) {
 	fd := os.Stdin.Fd()
 	oldState, err := cterm.MakeRaw(fd)
 	if err != nil {
-		return readLineFallback()
+		result, err = readLineFallback()
+		return
 	}
-	defer cterm.Restore(fd, oldState) //nolint:errcheck
+	defer func() {
+		if restoreErr := cterm.Restore(fd, oldState); restoreErr != nil && err == nil {
+			err = restoreErr
+		}
+	}()
 
 	termWidth, termHeight, err := cterm.GetSize(fd)
 	if err != nil || termWidth < 20 {
@@ -196,22 +199,10 @@ func readPathRaw(prompt string) (string, error) {
 			return "", fmt.Errorf("interrupted")
 
 		case 27:
-			// Read the follow-up bytes with a short timeout so that a bare
-			// Escape keypress doesn't block and consume the next character.
-			type seqResult struct{ n int }
-			seq := make([]byte, 2)
-			ch2 := make(chan seqResult, 1)
-			go func() {
-				n, _ := stdin.Read(seq)
-				ch2 <- seqResult{n}
-			}()
-			select {
-			case <-ch2:
-				// Consumed the ANSI escape sequence bytes (e.g. arrow keys).
-			case <-time.After(50 * time.Millisecond):
-				// Bare Escape — no follow-up bytes; goroutine may still be
-				// blocked on Read but will exit when the next key arrives.
-			}
+			// Escape key. We do not handle ANSI escape sequences (arrow keys etc.).
+			// The follow-up bytes ('[', direction byte) will be read by subsequent
+			// iterations of the main loop and discarded by the default branch.
+			// Avoids a blocked-goroutine leak from the previous timeout approach.
 
 		default:
 			if ch >= 32 {

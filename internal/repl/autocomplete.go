@@ -416,8 +416,9 @@ func (a *Autocomplete) getFilesystemPathCompletions(partial string, dirsOnly boo
 		}
 
 		if strings.HasPrefix(partial, "~") {
-			homeDir, _ := os.UserHomeDir()
-			completion = "~" + strings.TrimPrefix(completion, homeDir)
+			if homeDir, err := os.UserHomeDir(); err == nil {
+				completion = "~" + strings.TrimPrefix(completion, homeDir)
+			}
 		}
 
 		if entry.IsDir() {
