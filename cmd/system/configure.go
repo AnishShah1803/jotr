@@ -326,7 +326,10 @@ func runConfigInteractiveSmart(cmd *cobra.Command, detectedBaseDir string) error
 	// Use detected or default values
 	baseDir := detectedBaseDir
 	if baseDir == "" {
-		homeDir, _ := os.UserHomeDir()
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("could not determine home directory: %w", err)
+		}
 		baseDir = filepath.Join(homeDir, "jotr-notes")
 	}
 
@@ -354,6 +357,9 @@ func runConfigInteractiveSmart(cmd *cobra.Command, detectedBaseDir string) error
 	} else {
 		// Nothing detected — offer the default fallback explicitly
 		homeDir, _ := os.UserHomeDir()
+		if homeDir == "" {
+			homeDir = "~"
+		}
 		fmt.Println("No existing notes folder detected.")
 		fmt.Println()
 		fmt.Printf("Default: %s\n", baseDir)

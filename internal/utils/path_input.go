@@ -195,7 +195,10 @@ func readPathRaw(prompt string) (string, error) {
 
 		case 27:
 			seq := make([]byte, 2)
-			stdin.Read(seq) //nolint:errcheck
+			if _, err := stdin.Read(seq); err != nil {
+				// EOF or read error consuming escape sequence — ignore
+				break
+			}
 
 		default:
 			if ch >= 32 {

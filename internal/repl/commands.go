@@ -214,10 +214,10 @@ var commandRegistry = []CommandDef{
 	{
 		Name: "configure",
 		Params: []ParamDef{
-			{Name: "baseDir", Kind: ParamDirPath},
-			{Name: "diaryDir", Kind: ParamFilePath},
-			{Name: "todoFile", Kind: ParamFilePath},
-			{Name: "pdpFile", Kind: ParamFilePath},
+			{Name: "base-dir", Kind: ParamDirPath},
+			{Name: "diary-dir", Kind: ParamFilePath},
+			{Name: "todo-file", Kind: ParamFilePath},
+			{Name: "pdp-file", Kind: ParamFilePath},
 		},
 	},
 }
