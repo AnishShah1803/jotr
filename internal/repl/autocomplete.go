@@ -18,6 +18,7 @@ type Autocomplete struct {
 	subCommands    map[string][]string
 	actionCommands map[string][]string
 	paramCommands  map[string][]string
+	registry       map[string]*CommandDef
 }
 
 func NewAutocomplete(rootCmd *cobra.Command) *Autocomplete {
@@ -27,45 +28,25 @@ func NewAutocomplete(rootCmd *cobra.Command) *Autocomplete {
 		subCommands:    make(map[string][]string),
 		actionCommands: make(map[string][]string),
 		paramCommands:  make(map[string][]string),
+		registry:       registryByName(),
 	}
 
-	a.actionCommands["note"] = []string{"create", "open", "list", "rename", "delete", "move"}
-
-	a.actionCommands["index"] = []string{"rebuild", "sync", "status"}
-	a.actionCommands["alias"] = []string{"add", "remove", "list", "resolve"}
-	a.actionCommands["schedule"] = []string{"add", "list", "delete"}
-	a.actionCommands["shortcut"] = []string{"add", "remove", "list"}
-	a.actionCommands["tags"] = []string{"list", "find", "stats"}
-
-	a.actionCommands["git"] = []string{"status", "commit", "history", "diff"}
-	a.actionCommands["bulk"] = []string{"rename", "tag"}
-
-	a.actionCommands["links"] = []string{"outgoing", "backlinks"}
-	a.actionCommands["frontmatter"] = []string{"get", "set", "remove", "list"}
-	a.actionCommands["daily"] = []string{"append", "prepend", "read"}
-	a.actionCommands["files"] = []string{}
-	a.actionCommands["wordcount"] = []string{}
-	a.actionCommands["outline"] = []string{}
-
-	a.paramCommands["read"] = []string{"file=", "path=", "lines=", "format="}
-	a.paramCommands["daily"] = []string{"date=", "open="}
-	a.paramCommands["note"] = []string{"name=", "template="}
-	a.paramCommands["note create"] = []string{"path=", "file="}
-	a.paramCommands["note rename"] = []string{"file=", "name="}
-	a.paramCommands["note delete"] = []string{"--force", "<query>"}
-	a.paramCommands["note move"] = []string{"file=", "to="}
-	a.paramCommands["search"] = []string{"query=", "path=", "limit=", "case", "format="}
-	a.paramCommands["search context"] = []string{"query=", "path=", "limit="}
-	a.paramCommands["tags"] = []string{"name="}
-	a.paramCommands["capture"] = []string{"content="}
-	a.paramCommands["links"] = []string{}
-	a.paramCommands["frontmatter"] = []string{}
-	a.paramCommands["daily append"] = []string{"content="}
-	a.paramCommands["daily prepend"] = []string{"content="}
-	a.paramCommands["files"] = []string{"folder=", "ext=", "total"}
-	a.paramCommands["wordcount"] = []string{"file=", "path=", "words", "characters"}
-	a.paramCommands["outline"] = []string{"file=", "path=", "format=", "total"}
-	a.paramCommands["configure"] = []string{"--base-dir=", "--diary-dir=", "--todo-file=", "--pdp-file="}
+	for _, def := range commandRegistry {
+		if def.Subcommands != nil {
+			a.actionCommands[def.Name] = def.Subcommands
+		}
+		if len(def.Params) > 0 {
+			tokens := make([]string, 0, len(def.Params))
+			for _, p := range def.Params {
+				if p.Kind == ParamFlag {
+					tokens = append(tokens, p.Name)
+				} else {
+					tokens = append(tokens, p.Name+"=")
+				}
+			}
+			a.paramCommands[def.Name] = tokens
+		}
+	}
 
 	a.buildIndex(rootCmd, "")
 	sort.Strings(a.commandNames)
@@ -100,9 +81,6 @@ func (a *Autocomplete) buildIndex(cmd *cobra.Command, parentPath string) {
 			a.subCommands[parentPath] = append(a.subCommands[parentPath], name)
 		}
 
-		// Do not add aliases to commandNames or subCommands — they should not
-		// appear in autocomplete. Only register them in the aliases map for
-		// execution routing.
 		for _, alias := range subCmd.Aliases {
 			a.aliases[alias] = name
 		}
@@ -113,8 +91,6 @@ func (a *Autocomplete) buildIndex(cmd *cobra.Command, parentPath string) {
 	}
 }
 
-// resolve returns the canonical command name for a given alias, or the name itself
-// if it is not registered as an alias.
 func (a *Autocomplete) resolve(name string) string {
 	if canonical, ok := a.aliases[name]; ok {
 		return canonical
@@ -122,8 +98,6 @@ func (a *Autocomplete) resolve(name string) string {
 	return name
 }
 
-// resolvePath resolves the first word of a (possibly multi-word) command path.
-// e.g. "n create" → "note create", "tags" → "tags".
 func (a *Autocomplete) resolvePath(path string) string {
 	if idx := strings.Index(path, " "); idx != -1 {
 		return a.resolve(path[:idx]) + path[idx:]
@@ -290,8 +264,6 @@ func (a *Autocomplete) GetParamCompletions(cmdName string) []string {
 	return nil
 }
 
-// GetParamsForCommand returns the raw param tokens (e.g. ["path=", "file="]) for
-// a given command path, or nil if none are registered.
 func (a *Autocomplete) GetParamsForCommand(cmdName string) []string {
 	cmdName = a.resolvePath(cmdName)
 	if params, ok := a.paramCommands[cmdName]; ok {
@@ -346,6 +318,113 @@ func (a *Autocomplete) GetPathCompletions(cfg *config.LoadedConfig, partial stri
 		} else {
 			completions = append(completions, relPath)
 		}
+	}
+
+	return completions
+}
+
+func (a *Autocomplete) GetParamValueCompletionsFromRegistry(cmdPath string, paramName string, partial string) []string {
+	def, ok := a.registry[cmdPath]
+	if !ok {
+		return nil
+	}
+	for _, p := range def.Params {
+		if p.Name != paramName {
+			continue
+		}
+		switch p.Kind {
+		case ParamDirPath:
+			return a.getFilesystemPathCompletions(partial, true)
+		case ParamFilePath:
+			return a.getFilesystemPathCompletions(partial, false)
+		case ParamEnum:
+			var matches []string
+			for _, v := range p.Values {
+				if strings.HasPrefix(v, partial) {
+					matches = append(matches, v)
+				}
+			}
+			return matches
+		}
+		return nil
+	}
+	return nil
+}
+
+func (a *Autocomplete) getFilesystemPathCompletions(partial string, dirsOnly bool) []string {
+	expandedPartial := partial
+	if strings.HasPrefix(partial, "~") {
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			expandedPartial = filepath.Join(homeDir, partial[1:])
+		}
+	}
+
+	searchDir := expandedPartial
+	prefix := ""
+	if idx := strings.LastIndex(expandedPartial, "/"); idx != -1 {
+		searchDir = expandedPartial[:idx]
+		prefix = expandedPartial[idx+1:]
+	} else if expandedPartial != "" {
+		searchDir = "."
+		prefix = expandedPartial
+	} else {
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			searchDir = homeDir
+		} else {
+			searchDir = "."
+		}
+		prefix = ""
+	}
+
+	if info, err := os.Stat(searchDir); err != nil || !info.IsDir() {
+		searchDir = "."
+		if idx := strings.LastIndex(expandedPartial, "/"); idx != -1 {
+			prefix = expandedPartial[idx+1:]
+		} else {
+			prefix = expandedPartial
+		}
+	}
+
+	entries, err := os.ReadDir(searchDir)
+	if err != nil {
+		return nil
+	}
+
+	var completions []string
+	for _, entry := range entries {
+		name := entry.Name()
+
+		if strings.HasPrefix(name, ".") && !strings.HasPrefix(prefix, ".") {
+			continue
+		}
+
+		if !strings.HasPrefix(strings.ToLower(name), strings.ToLower(prefix)) {
+			continue
+		}
+
+		if dirsOnly && !entry.IsDir() {
+			continue
+		}
+
+		var completion string
+		if searchDir == "." {
+			completion = name
+		} else {
+			completion = filepath.Join(searchDir, name)
+		}
+
+		if strings.HasPrefix(partial, "~") {
+			homeDir, _ := os.UserHomeDir()
+			completion = "~" + strings.TrimPrefix(completion, homeDir)
+		}
+
+		if entry.IsDir() {
+			completion += "/"
+		}
+
+		completions = append(completions, completion)
 	}
 
 	return completions

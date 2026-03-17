@@ -384,12 +384,18 @@ func (m *Model) getCompletionsForInput(fields []string, hasTrailingSpace bool) [
 	if !hasTrailingSpace && len(fields) > 0 {
 		last := fields[len(fields)-1]
 		if strings.Contains(last, "=") {
-			// e.g. "note create path=" — user is typing the param key up to/including =
-			partialIsParam = true
-			key := strings.SplitN(last, "=", 2)[0]
-			// Remove it from usedParams so it's still offered as a completion.
-			usedParams[key+"="] = false
-			partial = key + "="
+			parts := strings.SplitN(last, "=", 2)
+			key := parts[0]
+			value := parts[1]
+			if value == "" {
+				// e.g. "configure diaryDir=" — user is typing the param key up to/including =
+				partialIsParam = true
+				// Remove it from usedParams so it's still offered as a completion.
+				usedParams[key+"="] = false
+				partial = key + "="
+			}
+			// If value != "", the param is complete (e.g., "diaryDir=/some/path")
+			// and should remain in usedParams
 		} else {
 			// Last field has no `=`: it's either a partial subcommand name or partial param key.
 			if len(cmdFields) > 0 {
@@ -401,7 +407,27 @@ func (m *Model) getCompletionsForInput(fields []string, hasTrailingSpace bool) [
 
 	cmdPath := strings.Join(cmdFields, " ")
 
-	// No params typed yet — delegate to subcommand completion.
+	if !hasTrailingSpace && len(fields) > 0 {
+		last := fields[len(fields)-1]
+		if strings.Contains(last, "=") {
+			parts := strings.SplitN(last, "=", 2)
+			key := parts[0]
+			value := parts[1]
+			valueCompletions := m.autocomplete.GetParamValueCompletionsFromRegistry(cmdPath, key, value)
+			if len(valueCompletions) > 0 {
+				committedBefore := strings.Join(fields[:len(fields)-1], " ")
+				var result []string
+				for _, pc := range valueCompletions {
+					entry := key + "=" + pc
+					if committedBefore != "" {
+						entry = committedBefore + " " + entry
+					}
+					result = append(result, entry)
+				}
+				return result
+			}
+		}
+	}
 	if !partialIsParam && len(usedParams) == 0 {
 		if hasTrailingSpace {
 			subs := m.autocomplete.GetSubCommands(cmdPath)
