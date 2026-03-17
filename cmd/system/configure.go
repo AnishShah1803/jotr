@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+
+	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
 var ConfigureCmd = &cobra.Command{
@@ -55,6 +57,109 @@ func expandTildePath(path string) (string, error) {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
 	return filepath.Join(homeDir, path[1:]), nil
+}
+
+// detectExistingNotesDir searches for existing notes directories.
+// Priority: ~/Notes or ~/Obsidian first, then depth-1 and depth-2 subdirs of
+// common parent dirs (Documents, Dropbox, workspace, work, home root).
+// Shallower matches win — depth-1 beats depth-2.
+func detectExistingNotesDir() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	// Priority 1: ~/Notes
+	notesDir := filepath.Join(homeDir, "Notes")
+	if _, err := os.Stat(notesDir); err == nil {
+		return notesDir
+	}
+
+	// Priority 2: ~/Obsidian
+	obsidianDir := filepath.Join(homeDir, "Obsidian")
+	if _, err := os.Stat(obsidianDir); err == nil {
+		return obsidianDir
+	}
+
+	// Priority 3: depth-1 then depth-2 search under common parent dirs.
+	// Depth-1 hits win over depth-2 (shallower = more deliberate placement).
+	parents := []string{"Documents", "Dropbox", "", "workspace", "work"}
+
+	// isNotesMatch reports whether a directory name looks like a notes vault.
+	isNotesMatch := func(name string) bool {
+		n := strings.ToLower(name)
+		return strings.Contains(n, "notes") || strings.Contains(n, "obsidian")
+	}
+
+	// depth-1: ~/parent/<entry>
+	for _, parent := range parents {
+		basePath := homeDir
+		if parent != "" {
+			basePath = filepath.Join(homeDir, parent)
+		}
+		if _, err := os.Stat(basePath); err != nil {
+			continue
+		}
+		entries, err := os.ReadDir(basePath)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			if isNotesMatch(entry.Name()) {
+				return filepath.Join(basePath, entry.Name())
+			}
+		}
+	}
+
+	// depth-2: ~/parent/<sub>/<entry>  (e.g. ~/Documents/repos/Obsidian)
+	for _, parent := range parents {
+		basePath := homeDir
+		if parent != "" {
+			basePath = filepath.Join(homeDir, parent)
+		}
+		if _, err := os.Stat(basePath); err != nil {
+			continue
+		}
+		subs, err := os.ReadDir(basePath)
+		if err != nil {
+			continue
+		}
+		for _, sub := range subs {
+			if !sub.IsDir() {
+				continue
+			}
+			subPath := filepath.Join(basePath, sub.Name())
+			entries, err := os.ReadDir(subPath)
+			if err != nil {
+				continue
+			}
+			for _, entry := range entries {
+				if !entry.IsDir() {
+					continue
+				}
+				if isNotesMatch(entry.Name()) {
+					return filepath.Join(subPath, entry.Name())
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+// detectDiaryDir searches for common diary/journal directory names within baseDir
+func detectDiaryDir(baseDir string) string {
+	candidates := []string{"Diary", "Journal", "Daily", "journals", "diary"}
+	for _, candidate := range candidates {
+		path := filepath.Join(baseDir, candidate)
+		if _, err := os.Stat(path); err == nil {
+			return candidate
+		}
+	}
+	return "Diary" // default
 }
 
 // validateBaseDir checks if the base directory is accessible.
@@ -158,6 +263,11 @@ func runConfigWithFlags(baseDir, diaryDir, todoFile, pdpFile string) error {
 	if err != nil {
 		return err
 	}
+	// Resolve any relative components to absolute path
+	expandedBaseDir, err = filepath.Abs(expandedBaseDir)
+	if err != nil {
+		return fmt.Errorf("failed to resolve path: %w", err)
+	}
 	if err := validateBaseDir(expandedBaseDir); err != nil {
 		return err
 	}
@@ -199,35 +309,151 @@ func runConfigWithFlags(baseDir, diaryDir, todoFile, pdpFile string) error {
 }
 
 func runConfigInteractive(cmd *cobra.Command) error {
+	// Detect existing notes directory
+	detectedBaseDir := detectExistingNotesDir()
+
+	// Always use smart defaults flow (works even if no directory detected)
+	return runConfigInteractiveSmart(cmd, detectedBaseDir)
+}
+
+// runConfigInteractiveSmart presents detected defaults with single confirmation
+func runConfigInteractiveSmart(cmd *cobra.Command, detectedBaseDir string) error {
 	reader := bufio.NewReader(cmd.InOrStdin())
+	cfg := &config.Config{}
+
+	detected := detectedBaseDir != ""
+
+	// Use detected or default values
+	baseDir := detectedBaseDir
+	if baseDir == "" {
+		homeDir, _ := os.UserHomeDir()
+		baseDir = filepath.Join(homeDir, "jotr-notes")
+	}
+
+	diaryDir := detectDiaryDir(baseDir)
+	todoFile := "todo"
+	pdpFile := "" // default to none
+
+	fmt.Println("🎯 jotr Configuration Wizard")
+	fmt.Println("============================")
+	fmt.Println()
+
+	if detected {
+		// Show what was found
+		fmt.Println("Detected existing notes folder:")
+		fmt.Printf("  Base directory: %s\n", baseDir)
+		fmt.Printf("  Diary folder:   %s/\n", diaryDir)
+		fmt.Printf("  Todo file:      %s.md\n", todoFile)
+		if pdpFile != "" {
+			fmt.Printf("  PDP file:       %s.md\n", pdpFile)
+		} else {
+			fmt.Println("  PDP file:       (not configured)")
+		}
+		fmt.Println()
+		fmt.Print("Use these settings? [Y/n/custom]: ")
+	} else {
+		// Nothing detected — offer the default fallback explicitly
+		homeDir, _ := os.UserHomeDir()
+		fmt.Println("No existing notes folder detected.")
+		fmt.Println()
+		fmt.Printf("Default: %s\n", baseDir)
+		fmt.Printf("  (jotr will create this folder for you)\n")
+		fmt.Println()
+		fmt.Printf("Tip: if your notes live somewhere else (e.g. %s/Documents/MyNotes),\n", homeDir)
+		fmt.Println("     choose 'custom' to specify the path.")
+		fmt.Println()
+		fmt.Print("Use default folder, or customise? [Y/custom]: ")
+	}
+
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+	response = strings.TrimSpace(strings.ToLower(response))
+
+	switch response {
+	case "", "y", "yes":
+		// Use detected defaults
+		cfg.Paths.BaseDir = baseDir
+		cfg.Paths.DiaryDir = diaryDir
+		cfg.Paths.TodoFilePath = todoFile
+		cfg.Paths.PDPFilePath = pdpFile
+	case "n", "no", "custom":
+		// Fall back to full interactive wizard, reusing the same reader to avoid buffer split
+		return runConfigInteractiveFull(cmd, reader)
+	default:
+		return fmt.Errorf("invalid response: %s (expected Y, n, or custom)", response)
+	}
+
+	// Validate base directory
+	if err := validateBaseDir(cfg.Paths.BaseDir); err != nil {
+		return err
+	}
+
+	// Apply default configuration values
+	applyDefaults(cfg)
+
+	fmt.Println("Saving configuration...")
+
+	if err := config.Save(cfg); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+
+	configPath, err := configPathFromHomeDir()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("✓ Configuration saved to: %s\n\n", configPath)
+
+	fmt.Println("🎉 Configuration complete!")
+	fmt.Println("\nNext steps:")
+	fmt.Println("  jotr daily     # Create today's note")
+	fmt.Println("  jotr --help    # See all commands")
+
+	return nil
+}
+
+// runConfigInteractiveFull runs the complete 4-step wizard with path completion
+func runConfigInteractiveFull(cmd *cobra.Command, existingReader *bufio.Reader) error {
+	var reader *bufio.Reader
+	if existingReader != nil {
+		reader = existingReader
+	} else {
+		reader = bufio.NewReader(cmd.InOrStdin())
+	}
 	cfg := &config.Config{}
 
 	fmt.Println("🎯 jotr Configuration Wizard")
 	fmt.Println("============================")
 	fmt.Println()
 
-	// Step 1: Base directory
+	// Step 1: Base directory (with TAB completion)
 	fmt.Println("Step 1: Base Directory")
-	fmt.Println("Enter the path to your notes directory:")
+	fmt.Println("Enter the path to your notes directory (TAB for completion):")
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("failed to get home directory: %w", err)
 	}
 	fmt.Printf("Example: %s/Documents/Notes\n", homeDir)
-	fmt.Print("> ")
 
-	baseDir, err := reader.ReadString('\n')
+	baseDir, err := utils.PromptPathWithCompletion("> ", reader)
 	if err != nil {
 		return fmt.Errorf("failed to read base directory input: %w", err)
 	}
-
-	baseDir = strings.TrimSpace(baseDir)
 
 	// Expand ~ to home directory
 	baseDir, err = expandTildePath(baseDir)
 	if err != nil {
 		return err
+	}
+	// Resolve any relative components to absolute path
+	baseDir = strings.TrimSpace(baseDir)
+	if baseDir != "" {
+		baseDir, err = filepath.Abs(baseDir)
+		if err != nil {
+			return fmt.Errorf("failed to resolve path: %w", err)
+		}
 	}
 
 	// Validate the directory path
@@ -242,9 +468,8 @@ func runConfigInteractive(cmd *cobra.Command) error {
 	fmt.Println("Step 2: Diary Directory")
 	fmt.Println("Enter the name of your diary folder (relative to base):")
 	fmt.Println("Example: Diary, Journal, Daily")
-	fmt.Print("> ")
 
-	diaryDir, err := reader.ReadString('\n')
+	diaryDir, err := utils.PromptPathWithCompletion("> ", reader)
 	if err != nil {
 		return fmt.Errorf("failed to read diary directory input: %w", err)
 	}
@@ -261,9 +486,8 @@ func runConfigInteractive(cmd *cobra.Command) error {
 	fmt.Println("Step 3: Todo File Path")
 	fmt.Println("Enter the path to your todo file (relative to base, without .md extension):")
 	fmt.Println("Example: todo, Work/tasks, TODO")
-	fmt.Print("> ")
 
-	todoFilePath, err := reader.ReadString('\n')
+	todoFilePath, err := utils.PromptPathWithCompletion("> ", reader)
 	if err != nil {
 		return fmt.Errorf("failed to read todo file path input: %w", err)
 	}
@@ -285,9 +509,8 @@ func runConfigInteractive(cmd *cobra.Command) error {
 	fmt.Println("Step 4: PDP File (Optional)")
 	fmt.Println("Enter the path to your PDP file (relative to base, without .md extension):")
 	fmt.Println("Press Enter to skip")
-	fmt.Print("> ")
 
-	pdpFilePath, err := reader.ReadString('\n')
+	pdpFilePath, err := utils.PromptPathWithCompletion("> ", reader)
 	if err != nil {
 		return fmt.Errorf("failed to read PDP file path input: %w", err)
 	}
