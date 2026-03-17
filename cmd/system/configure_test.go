@@ -36,8 +36,7 @@ func TestConfigureCommand_CommandIntegration(t *testing.T) {
 	_, cleanup := testhelpers.SetupTestConfig(t)
 	defer cleanup()
 
-	tmpDir := t.TempDir()
-	input := fmt.Sprintf("%s\nDiary\ntodo\n\n", tmpDir)
+	input := "Y\n"
 
 	rootCmd := &cobra.Command{Use: "jotr"}
 	rootCmd.AddCommand(ConfigureCmd)
@@ -58,7 +57,7 @@ func TestConfigureCommand_ValidatesEmptyBaseDir(t *testing.T) {
 	_, cleanup := testhelpers.SetupTestConfig(t)
 	defer cleanup()
 
-	input := "\nDiary\ntodo\n\n"
+	input := fmt.Sprintf("custom\n\nDiary\ntodo\n\n")
 
 	rootCmd := &cobra.Command{Use: "jotr"}
 	rootCmd.AddCommand(ConfigureCmd)
@@ -87,7 +86,7 @@ func TestConfigureCommand_SavesConfigWithValidInput(t *testing.T) {
 	customTodo := "Tasks"
 	customPdp := "PDP"
 
-	input := fmt.Sprintf("%s\n%s\n%s\n%s\n", tmpDir, customDiary, customTodo, customPdp)
+	input := fmt.Sprintf("custom\n%s\n%s\n%s\n%s\n", tmpDir, customDiary, customTodo, customPdp)
 
 	rootCmd := &cobra.Command{Use: "jotr"}
 	rootCmd.AddCommand(ConfigureCmd)
@@ -134,7 +133,7 @@ func TestConfigureCommand_AppliesDefaultValues(t *testing.T) {
 	defer cleanup()
 
 	tmpDir := t.TempDir()
-	input := fmt.Sprintf("%s\n\n\n\n", tmpDir)
+	input := fmt.Sprintf("custom\n%s\n\n\n\n", tmpDir)
 
 	rootCmd := &cobra.Command{Use: "jotr"}
 	rootCmd.AddCommand(ConfigureCmd)
@@ -180,7 +179,7 @@ func TestConfigureCommand_ExpandsTildeInPath(t *testing.T) {
 	homeDir, _ := os.UserHomeDir()
 	expectedDir := filepath.Join(homeDir, "Documents", "Notes")
 
-	input := "~/Documents/Notes\nDiary\ntodo\n\n"
+	input := "custom\n~/Documents/Notes\nDiary\ntodo\n\n"
 
 	rootCmd := &cobra.Command{Use: "jotr"}
 	rootCmd.AddCommand(ConfigureCmd)
@@ -216,7 +215,7 @@ func TestConfigureCommand_TodoFileStripsMdExtension(t *testing.T) {
 	defer cleanup()
 
 	tmpDir := t.TempDir()
-	input := fmt.Sprintf("%s\nDiary\ntasks.md\n\n", tmpDir)
+	input := fmt.Sprintf("custom\n%s\nDiary\ntasks.md\n\n", tmpDir)
 
 	rootCmd := &cobra.Command{Use: "jotr"}
 	rootCmd.AddCommand(ConfigureCmd)
@@ -256,7 +255,7 @@ func TestConfigureCommand_NestedDirectoryPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	nestedPath := filepath.Join(tmpDir, "work", "projects", "notes")
 
-	input := fmt.Sprintf("%s\nDiary\ntodo\n\n", nestedPath)
+	input := fmt.Sprintf("custom\n%s\nDiary\ntodo\n\n", nestedPath)
 
 	rootCmd := &cobra.Command{Use: "jotr"}
 	rootCmd.AddCommand(ConfigureCmd)
@@ -294,7 +293,7 @@ func TestConfigureCommand_OutputContainsAllSteps(t *testing.T) {
 	defer cleanup()
 
 	tmpDir := t.TempDir()
-	input := fmt.Sprintf("%s\nDiary\ntodo\n\n", tmpDir)
+	input := fmt.Sprintf("custom\n%s\nDiary\ntodo\n\n", tmpDir)
 
 	rootCmd := &cobra.Command{Use: "jotr"}
 	rootCmd.AddCommand(ConfigureCmd)
@@ -327,7 +326,7 @@ func TestConfigureCommand_AppliesFormatDefaults(t *testing.T) {
 	defer cleanup()
 
 	tmpDir := t.TempDir()
-	input := fmt.Sprintf("%s\nDiary\ntodo\n\n", tmpDir)
+	input := fmt.Sprintf("custom\n%s\nDiary\ntodo\n\n", tmpDir)
 
 	rootCmd := &cobra.Command{Use: "jotr"}
 	rootCmd.AddCommand(ConfigureCmd)
@@ -371,7 +370,7 @@ func TestConfigureCommand_AppliesAIAndStreakDefaults(t *testing.T) {
 	defer cleanup()
 
 	tmpDir := t.TempDir()
-	input := fmt.Sprintf("%s\nDiary\ntodo\n\n", tmpDir)
+	input := fmt.Sprintf("custom\n%s\nDiary\ntodo\n\n", tmpDir)
 
 	rootCmd := &cobra.Command{Use: "jotr"}
 	rootCmd.AddCommand(ConfigureCmd)
@@ -415,7 +414,7 @@ func TestConfigureCommand_AllDefaultsApplied(t *testing.T) {
 	defer cleanup()
 
 	tmpDir := t.TempDir()
-	input := fmt.Sprintf("%s\n\n\n\n", tmpDir)
+	input := fmt.Sprintf("custom\n%s\n\n\n\n", tmpDir)
 
 	rootCmd := &cobra.Command{Use: "jotr"}
 	rootCmd.AddCommand(ConfigureCmd)
@@ -459,7 +458,7 @@ func TestConfigureCommand_WritesValidJSON(t *testing.T) {
 	defer cleanup()
 
 	tmpDir := t.TempDir()
-	input := fmt.Sprintf("%s\nDiary\ntodo\n\n", tmpDir)
+	input := fmt.Sprintf("custom\n%s\nDiary\ntodo\n\n", tmpDir)
 
 	rootCmd := &cobra.Command{Use: "jotr"}
 	rootCmd.AddCommand(ConfigureCmd)
@@ -512,8 +511,7 @@ func TestConfigureCommand_AliasCommandsWork(t *testing.T) {
 	_, cleanup := testhelpers.SetupTestConfig(t)
 	defer cleanup()
 
-	tmpDir := t.TempDir()
-	input := fmt.Sprintf("%s\nDiary\ntodo\n\n", tmpDir)
+	input := "Y\n"
 
 	for _, alias := range []string{"config", "cfg"} {
 		alias := alias
