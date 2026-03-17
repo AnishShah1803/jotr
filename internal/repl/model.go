@@ -283,6 +283,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case tea.KeyShiftTab:
+			if len(m.completions) > 0 {
+				if !m.browsingCompletions {
+					// Enter completion browsing from the last item.
+					m.browsingCompletions = true
+					m.selectedIdx = len(m.completions) - 1
+					m.completionsOffset = 0
+				} else {
+					m.selectedIdx--
+					if m.selectedIdx < 0 {
+						m.selectedIdx = len(m.completions) - 1
+					}
+					if m.selectedIdx < m.completionsOffset {
+						m.completionsOffset = m.selectedIdx
+					}
+				}
+			}
 			return m, nil
 		}
 

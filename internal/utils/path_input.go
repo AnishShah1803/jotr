@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"time"
+
 	cterm "github.com/charmbracelet/x/term"
 	"github.com/mattn/go-isatty"
 )
@@ -194,10 +196,21 @@ func readPathRaw(prompt string) (string, error) {
 			return "", fmt.Errorf("interrupted")
 
 		case 27:
+			// Read the follow-up bytes with a short timeout so that a bare
+			// Escape keypress doesn't block and consume the next character.
+			type seqResult struct{ n int }
 			seq := make([]byte, 2)
-			if _, err := stdin.Read(seq); err != nil {
-				// EOF or read error consuming escape sequence — ignore
-				break
+			ch2 := make(chan seqResult, 1)
+			go func() {
+				n, _ := stdin.Read(seq)
+				ch2 <- seqResult{n}
+			}()
+			select {
+			case <-ch2:
+				// Consumed the ANSI escape sequence bytes (e.g. arrow keys).
+			case <-time.After(50 * time.Millisecond):
+				// Bare Escape — no follow-up bytes; goroutine may still be
+				// blocked on Read but will exit when the next key arrives.
 			}
 
 		default:
