@@ -26,7 +26,7 @@ func createTestTaskConfig(t *testing.T, tmpDir string) *config.LoadedConfig {
 	cfg.Format.CaptureSection = "Captured"
 	cfg.Format.DailyNotePattern = "{year}-{month}-{day}-{weekday}"
 	cfg.Format.DailyNoteDirPattern = "{year}/{month}"
-	cfg.Format.TaskSection = "Tasks"
+
 	cfg.DiaryPath = filepath.Join(tmpDir, "Diary")
 	cfg.TodoPath = filepath.Join(tmpDir, "todo.md")
 

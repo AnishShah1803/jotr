@@ -354,9 +354,6 @@ func TestConfigureCommand_AppliesFormatDefaults(t *testing.T) {
 		t.Fatalf("Failed to parse config: %v", err)
 	}
 
-	if cfg.Format.TaskSection != "Important Things" {
-		t.Errorf("Expected default TaskSection 'Important Things', got %s", cfg.Format.TaskSection)
-	}
 	if cfg.Format.CaptureSection != "Captured" {
 		t.Errorf("Expected default CaptureSection 'Captured', got %s", cfg.Format.CaptureSection)
 	}
@@ -398,8 +395,8 @@ func TestConfigureCommand_AppliesAIAndStreakDefaults(t *testing.T) {
 		t.Fatalf("Failed to parse config: %v", err)
 	}
 
-	if !cfg.AI.Enabled {
-		t.Error("Expected AI.Enabled to be true by default")
+	if cfg.AI.Enabled {
+		t.Error("Expected AI.Enabled to be false by default")
 	}
 	if cfg.AI.Command != "auggie -p --quiet" {
 		t.Errorf("Expected default AI.Command 'auggie -p --quiet', got %s", cfg.AI.Command)

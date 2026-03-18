@@ -68,7 +68,6 @@ func createDevConfig(path string) error {
 	cfg.Paths.TodoFilePath = "todo"
 	cfg.Paths.PDPFilePath = ""
 
-	cfg.Format.TaskSection = "Tasks"
 	cfg.Format.CaptureSection = "Captured"
 	cfg.Format.DailyNoteSections = []string{"Notes", "Development"}
 	cfg.Format.DailyNotePattern = "{year}-{month}-{day}.md"

@@ -43,7 +43,6 @@ type SyncOptions struct {
 	DiaryPath   string
 	TodoPath    string
 	StatePath   string
-	TaskSection string
 	LockTimeout time.Duration
 	DryRun      bool
 }
@@ -151,18 +150,29 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*state.S
 		return nil, fmt.Errorf("failed to read daily note: %w", err)
 	}
 
+	var tasksNeedingIDWriteback []tasks.Task
 	for i := range dailyTasks {
+		hadNoID := dailyTasks[i].ID == ""
 		tasks.EnsureTaskID(&dailyTasks[i])
+		// Strip the ID comment from the text so state stores clean text.
+		// The ID is already in task.ID; keeping it in Text causes spurious
+		// "modified" detections on every subsequent sync.
+		dailyTasks[i].Text = strings.TrimSpace(tasks.StripTaskID(dailyTasks[i].Text))
+		if hadNoID {
+			tasksNeedingIDWriteback = append(tasksNeedingIDWriteback, dailyTasks[i])
+		}
 	}
 
-	taskSection := opts.TaskSection
-	if taskSection == "" {
-		taskSection = "Tasks"
+	// Write newly-generated IDs back to the daily note so future syncs can match tasks.
+	if !opts.DryRun && len(tasksNeedingIDWriteback) > 0 {
+		if err := s.writeNewTaskIDs(notePath, tasksNeedingIDWriteback); err != nil {
+			return nil, fmt.Errorf("failed to write new task IDs to daily note: %w", err)
+		}
 	}
 
 	var activeDailyTasks []tasks.Task
 	for _, task := range dailyTasks {
-		if task.Section == taskSection && !task.Completed {
+		if !task.Completed {
 			activeDailyTasks = append(activeDailyTasks, task)
 		}
 	}
@@ -230,7 +240,7 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*state.S
 					return nil, fmt.Errorf("failed to read source file %s: %w", sourceFile, err)
 				}
 
-				if err := s.updateDailyNoteFromState(sourceFile, sourceTasks, todoState, opts.TaskSection); err != nil {
+				if err := s.updateDailyNoteFromState(sourceFile, sourceTasks, todoState); err != nil {
 					return nil, fmt.Errorf("failed to update daily note %s: %w", sourceFile, err)
 				}
 			}
@@ -252,60 +262,42 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*state.S
 	return result, nil
 }
 
-func (s *TaskService) updateDailyNoteFromState(notePath string, dailyTasks []tasks.Task, todoState *state.TodoState, taskSection string) error {
-	if taskSection == "" {
-		taskSection = "Tasks"
-	}
-
+func (s *TaskService) updateDailyNoteFromState(notePath string, dailyTasks []tasks.Task, todoState *state.TodoState) error {
 	noteContent, err := os.ReadFile(notePath)
 	if err != nil {
 		return fmt.Errorf("failed to read daily note: %w", err)
 	}
 
-	lines := strings.Split(string(noteContent), "\n")
-	var updatedLines []string
-	var inTaskSection bool
-	var sectionFound bool
-
-	for i := 0; i < len(lines); i++ {
-		line := lines[i]
-		trimmed := strings.TrimSpace(line)
-
-		if strings.HasPrefix(trimmed, "## ") {
-			if sectionFound && inTaskSection {
-				inTaskSection = false
-				sectionName := strings.TrimPrefix(trimmed, "## ")
-				if sectionName == taskSection {
-					sectionFound = false
-				}
-			} else if !sectionFound {
-				sectionName := strings.TrimPrefix(trimmed, "## ")
-				if sectionName == taskSection {
-					sectionFound = true
-					inTaskSection = true
-					updatedLines = append(updatedLines, line)
-					updatedLines = append(updatedLines, "")
-
-					for _, task := range dailyTasks {
-						if task.Section == taskSection {
-							if stateTask, exists := todoState.Tasks[task.ID]; exists {
-								taskLine := s.formatTaskLine(stateTask)
-								updatedLines = append(updatedLines, taskLine)
-							}
-						}
-					}
-					continue
-				}
-			}
-		}
-
-		if !inTaskSection {
-			updatedLines = append(updatedLines, line)
+	// Build O(1) lookup map: ID → task
+	taskByID := make(map[string]tasks.Task, len(dailyTasks))
+	for _, dt := range dailyTasks {
+		if dt.ID != "" {
+			taskByID[dt.ID] = dt
 		}
 	}
 
-	if !sectionFound {
-		return nil
+	lines := strings.Split(string(noteContent), "\n")
+	var updatedLines []string
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		// Check if this line is a task checkbox
+		if strings.HasPrefix(trimmed, "- [ ] ") || strings.HasPrefix(trimmed, "- [x] ") {
+			matched := false
+			if id := tasks.ExtractTaskID(line); id != "" {
+				if _, inDailyTasks := taskByID[id]; inDailyTasks {
+					if stateTask, exists := todoState.Tasks[id]; exists {
+						updatedLines = append(updatedLines, s.formatTaskLine(stateTask))
+						matched = true
+					}
+				}
+			}
+			if !matched {
+				updatedLines = append(updatedLines, line)
+			}
+		} else {
+			updatedLines = append(updatedLines, line)
+		}
 	}
 
 	content := strings.Join(updatedLines, "\n")
@@ -318,6 +310,63 @@ func (s *TaskService) updateDailyNoteFromState(notePath string, dailyTasks []tas
 	}
 
 	return nil
+}
+
+// writeNewTaskIDs writes newly-generated task IDs back to the daily note file.
+// This ensures that tasks without IDs in the file get their generated IDs persisted,
+// so future syncs (e.g. propagating completion status) can match them by ID.
+func (s *TaskService) writeNewTaskIDs(notePath string, newIDTasks []tasks.Task) error {
+	noteContent, err := os.ReadFile(notePath)
+	if err != nil {
+		return fmt.Errorf("failed to read daily note: %w", err)
+	}
+
+	// Build a map from clean task text → task for O(1) lookup.
+	// task.Text already has the ID appended (set by EnsureTaskID), so strip it to get the
+	// original text that still appears in the file.
+	taskByCleanText := make(map[string]tasks.Task, len(newIDTasks))
+	for _, t := range newIDTasks {
+		clean := strings.TrimSpace(tasks.StripTaskID(t.Text))
+		taskByCleanText[clean] = t
+	}
+
+	lines := strings.Split(string(noteContent), "\n")
+	var updatedLines []string
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		updated := false
+		if strings.HasPrefix(trimmed, "- [ ] ") || strings.HasPrefix(trimmed, "- [x] ") {
+			// Only rewrite lines that don't already have an ID.
+			if tasks.ExtractTaskID(line) == "" {
+				var lineText string
+				if strings.HasPrefix(trimmed, "- [ ] ") {
+					lineText = strings.TrimSpace(strings.TrimPrefix(trimmed, "- [ ] "))
+				} else {
+					lineText = strings.TrimSpace(strings.TrimPrefix(trimmed, "- [x] "))
+				}
+				if t, ok := taskByCleanText[lineText]; ok {
+					updatedLines = append(updatedLines, s.formatTaskLine(func() state.TaskState {
+						return state.TaskState{
+							ID:        t.ID,
+							Text:      tasks.StripTaskID(t.Text),
+							Completed: t.Completed,
+						}
+					}()))
+					updated = true
+				}
+			}
+		}
+		if !updated {
+			updatedLines = append(updatedLines, line)
+		}
+	}
+
+	content := strings.Join(updatedLines, "\n")
+	if !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+	return notes.WriteNote(context.Background(), notePath, content)
 }
 
 func (s *TaskService) formatTaskLine(stateTask state.TaskState) string {

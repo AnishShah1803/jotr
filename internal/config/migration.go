@@ -39,10 +39,6 @@ func setDefaultValues(cfg *Config) {
 		cfg.Version = ConfigVersion
 	}
 
-	if cfg.Format.TaskSection == "" {
-		cfg.Format.TaskSection = "Tasks"
-	}
-
 	if cfg.Format.CaptureSection == "" {
 		cfg.Format.CaptureSection = "Captured"
 	}

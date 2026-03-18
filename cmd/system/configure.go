@@ -188,13 +188,12 @@ func validateBaseDir(baseDir string) error {
 
 // applyDefaults sets default configuration values for fields not explicitly configured.
 func applyDefaults(cfg *config.Config) {
-	cfg.Format.TaskSection = "Important Things"
 	cfg.Format.CaptureSection = "Captured"
 	cfg.Format.DailyNoteSections = []string{"Notes", "Conversations/Activities"}
 	cfg.Format.DailyNotePattern = "{year}-{month}-{day}-{weekday}"
 	cfg.Format.DailyNoteDirPattern = "{year}/{month_num}-{month_abbr}"
 
-	cfg.AI.Enabled = true
+	cfg.AI.Enabled = false
 	cfg.AI.Command = "auggie -p --quiet"
 
 	cfg.Streaks.IncludeWeekends = false

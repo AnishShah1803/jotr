@@ -142,10 +142,9 @@ func TestSyncCommand_Integration(t *testing.T) {
 		service := services.NewTaskService()
 
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
-			DiaryPath:   diaryPath,
-			TodoPath:    todoPath,
-			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
-			TaskSection: "Tasks",
+			DiaryPath: diaryPath,
+			TodoPath:  todoPath,
+			StatePath: filepath.Join(fs.BaseDir, ".todo_state.json"),
 		})
 
 		if err != nil {
@@ -178,10 +177,9 @@ func TestSyncCommand_Integration(t *testing.T) {
 		service := services.NewTaskService()
 
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
-			DiaryPath:   diaryPath,
-			TodoPath:    todoPath,
-			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
-			TaskSection: "Tasks",
+			DiaryPath: diaryPath,
+			TodoPath:  todoPath,
+			StatePath: filepath.Join(fs.BaseDir, ".todo_state.json"),
 		})
 
 		if err != nil {
@@ -210,10 +208,9 @@ func TestSyncCommand_Integration(t *testing.T) {
 		service := services.NewTaskService()
 
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
-			DiaryPath:   diaryPath,
-			TodoPath:    todoPath,
-			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
-			TaskSection: "Tasks",
+			DiaryPath: diaryPath,
+			TodoPath:  todoPath,
+			StatePath: filepath.Join(fs.BaseDir, ".todo_state.json"),
 		})
 
 		if err != nil {
@@ -237,10 +234,9 @@ func TestSyncCommand_Integration(t *testing.T) {
 		service := services.NewTaskService()
 
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
-			DiaryPath:   diaryPath,
-			TodoPath:    todoPath,
-			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
-			TaskSection: "Tasks",
+			DiaryPath: diaryPath,
+			TodoPath:  todoPath,
+			StatePath: filepath.Join(fs.BaseDir, ".todo_state.json"),
 		})
 
 		if err != nil {
@@ -269,10 +265,9 @@ func TestSyncCommand_Integration(t *testing.T) {
 		service := services.NewTaskService()
 
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
-			DiaryPath:   diaryPath,
-			TodoPath:    todoPath,
-			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
-			TaskSection: "Tasks",
+			DiaryPath: diaryPath,
+			TodoPath:  todoPath,
+			StatePath: filepath.Join(fs.BaseDir, ".todo_state.json"),
 		})
 
 		if err != nil {
@@ -301,10 +296,9 @@ func TestSyncCommand_Integration(t *testing.T) {
 		service := services.NewTaskService()
 
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
-			DiaryPath:   diaryPath,
-			TodoPath:    todoPath,
-			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
-			TaskSection: "Tasks",
+			DiaryPath: diaryPath,
+			TodoPath:  todoPath,
+			StatePath: filepath.Join(fs.BaseDir, ".todo_state.json"),
 		})
 
 		if err != nil {
@@ -328,10 +322,9 @@ func TestSyncCommand_Integration(t *testing.T) {
 		service := services.NewTaskService()
 
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
-			DiaryPath:   diaryPath,
-			TodoPath:    todoPath,
-			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
-			TaskSection: "Tasks",
+			DiaryPath: diaryPath,
+			TodoPath:  todoPath,
+			StatePath: filepath.Join(fs.BaseDir, ".todo_state.json"),
 		})
 
 		if err != nil {
@@ -365,10 +358,9 @@ func TestSyncCommand_Integration(t *testing.T) {
 		service := services.NewTaskService()
 
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
-			DiaryPath:   diaryPath,
-			TodoPath:    todoPath,
-			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
-			TaskSection: "Tasks",
+			DiaryPath: diaryPath,
+			TodoPath:  todoPath,
+			StatePath: filepath.Join(fs.BaseDir, ".todo_state.json"),
 		})
 
 		if err != nil {
@@ -392,10 +384,9 @@ func TestSyncCommand_Integration(t *testing.T) {
 		service := services.NewTaskService()
 
 		result, err := service.SyncTasks(ctx, services.SyncOptions{
-			DiaryPath:   diaryPath,
-			TodoPath:    todoPath,
-			StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
-			TaskSection: "Tasks",
+			DiaryPath: diaryPath,
+			TodoPath:  todoPath,
+			StatePath: filepath.Join(fs.BaseDir, ".todo_state.json"),
 		})
 
 		if err != nil {

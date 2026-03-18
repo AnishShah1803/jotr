@@ -261,7 +261,7 @@ func (ch *ConfigHelper) CreateBasicConfig(t *testing.T) {
     "todo_file_path": "todo.md"
   },
   "format": {
-    "task_section": "Tasks",
+
     "capture_section": "Captured",
     "daily_note_sections": ["Notes", "Tasks"],
     "daily_note_pattern": "{year}-{month}-{day}-{weekday}",

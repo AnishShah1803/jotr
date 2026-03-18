@@ -140,7 +140,6 @@ func runHealthCheck() error {
 
 	// Show config summary
 	fmt.Println("\nConfiguration Summary:")
-	fmt.Printf("  Task Section: %s\n", cfg.Format.TaskSection)
 	fmt.Printf("  Capture Section: %s\n", cfg.Format.CaptureSection)
 	fmt.Printf("  Daily Note Sections: %v\n", cfg.Format.DailyNoteSections)
 	fmt.Printf("  Include Weekends: %v\n", cfg.Streaks.IncludeWeekends)

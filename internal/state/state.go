@@ -194,6 +194,9 @@ func (s *TodoState) MigrateFromMarkdown(tasksList []tasks.Task, source string) i
 	migrated := 0
 	for _, task := range tasksList {
 		tasks.EnsureTaskID(&task)
+		// Strip the ID comment from text so state stores clean text,
+		// consistent with how daily task text is stored.
+		task.Text = strings.TrimSpace(tasks.StripTaskID(task.Text))
 		s.AddTask(task, source)
 		migrated++
 	}
@@ -578,6 +581,13 @@ func (s *TodoState) applyChange(change TaskChange) {
 		task.CompletedAt = existing.CompletedAt
 		task.CreatedDate = existing.CreatedDate
 		task.CompletedDate = existing.CompletedDate
+		// Preserve the original source file path; synthetic values like "todo-list"
+		// or "merged" must not overwrite the real daily-note path.
+		if task.Source == "todo-list" || task.Source == "merged" || task.Source == "" {
+			if existing.Source != "" && existing.Source != "todo-list" && existing.Source != "merged" {
+				task.Source = existing.Source
+			}
+		}
 	}
 
 	// Set CompletedDate if task transitioned to complete

@@ -32,7 +32,7 @@ func TestLoadConfig_Valid(t *testing.T) {
 	config.Paths.BaseDir = "/tmp/test-jotr"
 	config.Paths.DiaryDir = "Diary"
 	config.Paths.TodoFilePath = "todo.md"
-	config.Format.TaskSection = "Important Things"
+
 	config.Format.CaptureSection = "Captured"
 	config.Format.DailyNoteSections = []string{"Notes", "Tasks"}
 	config.Format.DailyNotePattern = "{year}-{month}-{day}-{weekday}"
@@ -66,10 +66,6 @@ func TestLoadConfig_Valid(t *testing.T) {
 	// Verify loaded values
 	if loadedConfig.Paths.BaseDir != "/tmp/test-jotr" {
 		t.Errorf("Expected base_dir '/tmp/test-jotr', got '%s'", loadedConfig.Paths.BaseDir)
-	}
-
-	if loadedConfig.Format.TaskSection != "Important Things" {
-		t.Errorf("Expected task_section 'Important Things', got '%s'", loadedConfig.Format.TaskSection)
 	}
 
 	if len(loadedConfig.Format.DailyNoteSections) != 2 {
@@ -148,7 +144,6 @@ func TestLoadConfig_MissingBaseDir(t *testing.T) {
 
 	// Create config without base_dir
 	config := Config{}
-	config.Format.TaskSection = "Tasks"
 
 	data, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
@@ -194,7 +189,7 @@ func TestSaveConfig(t *testing.T) {
 	config.Paths.BaseDir = "/tmp/test-save"
 	config.Paths.DiaryDir = "Diary"
 	config.Paths.TodoFilePath = "todo.md"
-	config.Format.TaskSection = "Todo"
+
 	config.Format.CaptureSection = "Quick"
 	config.Format.DailyNoteSections = []string{"Notes", "Tasks", "Ideas"}
 	config.Format.DailyNotePattern = "{year}-{month}-{day}-{weekday}"
@@ -223,10 +218,6 @@ func TestSaveConfig(t *testing.T) {
 		t.Errorf("Expected base_dir '/tmp/test-save', got '%s'", loadedConfig.Paths.BaseDir)
 	}
 
-	if loadedConfig.Format.TaskSection != "Todo" {
-		t.Errorf("Expected task_section 'Todo', got '%s'", loadedConfig.Format.TaskSection)
-	}
-
 	if !loadedConfig.Streaks.IncludeWeekends {
 		t.Errorf("Expected include_weekends true, got false")
 	}
@@ -253,7 +244,7 @@ func TestSaveConfig_CreatesBackup(t *testing.T) {
 	initialConfig.Paths.BaseDir = "/initial/path"
 	initialConfig.Paths.DiaryDir = "Diary"
 	initialConfig.Paths.TodoFilePath = "todo.md"
-	initialConfig.Format.TaskSection = "Initial Tasks"
+
 	initialConfig.Format.DailyNotePattern = "{year}-{month}-{day}-{weekday}"
 	initialConfig.Format.DailyNoteDirPattern = "{year}/{month}"
 
@@ -277,7 +268,7 @@ func TestSaveConfig_CreatesBackup(t *testing.T) {
 	updatedConfig.Paths.BaseDir = "/updated/path"
 	updatedConfig.Paths.DiaryDir = "Diary"
 	updatedConfig.Paths.TodoFilePath = "todo.md"
-	updatedConfig.Format.TaskSection = "Updated Tasks"
+
 	updatedConfig.Format.DailyNotePattern = "{year}-{month}-{day}-{weekday}"
 	updatedConfig.Format.DailyNoteDirPattern = "{year}/{month}"
 
@@ -332,7 +323,7 @@ func TestValidateConfig_ReturnsWarnings(t *testing.T) {
 	cfg.Paths.BaseDir = "/tmp/test-jotr"
 	cfg.Paths.DiaryDir = "Diary"
 	cfg.Paths.TodoFilePath = "todo.md"
-	cfg.Format.TaskSection = "Tasks"
+
 	cfg.Format.CaptureSection = "Captured"
 	cfg.Format.DailyNotePattern = "{year}-{month}-{day}-{weekday}"
 	cfg.Format.DailyNoteDirPattern = "{year}/{month}"
