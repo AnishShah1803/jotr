@@ -1010,3 +1010,94 @@ func TestTaskService_SyncTasks_DeadlockPrevention(t *testing.T) {
 		t.Error("Task abc12345 should still exist after concurrent syncs")
 	}
 }
+
+// TestTaskService_SyncTasks_WriteBackIDAndPropagate verifies the full lifecycle:
+// 1. A task with no ID in the daily note gets an ID written back after the first sync.
+// 2. On the second sync the completion status propagates from state to the daily note.
+func TestTaskService_SyncTasks_WriteBackIDAndPropagate(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	configHelper := testhelpers.NewConfigHelper(fs)
+	configHelper.CreateBasicConfig(t)
+
+	configPath := filepath.Join(fs.BaseDir, ".config", "jotr", "config.json")
+	os.Setenv("JOTR_CONFIG", configPath)
+
+	now := time.Now()
+	year := now.Format("2006")
+	monthDir := now.Format("01-Jan")
+	dayFile := now.Format("2006-01-02-Mon.md")
+	dailyRelPath := filepath.Join("diary", year, monthDir, dayFile)
+
+	// Daily note with a task that has NO id comment.
+	fs.WriteFile(t, dailyRelPath, "# Daily Note\n\n- [ ] Review docs\n")
+
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+	statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
+	fs.WriteFile(t, "todo.md", "# To-Do List\n\n## Tasks\n")
+
+	service := NewTaskService()
+	ctx := context.Background()
+
+	// --- First sync: task should get an ID and it should be written back to the daily note.
+	_, err := service.SyncTasks(ctx, SyncOptions{
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: statePath,
+	})
+	if err != nil {
+		t.Fatalf("first SyncTasks() error = %v", err)
+	}
+
+	// Read the daily note back and confirm an id comment was written.
+	dailyNotePath := filepath.Join(fs.BaseDir, "diary", year, monthDir, dayFile)
+	dailyContent, err := os.ReadFile(dailyNotePath)
+	if err != nil {
+		t.Fatalf("failed to read daily note after first sync: %v", err)
+	}
+	if !strings.Contains(string(dailyContent), "<!-- id:") {
+		t.Fatalf("expected daily note to contain an id comment after first sync, got:\n%s", dailyContent)
+	}
+
+	// Extract the generated ID from state.
+	todoState, err := state.Read(statePath)
+	if err != nil {
+		t.Fatalf("failed to read state after first sync: %v", err)
+	}
+	var taskID string
+	for id := range todoState.Tasks {
+		taskID = id
+		break
+	}
+	if taskID == "" {
+		t.Fatal("expected at least one task in state after first sync")
+	}
+
+	// Mark the task as completed, simulating the todo app writing a completed task.
+	// Only update todo.md — do NOT touch the state file. The second sync should detect
+	// the change via CompareWithTodoList (state=incomplete vs todo=[x]) and propagate
+	// the completion back to the daily note.
+	completedLine := fmt.Sprintf("- [x] Review docs <!-- id: %s --> @completed(%s)\n", taskID, now.Format("2006-01-02"))
+	if err := os.WriteFile(todoPath, []byte("# To-Do List\n\n"+completedLine), 0644); err != nil {
+		t.Fatalf("failed to write completed task to todo.md: %v", err)
+	}
+
+	// --- Second sync: completion should propagate back to the daily note.
+	_, err = service.SyncTasks(ctx, SyncOptions{
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: statePath,
+	})
+	if err != nil {
+		t.Fatalf("second SyncTasks() error = %v", err)
+	}
+
+	dailyContent, err = os.ReadFile(dailyNotePath)
+	if err != nil {
+		t.Fatalf("failed to read daily note after second sync: %v", err)
+	}
+	if !strings.Contains(string(dailyContent), "- [x]") {
+		t.Errorf("expected daily note to contain '- [x]' after second sync, got:\n%s", dailyContent)
+	}
+}
