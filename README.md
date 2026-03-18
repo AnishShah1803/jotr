@@ -275,7 +275,6 @@ Example configuration:
     "todo_file_path": "todo"
   },
   "format": {
-    "task_section": "Tasks",
     "daily_note_sections": ["Notes", "Meetings"]
   }
 }

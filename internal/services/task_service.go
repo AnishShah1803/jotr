@@ -43,7 +43,6 @@ type SyncOptions struct {
 	DiaryPath   string
 	TodoPath    string
 	StatePath   string
-	TaskSection string
 	LockTimeout time.Duration
 	DryRun      bool
 }
@@ -155,14 +154,9 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*state.S
 		tasks.EnsureTaskID(&dailyTasks[i])
 	}
 
-	taskSection := opts.TaskSection
-	if taskSection == "" {
-		taskSection = "Tasks"
-	}
-
 	var activeDailyTasks []tasks.Task
 	for _, task := range dailyTasks {
-		if task.Section == taskSection && !task.Completed {
+		if !task.Completed {
 			activeDailyTasks = append(activeDailyTasks, task)
 		}
 	}
@@ -230,7 +224,7 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*state.S
 					return nil, fmt.Errorf("failed to read source file %s: %w", sourceFile, err)
 				}
 
-				if err := s.updateDailyNoteFromState(sourceFile, sourceTasks, todoState, opts.TaskSection); err != nil {
+				if err := s.updateDailyNoteFromState(sourceFile, sourceTasks, todoState); err != nil {
 					return nil, fmt.Errorf("failed to update daily note %s: %w", sourceFile, err)
 				}
 			}
@@ -252,11 +246,7 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*state.S
 	return result, nil
 }
 
-func (s *TaskService) updateDailyNoteFromState(notePath string, dailyTasks []tasks.Task, todoState *state.TodoState, taskSection string) error {
-	if taskSection == "" {
-		taskSection = "Tasks"
-	}
-
+func (s *TaskService) updateDailyNoteFromState(notePath string, dailyTasks []tasks.Task, todoState *state.TodoState) error {
 	noteContent, err := os.ReadFile(notePath)
 	if err != nil {
 		return fmt.Errorf("failed to read daily note: %w", err)
@@ -264,48 +254,31 @@ func (s *TaskService) updateDailyNoteFromState(notePath string, dailyTasks []tas
 
 	lines := strings.Split(string(noteContent), "\n")
 	var updatedLines []string
-	var inTaskSection bool
-	var sectionFound bool
 
-	for i := 0; i < len(lines); i++ {
-		line := lines[i]
+	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-
-		if strings.HasPrefix(trimmed, "## ") {
-			if sectionFound && inTaskSection {
-				inTaskSection = false
-				sectionName := strings.TrimPrefix(trimmed, "## ")
-				if sectionName == taskSection {
-					sectionFound = false
-				}
-			} else if !sectionFound {
-				sectionName := strings.TrimPrefix(trimmed, "## ")
-				if sectionName == taskSection {
-					sectionFound = true
-					inTaskSection = true
-					updatedLines = append(updatedLines, line)
-					updatedLines = append(updatedLines, "")
-
-					for _, task := range dailyTasks {
-						if task.Section == taskSection {
-							if stateTask, exists := todoState.Tasks[task.ID]; exists {
-								taskLine := s.formatTaskLine(stateTask)
-								updatedLines = append(updatedLines, taskLine)
-							}
-						}
-					}
+		// Check if this line is a task checkbox
+		if strings.HasPrefix(trimmed, "- [ ] ") || strings.HasPrefix(trimmed, "- [x] ") {
+			matched := false
+			for _, dt := range dailyTasks {
+				if dt.ID == "" {
 					continue
 				}
+				idComment := fmt.Sprintf("<!-- id: %s -->", dt.ID)
+				if strings.Contains(line, idComment) {
+					if stateTask, exists := todoState.Tasks[dt.ID]; exists {
+						updatedLines = append(updatedLines, s.formatTaskLine(stateTask))
+						matched = true
+						break
+					}
+				}
 			}
-		}
-
-		if !inTaskSection {
+			if !matched {
+				updatedLines = append(updatedLines, line)
+			}
+		} else {
 			updatedLines = append(updatedLines, line)
 		}
-	}
-
-	if !sectionFound {
-		return nil
 	}
 
 	content := strings.Join(updatedLines, "\n")

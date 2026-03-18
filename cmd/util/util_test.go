@@ -253,7 +253,6 @@ func TestRunValidation_ValidConfig(t *testing.T) {
 			"todo_file_path": "todo.txt"
 		},
 		"format": {
-			"task_section": "Tasks",
 			"capture_section": "Captured",
 			"daily_note_sections": ["Notes"]
 		}

@@ -124,10 +124,9 @@ func TestTaskService_SyncTasks_NoTasksToSync(t *testing.T) {
 	ctx := context.Background()
 
 	result, err := service.SyncTasks(ctx, SyncOptions{
-		DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
-		TodoPath:    todoPath,
-		StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
-		TaskSection: "Tasks",
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: filepath.Join(fs.BaseDir, ".todo_state.json"),
 	})
 	if err != nil {
 		t.Fatalf("SyncTasks() error = %v", err)
@@ -298,10 +297,9 @@ func TestTaskService_SyncTasks_Deduplication_SubstringFalsePositive(t *testing.T
 	ctx := context.Background()
 
 	result, err := service.SyncTasks(ctx, SyncOptions{
-		DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
-		TodoPath:    todoPath,
-		StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
-		TaskSection: "Tasks",
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: filepath.Join(fs.BaseDir, ".todo_state.json"),
 	})
 	if err != nil {
 		t.Fatalf("SyncTasks() error = %v", err)
@@ -351,10 +349,9 @@ func TestTaskService_SyncTasks_Deduplication_ExactMatch(t *testing.T) {
 	ctx := context.Background()
 
 	result, err := service.SyncTasks(ctx, SyncOptions{
-		DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
-		TodoPath:    todoPath,
-		StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
-		TaskSection: "Tasks",
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: filepath.Join(fs.BaseDir, ".todo_state.json"),
 	})
 	if err != nil {
 		t.Fatalf("SyncTasks() error = %v", err)
@@ -404,10 +401,9 @@ func TestTaskService_SyncTasks_Deduplication_IDBased(t *testing.T) {
 	ctx := context.Background()
 
 	result, err := service.SyncTasks(ctx, SyncOptions{
-		DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
-		TodoPath:    todoPath,
-		StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
-		TaskSection: "Tasks",
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: filepath.Join(fs.BaseDir, ".todo_state.json"),
 	})
 	if err != nil {
 		t.Fatalf("SyncTasks() error = %v", err)
@@ -458,10 +454,9 @@ func TestTaskService_SyncTasks_Deduplication_MultipleSimilar(t *testing.T) {
 	ctx := context.Background()
 
 	result, err := service.SyncTasks(ctx, SyncOptions{
-		DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
-		TodoPath:    todoPath,
-		StatePath:   filepath.Join(fs.BaseDir, ".todo_state.json"),
-		TaskSection: "Tasks",
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: filepath.Join(fs.BaseDir, ".todo_state.json"),
 	})
 	if err != nil {
 		t.Fatalf("SyncTasks() error = %v", err)
@@ -556,10 +551,9 @@ func TestTaskService_SyncTasks_ConcurrentFileLocking(t *testing.T) {
 			<-start
 
 			_, err := service.SyncTasks(ctx, SyncOptions{
-				DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
-				TodoPath:    todoPath,
-				StatePath:   statePath,
-				TaskSection: "Tasks",
+				DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+				TodoPath:  todoPath,
+				StatePath: statePath,
 			})
 			errors <- err
 		}(i)
@@ -980,10 +974,9 @@ func TestTaskService_SyncTasks_DeadlockPrevention(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			_, err := service.SyncTasks(ctx, SyncOptions{
-				DiaryPath:   filepath.Join(fs.BaseDir, "diary"),
-				TodoPath:    todoPath,
-				StatePath:   statePath,
-				TaskSection: "Tasks",
+				DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+				TodoPath:  todoPath,
+				StatePath: statePath,
 			})
 			errChan <- err
 		}()

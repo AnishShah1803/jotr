@@ -309,7 +309,6 @@ Example configuration:
     "pdp_file_path": "PDP"
   },
   "format": {
-    "task_section": "Important Things",
     "capture_section": "Captured",
     "daily_note_sections": ["Notes", "Conversations/Activities"]
   }

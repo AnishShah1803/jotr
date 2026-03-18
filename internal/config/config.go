@@ -96,7 +96,6 @@ type PathsConfig struct {
 
 // FormatConfig holds formatting-related configuration settings.
 type FormatConfig struct {
-	TaskSection         string   `json:"task_section"`
 	CaptureSection      string   `json:"capture_section"`
 	DailyNotePattern    string   `json:"daily_note_pattern"`
 	DailyNoteDirPattern string   `json:"daily_note_dir_pattern"`

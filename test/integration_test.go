@@ -34,7 +34,6 @@ func TestIntegrationWorkflow(t *testing.T) {
 			"pdp_file_path": ""
 		},
 		"format": {
-			"task_section": "Tasks",
 			"capture_section": "Captured",
 			"daily_note_sections": ["Notes", "Development"],
 			"daily_note_pattern": "{year}-{month}-{day}.md",

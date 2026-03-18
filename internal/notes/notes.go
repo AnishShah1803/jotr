@@ -286,7 +286,6 @@ func BuildDailyNotePath(diaryDir string, date time.Time) string {
 }
 
 // CreateDailyNote creates a daily note with template with context support.
-// It adds a Task section at the end if not already present in the sections.
 func CreateDailyNote(ctx context.Context, notePath string, sections []string, date time.Time) error {
 	select {
 	case <-ctx.Done():
@@ -316,31 +315,9 @@ func CreateDailyNote(ctx context.Context, notePath string, sections []string, da
 	return nil
 }
 
-// BuildDailyNoteSections prepares the complete sections list for a daily note,
-// including daily_note_sections from config and ensuring a Task section exists.
+// BuildDailyNoteSections returns the sections list for a daily note from config.
 func BuildDailyNoteSections(cfg *config.LoadedConfig) []string {
-	var allSections []string
-	allSections = append(allSections, cfg.Format.DailyNoteSections...)
-
-	taskSection := cfg.Format.TaskSection
-	if taskSection == "" {
-		taskSection = "Tasks"
-	}
-
-	hasTaskSection := false
-
-	for _, section := range cfg.Format.DailyNoteSections {
-		if section == taskSection {
-			hasTaskSection = true
-			break
-		}
-	}
-
-	if !hasTaskSection {
-		allSections = append(allSections, taskSection)
-	}
-
-	return allSections
+	return cfg.Format.DailyNoteSections
 }
 
 // GetRecentDailyNotes gets the most recent daily notes with context support.

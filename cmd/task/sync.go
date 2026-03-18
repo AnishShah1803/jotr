@@ -94,11 +94,10 @@ func syncTasks(ctx context.Context, cfg *config.LoadedConfig) error {
 	taskService := services.NewTaskService()
 
 	opts := services.SyncOptions{
-		DiaryPath:   cfg.DiaryPath,
-		TodoPath:    cfg.TodoPath,
-		StatePath:   cfg.StatePath,
-		TaskSection: cfg.Format.TaskSection,
-		DryRun:      syncDryRun,
+		DiaryPath: cfg.DiaryPath,
+		TodoPath:  cfg.TodoPath,
+		StatePath: cfg.StatePath,
+		DryRun:    syncDryRun,
 	}
 
 	result, err := taskService.SyncTasks(ctx, opts)

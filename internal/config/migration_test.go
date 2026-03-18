@@ -47,9 +47,6 @@ func TestMigrateV0_9_0_toV1_0_0_SetsDefaults(t *testing.T) {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
 
-	if cfg.Format.TaskSection != "Tasks" {
-		t.Errorf("Expected default task_section 'Tasks', got '%s'", cfg.Format.TaskSection)
-	}
 	if cfg.Format.CaptureSection != "Captured" {
 		t.Errorf("Expected default capture_section 'Captured', got '%s'", cfg.Format.CaptureSection)
 	}
@@ -94,7 +91,7 @@ func TestMigrateV0_9_0_toV1_0_0_PreservesExistingValues(t *testing.T) {
 	cfg.Version = "0.9.0"
 	cfg.Paths.BaseDir = "/custom/path"
 	cfg.Paths.DiaryDir = "MyDiary"
-	cfg.Format.TaskSection = "CustomTasks"
+
 	cfg.NoteTemplates = map[string]interface{}{
 		"custom": "value",
 	}
@@ -110,9 +107,7 @@ func TestMigrateV0_9_0_toV1_0_0_PreservesExistingValues(t *testing.T) {
 	if cfg.Paths.DiaryDir != "MyDiary" {
 		t.Errorf("Expected diary_dir to be preserved, got '%s'", cfg.Paths.DiaryDir)
 	}
-	if cfg.Format.TaskSection != "CustomTasks" {
-		t.Errorf("Expected task_section to be preserved, got '%s'", cfg.Format.TaskSection)
-	}
+
 	if cfg.NoteTemplates["custom"] != "value" {
 		t.Error("Expected custom template to be preserved")
 	}
@@ -214,7 +209,7 @@ func TestMigrateConfig_CompleteFlow(t *testing.T) {
 			"todo_file_path": "todo"
 		},
 		"format": {
-			"task_section": "",
+
 			"capture_section": "",
 			"daily_note_pattern": "",
 			"daily_note_dir_pattern": "",
@@ -239,10 +234,6 @@ func TestMigrateConfig_CompleteFlow(t *testing.T) {
 
 	if cfg.Version != ConfigVersion {
 		t.Errorf("Expected migrated config version to be %s, got %s", ConfigVersion, cfg.Version)
-	}
-
-	if cfg.Format.TaskSection != "Tasks" {
-		t.Errorf("Expected default TaskSection after migration, got '%s'", cfg.Format.TaskSection)
 	}
 
 	if _, exists := cfg.NoteTemplates["use_ai_beta"]; exists {

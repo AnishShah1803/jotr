@@ -8,7 +8,6 @@
   },
   "_paths_note": "All paths are relative to base_dir. Don't include .md extension - it will be added automatically. Examples: 'todo', 'Work/tasks', 'Career/PDP'",
   "format": {
-    "task_section": "Tasks",
     "capture_section": "Captured",
     "daily_note_sections": ["Notes", "Meetings"],
     "daily_note_pattern": "{year}-{month}-{day}-{weekday}",
