@@ -32,6 +32,7 @@ type Model struct {
 	completionsOffset   int
 	browsingCompletions bool
 	inHistoryNav        bool
+	streakResult        services.StreakResult
 }
 
 const replAsciiArt = `      ░░
@@ -110,6 +111,7 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Comm
 		quitting:     false,
 		completions:  []string{},
 		selectedIdx:  0,
+		streakResult: services.CalculateStreak(cfg),
 	}
 
 	return m
@@ -592,7 +594,7 @@ func (m Model) renderHeader() (string, int) {
 	leftPad := 2
 	leftPadStr := strings.Repeat(" ", leftPad)
 
-	streak := services.CalculateStreak(m.config)
+	streak := m.streakResult
 	var streakText string
 	if streak.CurrentStreak > 0 {
 		streakText = versionStyle.Render(fmt.Sprintf("%d day streak 🔥", streak.CurrentStreak))
@@ -645,6 +647,9 @@ func (m Model) renderHeader() (string, int) {
 			maxContent = w
 		}
 		if w := lipgloss.Width(hint); w > maxContent {
+			maxContent = w
+		}
+		if w := lipgloss.Width(streakText); w > maxContent {
 			maxContent = w
 		}
 
