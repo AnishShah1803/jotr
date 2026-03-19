@@ -21,7 +21,6 @@ func CalculateStreak(cfg *config.LoadedConfig) StreakResult {
 	result := StreakResult{}
 
 	firstValidDay := true
-	currentStreakSet := false
 	tempStreak := 0
 
 	for i := 0; i < 365; i++ {
@@ -40,12 +39,7 @@ func CalculateStreak(cfg *config.LoadedConfig) StreakResult {
 			tempStreak++
 			result.TotalNotes++
 
-			if !currentStreakSet {
-				result.CurrentStreak = tempStreak
-				currentStreakSet = true
-			} else {
-				result.CurrentStreak = tempStreak
-			}
+			result.CurrentStreak = tempStreak
 
 			if tempStreak > result.LongestStreak {
 				result.LongestStreak = tempStreak
@@ -55,7 +49,7 @@ func CalculateStreak(cfg *config.LoadedConfig) StreakResult {
 				result.CurrentStreak = 0
 				break
 			}
-			if currentStreakSet {
+			if tempStreak > 0 {
 				break
 			}
 
