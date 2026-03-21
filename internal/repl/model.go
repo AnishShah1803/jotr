@@ -2,6 +2,7 @@ package repl
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/output"
+	"github.com/AnishShah1803/jotr/internal/services"
 	"github.com/AnishShah1803/jotr/internal/version"
 )
 
@@ -30,6 +32,7 @@ type Model struct {
 	completionsOffset   int
 	browsingCompletions bool
 	inHistoryNav        bool
+	streakResult        services.StreakResult
 }
 
 const replAsciiArt = `      ░░
@@ -108,6 +111,7 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Comm
 		quitting:     false,
 		completions:  []string{},
 		selectedIdx:  0,
+		streakResult: services.CalculateStreak(cfg),
 	}
 
 	return m
@@ -590,6 +594,14 @@ func (m Model) renderHeader() (string, int) {
 	leftPad := 2
 	leftPadStr := strings.Repeat(" ", leftPad)
 
+	streak := m.streakResult
+	var streakText string
+	if streak.CurrentStreak > 0 {
+		streakText = versionStyle.Render(fmt.Sprintf("%d day streak 🔥", streak.CurrentStreak))
+	} else {
+		streakText = helpStyle.Render("no streak yet")
+	}
+
 	if m.width >= minWidthForArt && m.height >= minHeightForArt {
 		artRendered := renderLogo()
 		artWidth := lipgloss.Width(artRendered)
@@ -604,7 +616,7 @@ func (m Model) renderHeader() (string, int) {
 		}
 
 		verText := versionStyle.Render("jotr " + version.GetVersion())
-		verPadded := strings.Repeat("\n", replAsciiArtHeight-1) + verText
+		verPadded := strings.Repeat("\n", replAsciiArtHeight-1) + verText + "\n" + streakText
 		rightColWidth := m.width - artWidth - leftPad - gapRight
 		if rightColWidth < 20 {
 			rightColWidth = 20
@@ -628,13 +640,16 @@ func (m Model) renderHeader() (string, int) {
 	requiredWidth := leftPad + lipgloss.Width(logo) + lipgloss.Width(ver) + 2
 
 	if m.width < requiredWidth {
-		header := leftPadStr + logo + "\n" + leftPadStr + ver
+		header := leftPadStr + logo + "\n" + leftPadStr + ver + "\n" + leftPadStr + streakText
 
 		maxContent := lipgloss.Width(logo)
 		if w := lipgloss.Width(ver); w > maxContent {
 			maxContent = w
 		}
 		if w := lipgloss.Width(hint); w > maxContent {
+			maxContent = w
+		}
+		if w := lipgloss.Width(streakText); w > maxContent {
 			maxContent = w
 		}
 
@@ -654,5 +669,5 @@ func (m Model) renderHeader() (string, int) {
 		ver,
 	)
 	contentWidth := leftPad + lipgloss.Width(hint)
-	return header + "\n" + leftPadStr + hint, contentWidth
+	return header + "\n" + leftPadStr + streakText + "\n" + leftPadStr + hint, contentWidth
 }
