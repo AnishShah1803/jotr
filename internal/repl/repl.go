@@ -130,6 +130,9 @@ func captureProcessOutput(fn func() error) (output string, err error) {
 	os.Stdout = stdoutW
 	os.Stderr = stderrW
 	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in command: %v", r)
+		}
 		_ = stdoutW.Close()
 		_ = stderrW.Close()
 		wg.Wait()
