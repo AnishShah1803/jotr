@@ -33,6 +33,12 @@ type Model struct {
 	browsingCompletions bool
 	inHistoryNav        bool
 	streakResult        services.StreakResult
+	transcript          []transcriptEntry
+}
+
+type transcriptEntry struct {
+	command string
+	output  string
 }
 
 const replAsciiArt = `      ░░
@@ -97,6 +103,8 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Comm
 	ti.Focus()
 	ti.CharLimit = 500
 	ti.Width = 60
+	ti.TextStyle = inputStyle
+	ti.PlaceholderStyle = completionStyle
 
 	m := Model{
 		ctx:          ctx,
@@ -138,8 +146,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.ready = true
 		if !wasReady {
-			header, _ := m.renderHeader()
-			return m, tea.Println("\n" + header)
+			return m, nil
 		}
 		return m, nil
 
@@ -151,10 +158,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 			m.textInput.SetValue("")
-			m.completions = []string{}
-			m.selectedIdx = 0
-			m.browsingCompletions = false
-			m.inHistoryNav = false
+			m.clearCompletionState()
 			m.history.Reset()
 			return m, nil
 
@@ -177,30 +181,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.history.Add(input)
 			cmdOutput := m.executeCommand(input)
+			m.transcript = append(m.transcript, transcriptEntry{
+				command: input,
+				output:  strings.TrimSpace(cmdOutput),
+			})
+
 			m.textInput.SetValue("")
-			m.completions = []string{}
-			m.selectedIdx = 0
-			m.browsingCompletions = false
-			m.inHistoryNav = false
-
-			inset := 2
-			insetStr := strings.Repeat(" ", inset)
-
-			var block strings.Builder
-			block.WriteString("\n")
-			block.WriteString(promptStyle.Render("❯ ") + inputStyle.Render(input))
-			if cmdOutput != "" {
-				trimmed := strings.TrimSpace(cmdOutput)
-				for _, line := range strings.Split(trimmed, "\n") {
-					block.WriteString("\n")
-					block.WriteString(insetStr + line)
-				}
-			}
+			m.textInput.CursorStart()
+			m.clearCompletionState()
 
 			if m.quitting {
-				return m, tea.Sequence(tea.Println(block.String()), tea.Quit)
+				return m, tea.Quit
 			}
-			return m, tea.Println(block.String())
+			return m, nil
 
 		case tea.KeyUp:
 			if m.browsingCompletions {
@@ -306,23 +299,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-	case outputMsg:
-		chunk := string(msg)
-		if chunk != "" {
-			inset := 2
-			insetStr := strings.Repeat(" ", inset)
-			var block strings.Builder
-			for _, line := range strings.Split(strings.TrimSpace(chunk), "\n") {
-				block.WriteString(insetStr + line + "\n")
-			}
-			return m, tea.Println(strings.TrimRight(block.String(), "\n"))
-		}
-		return m, nil
 	}
 
 	prevValue := m.textInput.Value()
 	m.textInput, cmd = m.textInput.Update(msg)
-	// If the user typed a character while browsing completions, exit browsing mode.
 	if m.browsingCompletions && m.textInput.Value() != prevValue {
 		m.browsingCompletions = false
 	}
@@ -330,7 +310,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-type outputMsg string
+func (m *Model) clearCompletionState() {
+	m.completions = nil
+	m.selectedIdx = 0
+	m.completionsOffset = 0
+	m.browsingCompletions = false
+	m.inHistoryNav = false
+}
 
 func (m *Model) updateCompletions() {
 	value := m.textInput.Value()
@@ -540,8 +526,33 @@ func (m Model) View() string {
 	}
 
 	var b strings.Builder
+	header, _ := m.renderHeader()
+	b.WriteString(header)
+	b.WriteString("\n\n")
 
 	inset := 2
+	if len(m.transcript) > 0 {
+		transcriptSeparator := strings.Repeat(" ", inset) + strings.Repeat("─", 40)
+		b.WriteString(separatorStyle.Render(transcriptSeparator))
+		b.WriteString("\n\n")
+	}
+
+	for _, entry := range m.transcript {
+		b.WriteString(strings.Repeat(" ", inset))
+		b.WriteString(promptStyle.Render("❯ "))
+		b.WriteString(inputStyle.Render(entry.command))
+		b.WriteString("\n")
+		if entry.output != "" {
+			for _, line := range strings.Split(strings.TrimRight(entry.output, "\n"), "\n") {
+				b.WriteString(strings.Repeat(" ", inset*2))
+				b.WriteString(line)
+				b.WriteString("\n")
+			}
+		} else {
+			b.WriteString("\n")
+		}
+		b.WriteString("\n")
+	}
 
 	separator := strings.Repeat(" ", inset) + strings.Repeat("─", 40)
 	b.WriteString(separatorStyle.Render(separator))
@@ -549,7 +560,7 @@ func (m Model) View() string {
 
 	b.WriteString(strings.Repeat(" ", inset))
 	b.WriteString(promptStyle.Render("❯ "))
-	b.WriteString(inputStyle.Render(m.textInput.View()))
+	b.WriteString(m.textInput.View())
 
 	if len(m.completions) > 0 {
 		b.WriteString("\n")

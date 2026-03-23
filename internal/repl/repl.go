@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
+	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -29,7 +31,7 @@ func (m *Model) executeCommand(input string) string {
 		return fmt.Sprintf("Command not found: %s\nType 'help' for available commands.", args[0])
 	}
 
-	// Capture stdout and stderr using buffers
+	// Capture Cobra output separately from any direct stdout/stderr writes.
 	var outBuf, errBuf bytes.Buffer
 
 	// Set output on the original root command before cloning it so that
@@ -69,7 +71,9 @@ func (m *Model) executeCommand(input string) string {
 		resetFlags(subCmd.InheritedFlags())
 	}
 
-	execErr := tmpRoot.Execute()
+	directOutput, execErr := captureProcessOutput(func() error {
+		return tmpRoot.Execute()
+	})
 
 	var result strings.Builder
 
@@ -79,6 +83,9 @@ func (m *Model) executeCommand(input string) string {
 
 	if errBuf.Len() > 0 {
 		result.WriteString(errBuf.String())
+	}
+	if directOutput != "" {
+		result.WriteString(directOutput)
 	}
 
 	if execErr != nil {
@@ -94,6 +101,52 @@ func (m *Model) executeCommand(input string) string {
 	}
 
 	return output + "\n"
+}
+
+func captureProcessOutput(fn func() error) (string, error) {
+	origStdout := os.Stdout
+	origStderr := os.Stderr
+
+	stdoutR, stdoutW, err := os.Pipe()
+	if err != nil {
+		return "", err
+	}
+	defer stdoutR.Close()
+
+	stderrR, stderrW, err := os.Pipe()
+	if err != nil {
+		stdoutW.Close()
+		return "", err
+	}
+	defer stderrR.Close()
+
+	os.Stdout = stdoutW
+	os.Stderr = stderrW
+	defer func() {
+		os.Stdout = origStdout
+		os.Stderr = origStderr
+	}()
+
+	var stdoutBuf bytes.Buffer
+	var stderrBuf bytes.Buffer
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, _ = io.Copy(&stdoutBuf, stdoutR)
+	}()
+	go func() {
+		defer wg.Done()
+		_, _ = io.Copy(&stderrBuf, stderrR)
+	}()
+
+	execErr := fn()
+	_ = stdoutW.Close()
+	_ = stderrW.Close()
+	wg.Wait()
+
+	combined := stdoutBuf.String() + stderrBuf.String()
+	return combined, execErr
 }
 
 func parseInput(input string) []string {
@@ -141,6 +194,7 @@ func LaunchREPL(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Co
 
 	p := tea.NewProgram(
 		&m,
+		tea.WithAltScreen(),
 	)
 
 	_, err := p.Run()
