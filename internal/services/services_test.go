@@ -1101,3 +1101,135 @@ func TestTaskService_SyncTasks_WriteBackIDAndPropagate(t *testing.T) {
 		t.Errorf("expected daily note to contain '- [x]' after second sync, got:\n%s", dailyContent)
 	}
 }
+
+// TestTaskService_CreateTask_NoDeadlock verifies that CreateTask -> SyncTasks
+// doesn't deadlock by reacquiring the same locks.
+func TestTaskService_CreateTask_NoDeadlock(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	configHelper := testhelpers.NewConfigHelper(fs)
+	configHelper.CreateBasicConfig(t)
+
+	configPath := filepath.Join(fs.BaseDir, ".config", "jotr", "config.json")
+	os.Setenv("JOTR_CONFIG", configPath)
+
+	now := time.Now()
+	year := now.Format("2006")
+	monthDir := now.Format("01-Jan")
+	dayFile := now.Format("2006-01-02-Mon.md")
+	dailyRelPath := filepath.Join("diary", year, monthDir, dayFile)
+
+	diaryPath := filepath.Join(fs.BaseDir, "diary")
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+	statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
+
+	fs.WriteFile(t, dailyRelPath, "# Daily Note\n")
+	fs.WriteFile(t, "todo.md", "# To-Do List\n\n## Tasks\n")
+
+	service := NewTaskService()
+	ctx := context.Background()
+
+	done := make(chan bool, 1)
+	var result *CreateTaskResult
+	var err error
+
+	go func() {
+		result, err = service.CreateTask(ctx, CreateTaskOptions{
+			DiaryPath:   diaryPath,
+			TodoPath:    todoPath,
+			StatePath:   statePath,
+			Text:        "Test task",
+			LockTimeout: 5 * time.Second,
+		})
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		if err != nil {
+			t.Fatalf("CreateTask() error = %v", err)
+		}
+		if result == nil || result.TaskID == "" {
+			t.Fatal("expected CreateTask to return a task with an ID")
+		}
+
+		dailyNotePath := filepath.Join(fs.BaseDir, dailyRelPath)
+		dailyContent, err := os.ReadFile(dailyNotePath)
+		if err != nil {
+			t.Fatalf("failed to read daily note: %v", err)
+		}
+
+		if !strings.Contains(string(dailyContent), result.TaskID) {
+			t.Errorf("expected daily note to contain task ID %s, got:\n%s", result.TaskID, dailyContent)
+		}
+
+	case <-time.After(10 * time.Second):
+		t.Fatal("CreateTask() deadlocked or timed out")
+	}
+}
+
+// TestTaskService_UpdateTask_NoDeadlock verifies that UpdateTask -> SyncTasks
+// doesn't deadlock by reacquiring the same locks.
+func TestTaskService_UpdateTask_NoDeadlock(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	configHelper := testhelpers.NewConfigHelper(fs)
+	configHelper.CreateBasicConfig(t)
+
+	configPath := filepath.Join(fs.BaseDir, ".config", "jotr", "config.json")
+	os.Setenv("JOTR_CONFIG", configPath)
+
+	now := time.Now()
+	year := now.Format("2006")
+	monthDir := now.Format("01-Jan")
+	dayFile := now.Format("2006-01-02-Mon.md")
+	dailyRelPath := filepath.Join("diary", year, monthDir, dayFile)
+
+	diaryPath := filepath.Join(fs.BaseDir, "diary")
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+	statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
+
+	fs.WriteFile(t, dailyRelPath, "# Daily Note\n")
+	fs.WriteFile(t, "todo.md", "# To-Do List\n\n## Tasks\n")
+
+	service := NewTaskService()
+	ctx := context.Background()
+
+	createResult, err := service.CreateTask(ctx, CreateTaskOptions{
+		DiaryPath:   diaryPath,
+		TodoPath:    todoPath,
+		StatePath:   statePath,
+		Text:        "Original task",
+		LockTimeout: 5 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask() error = %v", err)
+	}
+
+	done := make(chan bool, 1)
+	var updateErr error
+
+	go func() {
+		_, updateErr = service.UpdateTask(ctx, UpdateTaskOptions{
+			DiaryPath:   diaryPath,
+			TodoPath:    todoPath,
+			StatePath:   statePath,
+			TaskID:      createResult.TaskID,
+			Text:        "Updated task text",
+			LockTimeout: 5 * time.Second,
+		})
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		if updateErr != nil {
+			t.Fatalf("UpdateTask() error = %v", updateErr)
+		}
+
+	case <-time.After(10 * time.Second):
+		t.Fatal("UpdateTask() deadlocked or timed out")
+	}
+}
