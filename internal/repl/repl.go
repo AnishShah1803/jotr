@@ -3,9 +3,12 @@ package repl
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
+	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -29,7 +32,7 @@ func (m *Model) executeCommand(input string) string {
 		return fmt.Sprintf("Command not found: %s\nType 'help' for available commands.", args[0])
 	}
 
-	// Capture stdout and stderr using buffers
+	// Capture Cobra output separately from any direct stdout/stderr writes.
 	var outBuf, errBuf bytes.Buffer
 
 	// Set output on the original root command before cloning it so that
@@ -69,7 +72,9 @@ func (m *Model) executeCommand(input string) string {
 		resetFlags(subCmd.InheritedFlags())
 	}
 
-	execErr := tmpRoot.Execute()
+	directOutput, execErr := captureProcessOutput(func() error {
+		return tmpRoot.Execute()
+	})
 
 	var result strings.Builder
 
@@ -79,6 +84,9 @@ func (m *Model) executeCommand(input string) string {
 
 	if errBuf.Len() > 0 {
 		result.WriteString(errBuf.String())
+	}
+	if directOutput != "" {
+		result.WriteString(directOutput)
 	}
 
 	if execErr != nil {
@@ -94,6 +102,66 @@ func (m *Model) executeCommand(input string) string {
 	}
 
 	return output + "\n"
+}
+
+func captureProcessOutput(fn func() error) (output string, err error) {
+	origStdout := os.Stdout
+	origStderr := os.Stderr
+
+	var stdoutBuf bytes.Buffer
+	var stderrBuf bytes.Buffer
+	var stdoutErr error
+	var stderrErr error
+	var wg sync.WaitGroup
+
+	stdoutR, stdoutW, err := os.Pipe()
+	if err != nil {
+		return "", err
+	}
+	defer stdoutR.Close()
+
+	stderrR, stderrW, err := os.Pipe()
+	if err != nil {
+		_ = stdoutW.Close()
+		return "", err
+	}
+	defer stderrR.Close()
+
+	os.Stdout = stdoutW
+	os.Stderr = stderrW
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in command: %v", r)
+		}
+		_ = stdoutW.Close()
+		_ = stderrW.Close()
+		wg.Wait()
+		os.Stdout = origStdout
+		os.Stderr = origStderr
+
+		combined := stdoutBuf.String() + stderrBuf.String()
+		if stdoutErr != nil || stderrErr != nil {
+			captureErr := fmt.Errorf("capture output: stdout=%v stderr=%v", stdoutErr, stderrErr)
+			if err != nil {
+				err = errors.Join(err, captureErr)
+			} else {
+				err = captureErr
+			}
+		}
+		output = combined
+	}()
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, stdoutErr = io.Copy(&stdoutBuf, stdoutR)
+	}()
+	go func() {
+		defer wg.Done()
+		_, stderrErr = io.Copy(&stderrBuf, stderrR)
+	}()
+
+	err = fn()
+	return
 }
 
 func parseInput(input string) []string {
@@ -141,6 +209,7 @@ func LaunchREPL(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Co
 
 	p := tea.NewProgram(
 		&m,
+		tea.WithAltScreen(),
 	)
 
 	_, err := p.Run()

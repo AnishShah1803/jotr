@@ -417,6 +417,23 @@ func TestExecuteCommand_CombinedStdoutStderr(t *testing.T) {
 	}
 }
 
+func TestCaptureProcessOutput(t *testing.T) {
+	out, err := captureProcessOutput(func() error {
+		fmt.Fprintln(os.Stdout, "stdout-line")
+		fmt.Fprintln(os.Stderr, "stderr-line")
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("expected no capture error, got %v", err)
+	}
+	if !strings.Contains(out, "stdout-line") {
+		t.Fatalf("expected captured output to contain stdout-line, got %q", out)
+	}
+	if !strings.Contains(out, "stderr-line") {
+		t.Fatalf("expected captured output to contain stderr-line, got %q", out)
+	}
+}
+
 func TestExecuteCommand_FlagResetAcrossRuns(t *testing.T) {
 	root := newTestRootCmd()
 	m := newTestModel(t, root)
@@ -434,6 +451,27 @@ func TestExecuteCommand_FlagResetAcrossRuns(t *testing.T) {
 	}
 	if !strings.Contains(out, "default") {
 		t.Errorf("expected second run output to contain 'default', got: %q", out)
+	}
+}
+
+func TestTranscriptCapsAtTenEntries(t *testing.T) {
+	root := newTestRootCmd()
+	m := newTestModel(t, root)
+
+	for i := 1; i <= 12; i++ {
+		m.appendTranscript(fmt.Sprintf("cmd%d", i), fmt.Sprintf("out%d", i))
+	}
+
+	if got := len(m.transcript); got != transcriptMaxEntries {
+		t.Fatalf("expected transcript length %d, got %d", transcriptMaxEntries, got)
+	}
+
+	if m.transcript[0].command != "cmd3" || m.transcript[0].output != "out3" {
+		t.Fatalf("expected oldest retained entry to be cmd3/out3, got %#v", m.transcript[0])
+	}
+
+	if m.transcript[9].command != "cmd12" || m.transcript[9].output != "out12" {
+		t.Fatalf("expected newest retained entry to be cmd12/out12, got %#v", m.transcript[9])
 	}
 }
 
