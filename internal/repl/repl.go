@@ -112,13 +112,15 @@ func captureProcessOutput(fn func() error) (string, error) {
 		return "", err
 	}
 	defer stdoutR.Close()
+	defer func() { _ = stdoutW.Close() }()
 
 	stderrR, stderrW, err := os.Pipe()
 	if err != nil {
-		stdoutW.Close()
+		_ = stdoutW.Close()
 		return "", err
 	}
 	defer stderrR.Close()
+	defer func() { _ = stderrW.Close() }()
 
 	os.Stdout = stdoutW
 	os.Stderr = stderrW
@@ -129,23 +131,26 @@ func captureProcessOutput(fn func() error) (string, error) {
 
 	var stdoutBuf bytes.Buffer
 	var stderrBuf bytes.Buffer
+	var stdoutErr error
+	var stderrErr error
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		_, _ = io.Copy(&stdoutBuf, stdoutR)
+		_, stdoutErr = io.Copy(&stdoutBuf, stdoutR)
 	}()
 	go func() {
 		defer wg.Done()
-		_, _ = io.Copy(&stderrBuf, stderrR)
+		_, stderrErr = io.Copy(&stderrBuf, stderrR)
 	}()
 
 	execErr := fn()
-	_ = stdoutW.Close()
-	_ = stderrW.Close()
 	wg.Wait()
 
 	combined := stdoutBuf.String() + stderrBuf.String()
+	if stdoutErr != nil || stderrErr != nil {
+		return combined, fmt.Errorf("capture output: stdout=%v stderr=%v", stdoutErr, stderrErr)
+	}
 	return combined, execErr
 }
 

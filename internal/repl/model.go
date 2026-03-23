@@ -95,6 +95,7 @@ var (
 )
 
 const completionsMaxLines = 10
+const transcriptMaxEntries = 10
 
 func NewModel(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Command) Model {
 	ti := textinput.New()
@@ -181,10 +182,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.history.Add(input)
 			cmdOutput := m.executeCommand(input)
-			m.transcript = append(m.transcript, transcriptEntry{
-				command: input,
-				output:  strings.TrimSpace(cmdOutput),
-			})
+			m.appendTranscript(input, cmdOutput)
 
 			m.textInput.SetValue("")
 			m.textInput.CursorStart()
@@ -316,6 +314,16 @@ func (m *Model) clearCompletionState() {
 	m.completionsOffset = 0
 	m.browsingCompletions = false
 	m.inHistoryNav = false
+}
+
+func (m *Model) appendTranscript(command, output string) {
+	m.transcript = append(m.transcript, transcriptEntry{
+		command: command,
+		output:  strings.TrimSpace(output),
+	})
+	if len(m.transcript) > transcriptMaxEntries {
+		m.transcript = m.transcript[len(m.transcript)-transcriptMaxEntries:]
+	}
 }
 
 func (m *Model) updateCompletions() {
