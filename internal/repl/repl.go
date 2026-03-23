@@ -3,6 +3,7 @@ package repl
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -103,16 +104,21 @@ func (m *Model) executeCommand(input string) string {
 	return output + "\n"
 }
 
-func captureProcessOutput(fn func() error) (string, error) {
+func captureProcessOutput(fn func() error) (output string, err error) {
 	origStdout := os.Stdout
 	origStderr := os.Stderr
+
+	var stdoutBuf bytes.Buffer
+	var stderrBuf bytes.Buffer
+	var stdoutErr error
+	var stderrErr error
+	var wg sync.WaitGroup
 
 	stdoutR, stdoutW, err := os.Pipe()
 	if err != nil {
 		return "", err
 	}
 	defer stdoutR.Close()
-	defer func() { _ = stdoutW.Close() }()
 
 	stderrR, stderrW, err := os.Pipe()
 	if err != nil {
@@ -120,20 +126,27 @@ func captureProcessOutput(fn func() error) (string, error) {
 		return "", err
 	}
 	defer stderrR.Close()
-	defer func() { _ = stderrW.Close() }()
 
 	os.Stdout = stdoutW
 	os.Stderr = stderrW
 	defer func() {
+		_ = stdoutW.Close()
+		_ = stderrW.Close()
+		wg.Wait()
 		os.Stdout = origStdout
 		os.Stderr = origStderr
-	}()
 
-	var stdoutBuf bytes.Buffer
-	var stderrBuf bytes.Buffer
-	var stdoutErr error
-	var stderrErr error
-	var wg sync.WaitGroup
+		combined := stdoutBuf.String() + stderrBuf.String()
+		if stdoutErr != nil || stderrErr != nil {
+			captureErr := fmt.Errorf("capture output: stdout=%v stderr=%v", stdoutErr, stderrErr)
+			if err != nil {
+				err = errors.Join(err, captureErr)
+			} else {
+				err = captureErr
+			}
+		}
+		output = combined
+	}()
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
@@ -144,14 +157,8 @@ func captureProcessOutput(fn func() error) (string, error) {
 		_, stderrErr = io.Copy(&stderrBuf, stderrR)
 	}()
 
-	execErr := fn()
-	wg.Wait()
-
-	combined := stdoutBuf.String() + stderrBuf.String()
-	if stdoutErr != nil || stderrErr != nil {
-		return combined, fmt.Errorf("capture output: stdout=%v stderr=%v", stdoutErr, stderrErr)
-	}
-	return combined, execErr
+	err = fn()
+	return
 }
 
 func parseInput(input string) []string {
