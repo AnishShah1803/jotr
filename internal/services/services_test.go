@@ -470,6 +470,106 @@ func TestTaskService_SyncTasks_Deduplication_MultipleSimilar(t *testing.T) {
 	}
 }
 
+func TestTaskService_SyncTasks_PromotesManualTodoOnlyTaskToDailyAndSurvivesPrune(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	configHelper := testhelpers.NewConfigHelper(fs)
+	configHelper.CreateBasicConfig(t)
+
+	configPath := filepath.Join(fs.BaseDir, ".config", "jotr", "config.json")
+	os.Setenv("JOTR_CONFIG", configPath)
+
+	now := time.Now()
+	year := now.Format("2006")
+	monthDir := now.Format("01-Jan")
+	dayFile := now.Format("2006-01-02-Mon.md")
+	dailyRelPath := filepath.Join("diary", year, monthDir, dayFile)
+	dailyPath := filepath.Join(fs.BaseDir, dailyRelPath)
+
+	const manualTaskText = "Manual todo-only task should sync into daily"
+
+	fs.WriteFile(t, dailyRelPath, "# Daily Note\n\n## Tasks\n\n")
+	fs.WriteFile(t, "todo.md", "# To-Do List\n\n## Tasks\n\n- [ ] "+manualTaskText+"\n")
+
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+	statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
+
+	service := NewTaskService()
+	ctx := context.Background()
+
+	if _, err := service.SyncTasks(ctx, SyncOptions{
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: statePath,
+	}); err != nil {
+		t.Fatalf("SyncTasks() error = %v", err)
+	}
+
+	dailyContent, err := os.ReadFile(dailyPath)
+	if err != nil {
+		t.Fatalf("failed to read daily note after sync: %v", err)
+	}
+	if !strings.Contains(string(dailyContent), "- [ ] "+manualTaskText) {
+		t.Fatalf("expected manual todo-only task in daily note after sync, got:\n%s", dailyContent)
+	}
+
+	todoTasks, err := tasks.ReadTasks(ctx, todoPath)
+	if err != nil {
+		t.Fatalf("failed to read todo tasks after sync: %v", err)
+	}
+
+	foundInTodo := false
+	for _, task := range todoTasks {
+		if strings.TrimSpace(tasks.StripTaskID(task.Text)) == manualTaskText {
+			foundInTodo = true
+			break
+		}
+	}
+	if !foundInTodo {
+		t.Fatalf("expected manual task to remain in todo/state after sync")
+	}
+
+	todoState, err := state.Read(statePath)
+	if err != nil {
+		t.Fatalf("failed to read state after sync: %v", err)
+	}
+
+	var syncedTaskID string
+	for id, taskState := range todoState.Tasks {
+		if strings.TrimSpace(tasks.StripTaskID(taskState.Text)) == manualTaskText {
+			syncedTaskID = id
+			break
+		}
+	}
+	if syncedTaskID == "" {
+		t.Fatalf("expected manual task to be present in todo state after sync")
+	}
+
+	pruneResult, err := service.PruneTasks(ctx, PruneOptions{
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: statePath,
+	})
+	if err != nil {
+		t.Fatalf("PruneTasks() error = %v", err)
+	}
+	if pruneResult.RemovedCount != 0 {
+		t.Fatalf("PruneTasks().RemovedCount = %d; want 0 for synced manual todo-only task", pruneResult.RemovedCount)
+	}
+	if pruneResult.OrphanCount != 0 {
+		t.Fatalf("PruneTasks().OrphanCount = %d; want 0 for synced manual todo-only task", pruneResult.OrphanCount)
+	}
+
+	prunedState, err := state.Read(statePath)
+	if err != nil {
+		t.Fatalf("failed to read state after prune: %v", err)
+	}
+	if _, exists := prunedState.Tasks[syncedTaskID]; !exists {
+		t.Fatalf("expected synced manual task %q to remain in state after prune", syncedTaskID)
+	}
+}
+
 func TestTaskService_LoadConfig(t *testing.T) {
 	fs := testhelpers.NewTestFS(t)
 	defer fs.Cleanup()

@@ -183,7 +183,7 @@ var commandRegistry = []CommandDef{
 	// ── Task ────────────────────────────────────────────────────────────────
 	{
 		Name:        "task",
-		Subcommands: []string{"add", "list", "complete", "edit", "archive", "prune", "stats"},
+		Subcommands: []string{"add", "list", "complete", "edit", "archive", "prune", "stats", "sync"},
 	},
 
 	// ── Alias ────────────────────────────────────────────────────────────────

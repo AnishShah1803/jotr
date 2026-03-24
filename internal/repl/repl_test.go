@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -313,6 +314,55 @@ func TestGetSubCommandCompletions(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCommandRegistry_TaskIncludesSyncSubcommand(t *testing.T) {
+	taskDef := (*CommandDef)(nil)
+	for i := range commandRegistry {
+		if commandRegistry[i].Name == "task" {
+			taskDef = &commandRegistry[i]
+			break
+		}
+	}
+
+	if taskDef == nil {
+		t.Fatalf("expected command registry to include task command")
+	}
+
+	if !slices.Contains(taskDef.Subcommands, "sync") {
+		t.Fatalf("expected task subcommands to include sync, got %v", taskDef.Subcommands)
+	}
+}
+
+func TestExecuteCommand_DispatchesTaskSyncSubcommand(t *testing.T) {
+	root := &cobra.Command{
+		Use:           "jotr",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+	}
+
+	task := &cobra.Command{Use: "task"}
+	syncInvoked := false
+	taskSync := &cobra.Command{
+		Use: "sync",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			syncInvoked = true
+			fmt.Fprintln(cmd.OutOrStdout(), "task sync invoked")
+			return nil
+		},
+	}
+	task.AddCommand(taskSync)
+	root.AddCommand(task)
+
+	m := newTestModel(t, root)
+	out := m.executeCommand("task sync")
+
+	if !syncInvoked {
+		t.Fatalf("expected task sync subcommand to be invoked")
+	}
+	if !strings.Contains(out, "task sync invoked") {
+		t.Fatalf("expected output to include sync invocation marker, got %q", out)
 	}
 }
 

@@ -208,6 +208,38 @@ func (s *TaskService) syncTasksWithLocks(ctx context.Context, opts SyncOptions, 
 		todoTasks, _ = tasks.ReadTasks(ctx, opts.TodoPath)
 	}
 
+	if notePath != "" {
+		for _, todoTask := range todoTasks {
+			if todoTask.ID != "" {
+				continue
+			}
+			cleanTodoText := strings.TrimSpace(tasks.StripTaskID(todoTask.Text))
+			if cleanTodoText == "" {
+				continue
+			}
+			alreadyInDaily := false
+			for _, dailyTask := range dailyTasks {
+				if strings.TrimSpace(tasks.StripTaskID(dailyTask.Text)) == cleanTodoText {
+					alreadyInDaily = true
+					break
+				}
+			}
+			if alreadyInDaily {
+				continue
+			}
+			if err := s.appendTaskToDailyNote(ctx, notePath, todoTask); err != nil {
+				return nil, fmt.Errorf("failed to promote todo task to daily note: %w", err)
+			}
+		}
+		if updatedDailyTasks, err := tasks.ReadTasks(ctx, notePath); err == nil {
+			dailyTasks = updatedDailyTasks
+			for i := range dailyTasks {
+				tasks.EnsureTaskID(&dailyTasks[i])
+				dailyTasks[i].Text = strings.TrimSpace(tasks.StripTaskID(dailyTasks[i].Text))
+			}
+		}
+	}
+
 	result.TasksRead = len(dailyTasks) + len(todoTasks)
 
 	syncResult := todoState.BidirectionalSync(dailyTasks, todoTasks, notePath)
@@ -905,11 +937,12 @@ func (s *TaskService) PruneTasks(ctx context.Context, opts PruneOptions) (*Prune
 	for id, taskState := range todoState.Tasks {
 		cleanText := strings.TrimSpace(tasks.StripTaskID(taskState.Text))
 		if !seenDailyIDs[id] {
+			if taskState.Source == "" || taskState.Source == "todo-list" || taskState.Source == "merged" {
+				continue
+			}
 			removedIDs = append(removedIDs, id)
 			orphanedTasks = append(orphanedTasks, state.TaskChangeDetail{ID: id, Text: cleanText, Change: "deleted", Details: "missing from daily notes"})
-			if taskState.Source == "" || taskState.Source == "todo-list" || taskState.Source == "merged" {
-				result.OrphanCount++
-			}
+			result.OrphanCount++
 			continue
 		}
 		if cleanText != "" {
