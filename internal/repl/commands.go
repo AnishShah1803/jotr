@@ -180,6 +180,12 @@ var commandRegistry = []CommandDef{
 		Subcommands: []string{"rebuild", "sync", "status"},
 	},
 
+	// ── Task ────────────────────────────────────────────────────────────────
+	{
+		Name:        "task",
+		Subcommands: []string{"add", "list", "complete", "edit", "archive", "prune", "stats"},
+	},
+
 	// ── Alias ────────────────────────────────────────────────────────────────
 	{
 		Name:        "alias",

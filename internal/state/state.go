@@ -279,6 +279,10 @@ func (s *TodoState) CompareWithDailyNotes(dailyTasks []tasks.Task, source string
 	}
 
 	for _, task := range dailyTasks {
+		if task.Completed {
+			continue
+		}
+
 		if task.ID == "" || !s.HasTask(task.ID) {
 			changes = append(changes, TaskChange{
 				TaskID:     task.ID,

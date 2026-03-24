@@ -114,8 +114,11 @@ func (s *TaskService) SyncTasks(ctx context.Context, opts SyncOptions) (*state.S
 	if lockTimeout <= 0 {
 		lockTimeout = 10 * time.Second
 	}
-	today := time.Now()
-	notePath := notes.BuildDailyNotePath(opts.DiaryPath, today)
+	notePath := opts.DailyPath
+	if notePath == "" {
+		today := time.Now()
+		notePath = notes.BuildDailyNotePath(opts.DiaryPath, today)
+	}
 	locks, err := s.acquireSyncLocks(opts.StatePath, opts.TodoPath, notePath, lockTimeout)
 	if err != nil {
 		if s.isLockTimeoutError(err) {
@@ -151,14 +154,18 @@ func (s *TaskService) syncTasksWithLocks(ctx context.Context, opts SyncOptions, 
 	}
 	result.DailyPath = notePath
 
-	if !utils.FileExists(notePath) {
-		return nil, fmt.Errorf("today's note doesn't exist: %s", notePath)
+	if notePath != "" && !utils.FileExists(notePath) {
+		return nil, fmt.Errorf("daily note doesn't exist: %s", notePath)
 	}
 
 	// Read all data AFTER locks are held to prevent race conditions
-	dailyTasks, err := tasks.ReadTasks(ctx, notePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read daily note: %w", err)
+	var dailyTasks []tasks.Task
+	if notePath != "" {
+		var err error
+		dailyTasks, err = tasks.ReadTasks(ctx, notePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read daily note: %w", err)
+		}
 	}
 
 	var tasksNeedingIDWriteback []tasks.Task
@@ -178,13 +185,6 @@ func (s *TaskService) syncTasksWithLocks(ctx context.Context, opts SyncOptions, 
 	if !opts.DryRun && len(tasksNeedingIDWriteback) > 0 {
 		if err := s.writeNewTaskIDs(notePath, tasksNeedingIDWriteback); err != nil {
 			return nil, fmt.Errorf("failed to write new task IDs to daily note: %w", err)
-		}
-	}
-
-	var activeDailyTasks []tasks.Task
-	for _, task := range dailyTasks {
-		if !task.Completed {
-			activeDailyTasks = append(activeDailyTasks, task)
 		}
 	}
 
@@ -210,7 +210,7 @@ func (s *TaskService) syncTasksWithLocks(ctx context.Context, opts SyncOptions, 
 
 	result.TasksRead = len(dailyTasks) + len(todoTasks)
 
-	syncResult := todoState.BidirectionalSync(activeDailyTasks, todoTasks, notePath)
+	syncResult := todoState.BidirectionalSync(dailyTasks, todoTasks, notePath)
 
 	result.Conflicts = syncResult.Conflicts
 	result.ConflictsDetail = syncResult.ConflictsDetail
@@ -390,6 +390,23 @@ func (s *TaskService) formatTaskLine(stateTask state.TaskState) string {
 
 	text := tasks.StripCompletedTag(tasks.StripTaskID(stateTask.Text))
 	sb.WriteString(text)
+
+	if stateTask.Priority != "" && !strings.Contains(text, "[P") {
+		sb.WriteString(" [")
+		sb.WriteString(stateTask.Priority)
+		sb.WriteString("]")
+	}
+
+	for _, tag := range stateTask.Tags {
+		tag = strings.TrimSpace(strings.TrimPrefix(tag, "#"))
+		if tag == "" {
+			continue
+		}
+		if !strings.Contains(text, "#"+tag) {
+			sb.WriteString(" #")
+			sb.WriteString(tag)
+		}
+	}
 
 	if stateTask.ID != "" {
 		sb.WriteString(fmt.Sprintf(" <!-- id: %s -->", stateTask.ID))
@@ -655,6 +672,7 @@ func (s *TaskService) CreateTask(ctx context.Context, opts CreateTaskOptions) (*
 	if text == "" {
 		return nil, fmt.Errorf("task text is required")
 	}
+	priority := normalizePriority(opts.Priority)
 
 	if len(opts.Tags) > 0 {
 		for _, tag := range opts.Tags {
@@ -668,14 +686,14 @@ func (s *TaskService) CreateTask(ctx context.Context, opts CreateTaskOptions) (*
 		}
 	}
 
-	if opts.Priority != "" && !strings.Contains(text, "[P") {
-		text = strings.TrimSpace(fmt.Sprintf("%s [%s]", text, opts.Priority))
+	if priority != "" && !strings.Contains(text, "[P") {
+		text = strings.TrimSpace(fmt.Sprintf("%s [%s]", text, priority))
 	}
 
 	newTask := tasks.Task{
 		Text:      text,
 		Section:   strings.TrimSpace(opts.Section),
-		Priority:  strings.TrimSpace(opts.Priority),
+		Priority:  priority,
 		Tags:      normalizeTaskTags(opts.Tags),
 		Completed: false,
 	}
@@ -708,9 +726,24 @@ func (s *TaskService) UpdateTask(ctx context.Context, opts UpdateTaskOptions) (*
 		lockTimeout = 10 * time.Second
 	}
 
-	dailyPath := notes.BuildDailyNotePath(opts.DiaryPath, time.Now())
+	editSourcePath := opts.TodoPath
+	syncDailyPath := ""
 
-	locks, err := s.acquireSyncLocks(opts.StatePath, opts.TodoPath, dailyPath, lockTimeout)
+	if statePath, err := state.Read(opts.StatePath); err == nil {
+		if existing, ok := statePath.Tasks[opts.TaskID]; ok {
+			if existing.Source != "" && existing.Source != "todo-list" && existing.Source != "merged" {
+				editSourcePath = existing.Source
+				syncDailyPath = editSourcePath
+			}
+		}
+	}
+
+	lockSourcePath := ""
+	if editSourcePath != opts.TodoPath {
+		lockSourcePath = editSourcePath
+	}
+
+	locks, err := s.acquireSyncLocks(opts.StatePath, opts.TodoPath, lockSourcePath, lockTimeout)
 	if err != nil {
 		if s.isLockTimeoutError(err) {
 			return nil, fmt.Errorf("another task edit operation is in progress. Please try again in a few seconds")
@@ -736,10 +769,11 @@ func (s *TaskService) UpdateTask(ctx context.Context, opts UpdateTaskOptions) (*
 		return nil, fmt.Errorf("task %s not found", opts.TaskID)
 	}
 
+	priority := normalizePriority(opts.Priority)
 	updatedTask := tasks.Task{
 		Text:      strings.TrimSpace(opts.Text),
 		Section:   strings.TrimSpace(opts.Section),
-		Priority:  strings.TrimSpace(opts.Priority),
+		Priority:  priority,
 		Tags:      normalizeTaskTags(opts.Tags),
 		ID:        opts.TaskID,
 		Completed: existing.Completed,
@@ -757,22 +791,23 @@ func (s *TaskService) UpdateTask(ctx context.Context, opts UpdateTaskOptions) (*
 		updatedTask.Tags = existing.Tags
 	}
 
-	todoState.AddTask(updatedTask, existing.Source)
-
-	if existing.Source != "" && existing.Source != "todo-list" && existing.Source != "merged" {
-		if err := s.replaceTaskLineInFile(ctx, existing.Source, todoState.Tasks[opts.TaskID]); err != nil {
-			return nil, err
-		}
+	if err := s.replaceTaskLineInFile(ctx, editSourcePath, state.TaskState{
+		Text:      updatedTask.Text,
+		Section:   updatedTask.Section,
+		Priority:  updatedTask.Priority,
+		Tags:      updatedTask.Tags,
+		ID:        updatedTask.ID,
+		Completed: updatedTask.Completed,
+		Source:    editSourcePath,
+	}); err != nil {
+		return nil, err
 	}
 
-	if err := todoState.Write(opts.StatePath); err != nil {
-		return nil, fmt.Errorf("failed to write state file: %w", err)
-	}
 	if _, err := s.syncTasksWithLocks(ctx, SyncOptions{
 		DiaryPath: opts.DiaryPath,
 		TodoPath:  opts.TodoPath,
 		StatePath: opts.StatePath,
-		DailyPath: dailyPath,
+		DailyPath: syncDailyPath,
 	}, locks); err != nil {
 		return nil, err
 	}
@@ -1003,8 +1038,9 @@ func (s *TaskService) appendTaskToDailyNote(ctx context.Context, notePath string
 	}
 
 	taskLine := "- [ ] " + strings.TrimSpace(tasks.StripTaskID(task.Text))
-	if task.Priority != "" && !strings.Contains(taskLine, "[P") {
-		taskLine = strings.TrimSpace(taskLine + " [" + task.Priority + "]")
+	priority := normalizePriority(task.Priority)
+	if priority != "" && !strings.Contains(taskLine, "[P") {
+		taskLine = strings.TrimSpace(taskLine + " [" + priority + "]")
 	}
 	for _, tag := range task.Tags {
 		tag = strings.TrimSpace(strings.TrimPrefix(tag, "#"))
@@ -1024,6 +1060,18 @@ func (s *TaskService) appendTaskToDailyNote(ctx context.Context, notePath string
 		content += "\n"
 	}
 	return notes.WriteNote(ctx, notePath, content)
+}
+
+func normalizePriority(priority string) string {
+	priority = strings.TrimSpace(strings.ToUpper(priority))
+	if priority == "" {
+		return ""
+	}
+	priority = strings.TrimPrefix(priority, "P")
+	if len(priority) != 1 || priority < "0" || priority > "3" {
+		return ""
+	}
+	return "P" + priority
 }
 
 // GetAllTasks reads all tasks from a file.

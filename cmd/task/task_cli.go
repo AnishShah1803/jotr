@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/AnishShah1803/jotr/internal/config"
@@ -22,8 +23,11 @@ import (
 )
 
 var (
-	taskBulletRegex = regexp.MustCompile(`^(\s*[-*+]\s*)\[([ xX])\]\s*(.*)$`)
-	taskTagRegex    = regexp.MustCompile(`#([a-zA-Z0-9_-]+)`)
+	taskBulletRegex   = regexp.MustCompile(`^(\s*[-*+]\s*)\[([ xX])\]\s*(.*)$`)
+	taskTagRegex      = regexp.MustCompile(`#([a-zA-Z0-9_-]+)`)
+	taskPriorityStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "62", Dark: "63"}).Bold(true)
+	taskTagStyle      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "36", Dark: "80"})
+	taskTextStyle     = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "252", Dark: "250"})
 )
 
 var TaskCmd = &cobra.Command{
@@ -159,6 +163,10 @@ func loadTasks(ctx context.Context, cfg *config.LoadedConfig, includeCompleted b
 	return orderTasksBySection(tasks.FilterTasks(allTasks, &completed, "", "")), nil
 }
 
+func LoadTasksForEdit(ctx context.Context, cfg *config.LoadedConfig) ([]tasks.Task, error) {
+	return loadTasks(ctx, cfg, true)
+}
+
 func loadVisibleTaskList(ctx context.Context, cfg *config.LoadedConfig) ([]tasks.Task, error) {
 	return loadTasks(ctx, cfg, false)
 }
@@ -209,10 +217,26 @@ func orderTasksBySection(taskList []tasks.Task) []tasks.Task {
 
 	ordered := make([]tasks.Task, 0, len(taskList))
 	for _, section := range sectionNames {
+		sort.SliceStable(groups[section], func(i, j int) bool {
+			return priorityRank(groups[section][i].Priority) < priorityRank(groups[section][j].Priority)
+		})
 		ordered = append(ordered, groups[section]...)
 	}
 
 	return ordered
+}
+
+func priorityRank(priority string) int {
+	priority = strings.TrimSpace(strings.ToUpper(priority))
+	if priority == "" {
+		return 99
+	}
+	priority = strings.TrimPrefix(priority, "P")
+	n, err := strconv.Atoi(priority)
+	if err != nil {
+		return 99
+	}
+	return n
 }
 
 func isDateSection(section string) bool {
@@ -240,25 +264,21 @@ func taskDate(task tasks.Task) (time.Time, bool) {
 }
 
 func displayTaskLine(task tasks.Task) string {
-	status := "○"
-	if task.Completed {
-		status = "✓"
-	}
-
 	text := stripTaskTags(strings.TrimSpace(tasks.StripCompletedTag(tasks.StripTaskID(task.Text))))
-	parts := []string{status}
+	text = stripPriorityMarker(text)
+	parts := make([]string, 0, 3)
 	if task.Priority != "" {
-		parts = append(parts, fmt.Sprintf("[%s]", task.Priority))
+		parts = append(parts, taskPriorityStyle.Render(fmt.Sprintf("[%s]", task.Priority)))
 	}
 	if text != "" {
-		parts = append(parts, text)
+		parts = append(parts, taskTextStyle.Render(text))
 	}
 	if len(task.Tags) > 0 {
 		tags := make([]string, 0, len(task.Tags))
 		for _, tag := range task.Tags {
 			tags = append(tags, "#"+tag)
 		}
-		parts = append(parts, fmt.Sprintf("tags: %s", strings.Join(tags, " ")))
+		parts = append(parts, taskTagStyle.Render(strings.Join(tags, " ")))
 	}
 	if task.CompletedDate != "" {
 		parts = append(parts, fmt.Sprintf("done: %s", task.CompletedDate))
@@ -267,8 +287,24 @@ func displayTaskLine(task tasks.Task) string {
 	return strings.Join(parts, "  ")
 }
 
+func stripPriorityMarker(text string) string {
+	text = strings.TrimSpace(text)
+	for _, p := range []string{"[P0]", "[P1]", "[P2]", "[P3]"} {
+		text = strings.ReplaceAll(text, p, "")
+	}
+	return strings.Join(strings.Fields(text), " ")
+}
+
 func showTaskList(ctx context.Context, cfg *config.LoadedConfig, includeCompleted bool) error {
-	taskList, err := loadTasks(ctx, cfg, includeCompleted)
+	var (
+		taskList []tasks.Task
+		err      error
+	)
+	if includeCompleted {
+		taskList, err = loadTasks(ctx, cfg, true)
+	} else {
+		taskList, err = loadVisibleTaskList(ctx, cfg)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to read tasks: %w", err)
 	}
@@ -289,16 +325,15 @@ func showTaskList(ctx context.Context, cfg *config.LoadedConfig, includeComplete
 				fmt.Println()
 			}
 			currentSection = section
-			if isDateSection(section) {
-				fmt.Printf("## %s\n", section)
-			} else {
-				fmt.Printf("## %s\n", section)
-			}
 		}
 		fmt.Printf("%d. %s\n", i+1, displayTaskLine(task))
 	}
 
 	return nil
+}
+
+func RunTaskList(ctx context.Context, cfg *config.LoadedConfig, includeCompleted bool) error {
+	return showTaskList(ctx, cfg, includeCompleted)
 }
 
 func addTask(ctx context.Context, cfg *config.LoadedConfig, args []string) error {
@@ -317,10 +352,6 @@ func addTask(ctx context.Context, cfg *config.LoadedConfig, args []string) error
 		return fmt.Errorf("task text is required")
 	}
 
-	section, err := promptOptional("Section (press enter for Tasks): ")
-	if err != nil {
-		return err
-	}
 	priority, err := promptOptional("Priority (P0-P3, press enter to skip): ")
 	if err != nil {
 		return err
@@ -339,22 +370,46 @@ func addTask(ctx context.Context, cfg *config.LoadedConfig, args []string) error
 		}
 	}
 
-	taskService := services.NewTaskService()
-	result, err := taskService.CreateTask(ctx, services.CreateTaskOptions{
-		DiaryPath: cfg.DiaryPath,
-		TodoPath:  cfg.TodoPath,
-		StatePath: cfg.StatePath,
-		Text:      text,
-		Section:   section,
-		Priority:  strings.TrimSpace(priority),
-		Tags:      tags,
-	})
+	output, err := RunTaskAdd(ctx, cfg, text, strings.TrimSpace(priority), tags)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Added task %s\n", result.TaskID)
+	fmt.Print(output)
 	return nil
+}
+
+func RunTaskAdd(ctx context.Context, cfg *config.LoadedConfig, text, priority string, tags []string) (string, error) {
+	taskService := services.NewTaskService()
+	priority = normalizePriority(priority)
+	result, err := taskService.CreateTask(ctx, services.CreateTaskOptions{
+		DiaryPath: cfg.DiaryPath,
+		TodoPath:  cfg.TodoPath,
+		StatePath: cfg.StatePath,
+		Text:      strings.TrimSpace(text),
+		Priority:  strings.TrimSpace(priority),
+		Tags:      tags,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("Added task %s\n", result.TaskID), nil
+}
+
+func normalizePriority(priority string) string {
+	priority = strings.TrimSpace(priority)
+	priority = strings.TrimPrefix(strings.ToUpper(priority), "P")
+	if priority == "" {
+		return ""
+	}
+	if len(priority) == 1 && priority[0] >= '0' && priority[0] <= '3' {
+		return "P" + priority
+	}
+	if strings.HasPrefix(priority, "P") && len(priority) == 2 && priority[1] >= '0' && priority[1] <= '3' {
+		return priority
+	}
+	return priority
 }
 
 func promptOptional(prompt string) (string, error) {
@@ -412,7 +467,18 @@ func resolveSelection(args []string, prompt string) ([]int, error) {
 	return promptForSelection(prompt)
 }
 
+func shouldRenderListBeforeSelectionPrompt(args []string) bool {
+	return len(args) == 0 && !utils.IsReplMode()
+}
+
 func completeTasks(ctx context.Context, cfg *config.LoadedConfig, args []string) error {
+	if len(args) == 0 && utils.IsReplMode() {
+		return fmt.Errorf("task numbers are required in REPL mode")
+	}
+	return RunTaskComplete(ctx, cfg, args)
+}
+
+func RunTaskComplete(ctx context.Context, cfg *config.LoadedConfig, args []string) error {
 	taskList, err := loadTasks(ctx, cfg, false)
 	if err != nil {
 		return fmt.Errorf("failed to read tasks: %w", err)
@@ -421,25 +487,24 @@ func completeTasks(ctx context.Context, cfg *config.LoadedConfig, args []string)
 		fmt.Println("No pending tasks to complete")
 		return nil
 	}
-
-	selection, err := resolveSelection(args, "Task numbers to complete: ")
-	if err != nil {
-		if len(args) == 0 {
-			if err := showTaskList(ctx, cfg, false); err != nil {
-				return err
-			}
-		}
-		return err
-	}
-
-	if len(args) == 0 {
+	if shouldRenderListBeforeSelectionPrompt(args) {
 		if err := showTaskList(ctx, cfg, false); err != nil {
 			return err
 		}
 	}
 
+	selection, err := resolveSelection(args, "Task numbers to complete: ")
+	if err != nil {
+		return err
+	}
+
 	selected := make(map[int]bool)
 	selectedTasks := make(map[int]tasks.Task, len(selection))
+	stateData, err := state.Read(cfg.StatePath)
+	if err != nil {
+		return fmt.Errorf("failed to read state file: %w", err)
+	}
+
 	for _, n := range selection {
 		if n < 1 || n > len(taskList) {
 			return fmt.Errorf("task number %d is out of range", n)
@@ -462,32 +527,103 @@ func completeTasks(ctx context.Context, cfg *config.LoadedConfig, args []string)
 	}
 	lines := strings.Split(string(content), "\n")
 	completedDate := time.Now().Format("2006-01-02")
+	todoOriginTasks := make(map[int]tasks.Task, len(selectedTasks))
+	noteOriginTaskCount := 0
+	completedMessages := make([]string, 0, len(selectedTasks))
 
 	for i, task := range taskList {
 		if !selected[i+1] {
 			continue
 		}
+
+		picked := selectedTasks[i+1]
+		taskSource := ""
+		if picked.ID != "" {
+			if taskState, ok := stateData.Tasks[picked.ID]; ok {
+				taskSource = taskState.Source
+			}
+		}
+
+		if taskSource != "" && taskSource != "todo-list" && taskSource != "merged" {
+			if err := completeTaskInSourceFile(ctx, taskSource, picked, completedDate); err != nil {
+				return err
+			}
+			noteOriginTaskCount++
+			completedMessages = append(completedMessages, fmt.Sprintf("Completed: task %d — %s", i+1, picked.Text))
+			continue
+		}
+
 		lineIdx := task.Line - 1
 		if lineIdx < 0 || lineIdx >= len(lines) {
 			continue
 		}
-		lines[lineIdx] = markTaskLineComplete(lines[lineIdx], selectedTasks[i+1], completedDate)
+		lines[lineIdx] = markTaskLineComplete(lines[lineIdx], picked, completedDate)
+		todoOriginTasks[i+1] = picked
+		completedMessages = append(completedMessages, fmt.Sprintf("Completed: task %d — %s", i+1, picked.Text))
 	}
 
-	updated := strings.Join(lines, "\n")
-	if !strings.HasSuffix(updated, "\n") {
-		updated += "\n"
+	if len(todoOriginTasks) > 0 {
+		updated := strings.Join(lines, "\n")
+		if !strings.HasSuffix(updated, "\n") {
+			updated += "\n"
+		}
+
+		if err := notes.WriteNote(ctx, cfg.TodoPath, updated); err != nil {
+			return fmt.Errorf("failed to write todo file: %w", err)
+		}
+
+		if err := markTasksCompletedInState(cfg.StatePath, todoOriginTasks); err != nil {
+			return err
+		}
 	}
 
-	if err := notes.WriteNote(ctx, cfg.TodoPath, updated); err != nil {
-		return fmt.Errorf("failed to write todo file: %w", err)
+	if noteOriginTaskCount > 0 {
+		taskService := services.NewTaskService()
+		if _, err := taskService.SyncTasks(ctx, services.SyncOptions{
+			DiaryPath: cfg.DiaryPath,
+			TodoPath:  cfg.TodoPath,
+			StatePath: cfg.StatePath,
+		}); err != nil {
+			return err
+		}
 	}
 
-	if err := markTasksCompletedInState(cfg.StatePath, selectedTasks); err != nil {
-		return err
+	for _, message := range completedMessages {
+		fmt.Println(message)
 	}
 
-	fmt.Printf("Completed %d task(s)\n", len(selected))
+	return nil
+}
+
+func completeTaskInSourceFile(ctx context.Context, sourcePath string, task tasks.Task, completedDate string) error {
+	content, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return fmt.Errorf("failed to read task source file: %w", err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+	updated := false
+	for i, line := range lines {
+		if tasks.ExtractTaskID(line) == task.ID {
+			lines[i] = markTaskLineComplete(lines[i], task, completedDate)
+			updated = true
+			break
+		}
+	}
+
+	if !updated {
+		return fmt.Errorf("task %s not found in source file", task.ID)
+	}
+
+	newContent := strings.Join(lines, "\n")
+	if !strings.HasSuffix(newContent, "\n") {
+		newContent += "\n"
+	}
+
+	if err := notes.WriteNote(ctx, sourcePath, newContent); err != nil {
+		return fmt.Errorf("failed to write task source file: %w", err)
+	}
+
 	return nil
 }
 
@@ -513,6 +649,13 @@ func markTaskLineComplete(line string, task tasks.Task, completedDate string) st
 }
 
 func editTask(ctx context.Context, cfg *config.LoadedConfig, args []string) error {
+	if len(args) == 0 && utils.IsReplMode() {
+		return fmt.Errorf("task number is required in REPL mode")
+	}
+	return RunTaskEdit(ctx, cfg, args)
+}
+
+func RunTaskEdit(ctx context.Context, cfg *config.LoadedConfig, args []string) error {
 	taskList, err := loadTasks(ctx, cfg, true)
 	if err != nil {
 		return fmt.Errorf("failed to read tasks: %w", err)
@@ -521,14 +664,14 @@ func editTask(ctx context.Context, cfg *config.LoadedConfig, args []string) erro
 		fmt.Println("No tasks to edit")
 		return nil
 	}
+	if shouldRenderListBeforeSelectionPrompt(args) {
+		if err := showTaskList(ctx, cfg, true); err != nil {
+			return err
+		}
+	}
 
 	selection, err := resolveSelection(args, "Task number to edit: ")
 	if err != nil {
-		if len(args) == 0 {
-			if err := showTaskList(ctx, cfg, true); err != nil {
-				return err
-			}
-		}
 		return err
 	}
 	if len(selection) == 0 {
