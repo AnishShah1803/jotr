@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -536,6 +537,81 @@ func TestRunTaskAddFromPrompt(t *testing.T) {
 	}
 }
 
+func TestExecuteCommand_TaskSearchFilterOnlyQueries(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := &config.LoadedConfig{
+		Config:    config.Config{},
+		TodoPath:  filepath.Join(tmpDir, "todo.md"),
+		StatePath: filepath.Join(tmpDir, "state.json"),
+	}
+
+	todoContent := `# To-Do List
+
+## Tasks
+
+- [ ] Repl pending p3 task [P3] #home
+- [x] Repl completed p1 task [P1] #work @completed(2026-03-01)
+`
+	if err := notes.WriteNote(context.Background(), cfg.TodoPath, todoContent); err != nil {
+		t.Fatalf("failed to create todo file: %v", err)
+	}
+
+	newSearchModel := func(t *testing.T) *Model {
+		t.Helper()
+		root := &cobra.Command{Use: "jotr", SilenceErrors: true, SilenceUsage: true}
+		task := &cobra.Command{Use: "task"}
+		var filters []string
+		search := &cobra.Command{
+			Use: "search [query]",
+			RunE: func(cmd *cobra.Command, args []string) error {
+				query := strings.TrimSpace(strings.Join(args, " "))
+				return taskcmd.RunTaskSearch(context.Background(), cfg, query, filters)
+			},
+		}
+		search.Flags().StringArrayVarP(&filters, "filter", "f", nil, "")
+		task.AddCommand(search)
+		root.AddCommand(task)
+		return newTestModel(t, root)
+	}
+
+	t.Run("priority P3 filter only", func(t *testing.T) {
+		m := newSearchModel(t)
+		out := m.executeCommand("task search --filter priority=P3")
+
+		if strings.Contains(out, "No matching tasks found") {
+			t.Fatalf("expected visible P3 task in REPL filter-only search output, got: %q", out)
+		}
+		if !strings.Contains(out, "Repl pending p3 task") {
+			t.Fatalf("expected P3 task in REPL filter-only search output, got: %q", out)
+		}
+		if strings.Contains(out, "Repl completed p1 task") {
+			t.Fatalf("did not expect non-P3 task in REPL priority filter output, got: %q", out)
+		}
+	})
+
+	t.Run("status all filter only", func(t *testing.T) {
+		m := newSearchModel(t)
+		out := m.executeCommand("task search --filter status=all")
+		normalized := stripANSIEscapeCodes(out)
+
+		if strings.Contains(normalized, "No matching tasks found") {
+			t.Fatalf("expected visible tasks in REPL status=all filter-only search output, got: %q", normalized)
+		}
+		if !strings.Contains(normalized, "Repl pending p3 task") {
+			t.Fatalf("expected pending task in REPL status=all output, got: %q", normalized)
+		}
+		if !strings.Contains(normalized, "Repl completed p1 task") {
+			t.Fatalf("expected completed task in REPL status=all output, got: %q", normalized)
+		}
+		if strings.Contains(normalized, "done:") {
+			t.Fatalf("expected completed date without done label in REPL output, got: %q", normalized)
+		}
+		if !strings.Contains(normalized, "2026-03-01") {
+			t.Fatalf("expected completed date to remain visible in REPL output, got: %q", normalized)
+		}
+	})
+}
+
 func newTaskPromptModel(t *testing.T, todoContent string) *Model {
 	t.Helper()
 
@@ -614,7 +690,7 @@ func TestStartTaskEditPrompt_LoadsTaskListContextBeforePrompt(t *testing.T) {
 ## Tasks
 
 - [ ] Pending edit task
-- [x] Completed edit task
+- [x] Completed edit task @completed(2026-03-01)
 `)
 	m.appendTranscript("read", "unrelated output")
 
@@ -635,6 +711,17 @@ func TestStartTaskEditPrompt_LoadsTaskListContextBeforePrompt(t *testing.T) {
 	}
 	if strings.TrimSpace(last.output) == "" {
 		t.Fatalf("expected task list output to be captured before prompt")
+	}
+
+	normalized := stripANSIEscapeCodes(last.output)
+	if !strings.Contains(normalized, "Completed edit task") {
+		t.Fatalf("expected completed task text in REPL task-list context, got: %q", normalized)
+	}
+	if !strings.Contains(normalized, "2026-03-01") {
+		t.Fatalf("expected completed date in REPL task-list context, got: %q", normalized)
+	}
+	if strings.Contains(normalized, "done:") {
+		t.Fatalf("expected completed date without done label in REPL task-list context, got: %q", normalized)
 	}
 }
 
@@ -960,6 +1047,12 @@ func assertOutputFragmentsInOrder(t *testing.T, output string, fragments []strin
 		}
 		lastIdx = idx
 	}
+}
+
+var ansiEscapeCodePattern = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSIEscapeCodes(output string) string {
+	return ansiEscapeCodePattern.ReplaceAllString(output, "")
 }
 
 func TestTranscriptCapsAtTenEntries(t *testing.T) {

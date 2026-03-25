@@ -35,6 +35,8 @@ var (
 	stripIDRegex    = regexp.MustCompile(`\s*<!-- id: [a-f0-9]{8} -->`)
 	completedTagRe  = regexp.MustCompile(`\s*@completed\(\d{4}-\d{2}-\d{2}\)`)
 	completedDateRe = regexp.MustCompile(`@completed\((\d{4}-\d{2}-\d{2})\)`)
+	inlineCheckRe   = regexp.MustCompile(`\[(?: |x|X)\]`)
+	leadingCheckRe  = regexp.MustCompile(`^\s*(?:[-*+]\s*)?\[(?: |x|X)\]\s*(.*)$`)
 )
 
 // ParseTasks parses tasks from markdown content.
@@ -201,7 +203,14 @@ func FormatTask(task Task) string {
 		priority = fmt.Sprintf("%s ", task.Priority)
 	}
 
-	return fmt.Sprintf("%s  %s%s", checkbox, priority, task.Text)
+	text := task.Text
+	if matches := leadingCheckRe.FindStringSubmatch(text); len(matches) == 2 {
+		text = matches[1]
+	}
+	text = inlineCheckRe.ReplaceAllString(text, " ")
+	text = strings.Join(strings.Fields(text), " ")
+
+	return fmt.Sprintf("%s  %s%s", checkbox, priority, text)
 }
 
 // IsOverdue checks if a task is overdue based on due date in text.

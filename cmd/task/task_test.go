@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -501,6 +502,7 @@ func TestRunTaskList_DisplaysPrioritiesInOutput(t *testing.T) {
 - [ ] Task with P2 [P2]
 - [ ] Task with P3 [P3]
 - [ ] Task with no priority
+- [ ] Task with inline[ ]marker and done[x]flag in text
 `
 	if err := notes.WriteNote(context.Background(), cfg.TodoPath, todoContent); err != nil {
 		t.Fatalf("failed to create todo file: %v", err)
@@ -528,18 +530,336 @@ func TestRunTaskList_DisplaysPrioritiesInOutput(t *testing.T) {
 	if !strings.Contains(output, "#ops") {
 		t.Fatalf("expected task tag metadata in output, got: %q", output)
 	}
+	if !strings.Contains(output, "1. ") {
+		t.Fatalf("expected numbered list output, got: %q", output)
+	}
 	if strings.Contains(output, "## Tasks") {
 		t.Fatalf("expected task list output without markdown Tasks heading, got: %q", output)
 	}
 	if strings.Contains(output, "- [ ]") || strings.Contains(output, "- [x]") {
 		t.Fatalf("expected task list output without markdown checkboxes, got: %q", output)
 	}
+	assertNoCheckboxMarkersInNumberedTaskLines(t, output)
 
 	assertFragmentsInOrder(t, output, []string{
 		"Task with P0",
 		"Task with P2",
 		"Task with P3",
 		"Task with no priority",
+		"Task with inline marker and done flag in text",
+	})
+}
+
+func TestRunTaskList_ShowsCompletedDateWithoutDoneLabel(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := createTestTaskConfig(t, tmpDir)
+	cfg.StatePath = filepath.Join(tmpDir, "state.json")
+
+	todoContent := `# To-Do List
+
+## Tasks
+
+- [ ] Pending task [P2]
+- [x] Completed release task [P1] #ops @completed(2026-03-01)
+`
+	if err := notes.WriteNote(context.Background(), cfg.TodoPath, todoContent); err != nil {
+		t.Fatalf("failed to create todo file: %v", err)
+	}
+
+	output, err := withPatchedCLIIO(t, "", func() error {
+		return RunTaskList(context.Background(), cfg, true)
+	})
+	if err != nil {
+		t.Fatalf("RunTaskList returned error: %v", err)
+	}
+
+	normalized := stripANSIEscapeCodes(output)
+	if !strings.Contains(normalized, "Completed release task") {
+		t.Fatalf("expected completed task text in list output, got: %q", normalized)
+	}
+	if !strings.Contains(normalized, "2026-03-01") {
+		t.Fatalf("expected completed date in list output, got: %q", normalized)
+	}
+	if strings.Contains(normalized, "done:") {
+		t.Fatalf("expected completed date without done label in list output, got: %q", normalized)
+	}
+}
+
+func TestRunTaskSearch_StripsCheckboxMarkersFromRenderedTaskText(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := createTestTaskConfig(t, tmpDir)
+	cfg.StatePath = filepath.Join(tmpDir, "state.json")
+
+	todoContent := `# To-Do List
+
+## Tasks
+
+- [ ] Prepare release [ ]checklist [P1] #ops
+- [x] Verify rollout[x]notes [P2] #ops @completed(2026-03-01)
+`
+	if err := notes.WriteNote(context.Background(), cfg.TodoPath, todoContent); err != nil {
+		t.Fatalf("failed to create todo file: %v", err)
+	}
+
+	output, err := withPatchedCLIIO(t, "", func() error {
+		return RunTaskSearch(context.Background(), cfg, "ops", []string{"status:all"})
+	})
+	if err != nil {
+		t.Fatalf("RunTaskSearch returned error: %v", err)
+	}
+
+	if !strings.Contains(output, "1. ") || !strings.Contains(output, "2. ") {
+		t.Fatalf("expected numbered search results, got: %q", output)
+	}
+	if !strings.Contains(output, "[P1]") || !strings.Contains(output, "[P2]") {
+		t.Fatalf("expected priority markers in search output, got: %q", output)
+	}
+	if !strings.Contains(output, "#ops") {
+		t.Fatalf("expected tags in search output, got: %q", output)
+	}
+	if !strings.Contains(output, "source: todo.md") {
+		t.Fatalf("expected source context in search output, got: %q", output)
+	}
+	if !strings.Contains(output, "Prepare release checklist") {
+		t.Fatalf("expected search output to include sanitized pending task text, got: %q", output)
+	}
+	if !strings.Contains(output, "Verify rollout notes") {
+		t.Fatalf("expected search output to include sanitized completed task text, got: %q", output)
+	}
+	normalized := stripANSIEscapeCodes(output)
+	if !strings.Contains(normalized, "2026-03-01") {
+		t.Fatalf("expected completed date in search output, got: %q", normalized)
+	}
+	if strings.Contains(normalized, "done:") {
+		t.Fatalf("expected completed date without done label in search output, got: %q", normalized)
+	}
+	assertNoCheckboxMarkersInNumberedTaskLines(t, output)
+}
+
+func TestRunTaskSearch_RejectsEmptyCriteria(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := createTestTaskConfig(t, tmpDir)
+
+	err := RunTaskSearch(context.Background(), cfg, "", nil)
+	if err == nil {
+		t.Fatalf("expected RunTaskSearch to reject empty criteria")
+	}
+	if !strings.Contains(err.Error(), "search query or at least one filter is required") {
+		t.Fatalf("expected empty-criteria error, got: %v", err)
+	}
+}
+
+func TestRunTaskSearch_AllowsFilterOnlySearch(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := createTestTaskConfig(t, tmpDir)
+	cfg.StatePath = filepath.Join(tmpDir, "state.json")
+
+	todoContent := `# To-Do List
+
+## Tasks
+
+- [ ] Plan personal errands #home [P3]
+- [x] Finish work retrospective #work [P1] @completed(2026-03-01)
+`
+	if err := notes.WriteNote(context.Background(), cfg.TodoPath, todoContent); err != nil {
+		t.Fatalf("failed to create todo file: %v", err)
+	}
+
+	t.Run("status filter only", func(t *testing.T) {
+		output, err := withPatchedCLIIO(t, "", func() error {
+			return RunTaskSearch(context.Background(), cfg, "", []string{"status=completed"})
+		})
+		if err != nil {
+			t.Fatalf("RunTaskSearch returned error for filter-only status search: %v", err)
+		}
+
+		if !strings.Contains(output, "Finish work retrospective") {
+			t.Fatalf("expected completed task in status-only output, got: %q", output)
+		}
+		if strings.Contains(output, "Plan personal errands") {
+			t.Fatalf("did not expect pending task in completed-only output, got: %q", output)
+		}
+	})
+
+	t.Run("tag filter only", func(t *testing.T) {
+		output, err := withPatchedCLIIO(t, "", func() error {
+			return RunTaskSearch(context.Background(), cfg, "", []string{"tag=home"})
+		})
+		if err != nil {
+			t.Fatalf("RunTaskSearch returned error for filter-only tag search: %v", err)
+		}
+
+		if !strings.Contains(output, "Plan personal errands") {
+			t.Fatalf("expected tagged task in tag-only output, got: %q", output)
+		}
+		if strings.Contains(output, "Finish work retrospective") {
+			t.Fatalf("did not expect unmatched completed task in tag-only output, got: %q", output)
+		}
+	})
+
+	t.Run("priority filter only", func(t *testing.T) {
+		output, err := withPatchedCLIIO(t, "", func() error {
+			return RunTaskSearch(context.Background(), cfg, "", []string{"priority=P3"})
+		})
+		if err != nil {
+			t.Fatalf("RunTaskSearch returned error for filter-only priority search: %v", err)
+		}
+
+		if strings.Contains(output, "No matching tasks found") {
+			t.Fatalf("expected visible P3 task in priority-only output, got: %q", output)
+		}
+		if !strings.Contains(output, "Plan personal errands") {
+			t.Fatalf("expected P3 task in priority-only output, got: %q", output)
+		}
+		if strings.Contains(output, "Finish work retrospective") {
+			t.Fatalf("did not expect non-P3 task in priority-only output, got: %q", output)
+		}
+	})
+
+	t.Run("status all filter only", func(t *testing.T) {
+		output, err := withPatchedCLIIO(t, "", func() error {
+			return RunTaskSearch(context.Background(), cfg, "", []string{"status=all"})
+		})
+		if err != nil {
+			t.Fatalf("RunTaskSearch returned error for filter-only status=all search: %v", err)
+		}
+
+		if strings.Contains(output, "No matching tasks found") {
+			t.Fatalf("expected status=all output to include visible pending and completed tasks, got: %q", output)
+		}
+		if !strings.Contains(output, "Plan personal errands") {
+			t.Fatalf("expected pending task in status=all output, got: %q", output)
+		}
+		if !strings.Contains(output, "Finish work retrospective") {
+			t.Fatalf("expected completed task in status=all output, got: %q", output)
+		}
+	})
+}
+
+func TestResolveTaskSearchCriteria_ExtractsInlineFilterArgs(t *testing.T) {
+	t.Parallel()
+
+	query, filters := resolveTaskSearchCriteria([]string{"priority=P3"}, nil)
+	if query != "" {
+		t.Fatalf("expected empty query for inline filter-only arg, got %q", query)
+	}
+	if len(filters) != 1 || filters[0] != "priority=P3" {
+		t.Fatalf("expected single priority filter, got %v", filters)
+	}
+
+	query, filters = resolveTaskSearchCriteria([]string{"status=all"}, nil)
+	if query != "" {
+		t.Fatalf("expected empty query for status=all filter-only arg, got %q", query)
+	}
+	if len(filters) != 1 || filters[0] != "status=all" {
+		t.Fatalf("expected single status filter, got %v", filters)
+	}
+
+	query, filters = resolveTaskSearchCriteria([]string{"release", "priority=P1"}, nil)
+	if query != "release" {
+		t.Fatalf("expected query to preserve non-filter token, got %q", query)
+	}
+	if len(filters) != 1 || filters[0] != "priority=P1" {
+		t.Fatalf("expected one extracted filter for mixed input, got %v", filters)
+	}
+
+	query, filters = resolveTaskSearchCriteria([]string{"priority", "P3"}, nil)
+	if query != "" {
+		t.Fatalf("expected empty query for shorthand filter-only args, got %q", query)
+	}
+	if len(filters) != 1 || filters[0] != "priority:P3" {
+		t.Fatalf("expected shorthand priority filter to normalize to kind:value, got %v", filters)
+	}
+
+	query, filters = resolveTaskSearchCriteria([]string{"status", "all"}, nil)
+	if query != "" {
+		t.Fatalf("expected empty query for shorthand status-only args, got %q", query)
+	}
+	if len(filters) != 1 || filters[0] != "status:all" {
+		t.Fatalf("expected shorthand status filter to normalize to kind:value, got %v", filters)
+	}
+}
+
+func TestRunTaskSearch_FilterOnlyInlineStyleArgsMatchViaResolvedCriteria(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	cfg := createTestTaskConfig(t, tmpDir)
+	cfg.StatePath = filepath.Join(tmpDir, "state.json")
+
+	todoContent := `# To-Do List
+
+## Tasks
+
+- [ ] Handle low priority backlog item [P3] #ops
+- [x] Finished migration [P1] #ops @completed(2026-03-01)
+`
+	if err := notes.WriteNote(context.Background(), cfg.TodoPath, todoContent); err != nil {
+		t.Fatalf("failed to create todo file: %v", err)
+	}
+
+	t.Run("priority=P3", func(t *testing.T) {
+		query, filters := resolveTaskSearchCriteria([]string{"priority=P3"}, nil)
+		output, err := withPatchedCLIIO(t, "", func() error {
+			return RunTaskSearch(context.Background(), cfg, query, filters)
+		})
+		if err != nil {
+			t.Fatalf("RunTaskSearch returned error: %v", err)
+		}
+		if !strings.Contains(output, "Handle low priority backlog item") {
+			t.Fatalf("expected P3 task in output, got: %q", output)
+		}
+		if strings.Contains(output, "Finished migration") {
+			t.Fatalf("did not expect non-P3 task in output, got: %q", output)
+		}
+	})
+
+	t.Run("status=all", func(t *testing.T) {
+		query, filters := resolveTaskSearchCriteria([]string{"status=all"}, nil)
+		output, err := withPatchedCLIIO(t, "", func() error {
+			return RunTaskSearch(context.Background(), cfg, query, filters)
+		})
+		if err != nil {
+			t.Fatalf("RunTaskSearch returned error: %v", err)
+		}
+		if !strings.Contains(output, "Handle low priority backlog item") {
+			t.Fatalf("expected pending task in status=all output, got: %q", output)
+		}
+		if !strings.Contains(output, "Finished migration") {
+			t.Fatalf("expected completed task in status=all output, got: %q", output)
+		}
+	})
+
+	t.Run("priority P3", func(t *testing.T) {
+		query, filters := resolveTaskSearchCriteria([]string{"priority", "P3"}, nil)
+		output, err := withPatchedCLIIO(t, "", func() error {
+			return RunTaskSearch(context.Background(), cfg, query, filters)
+		})
+		if err != nil {
+			t.Fatalf("RunTaskSearch returned error: %v", err)
+		}
+		if !strings.Contains(output, "Handle low priority backlog item") {
+			t.Fatalf("expected P3 task in output for shorthand filter, got: %q", output)
+		}
+		if strings.Contains(output, "Finished migration") {
+			t.Fatalf("did not expect non-P3 task in shorthand priority output, got: %q", output)
+		}
+	})
+
+	t.Run("status all", func(t *testing.T) {
+		query, filters := resolveTaskSearchCriteria([]string{"status", "all"}, nil)
+		output, err := withPatchedCLIIO(t, "", func() error {
+			return RunTaskSearch(context.Background(), cfg, query, filters)
+		})
+		if err != nil {
+			t.Fatalf("RunTaskSearch returned error: %v", err)
+		}
+		if !strings.Contains(output, "Handle low priority backlog item") {
+			t.Fatalf("expected pending task in shorthand status=all output, got: %q", output)
+		}
+		if !strings.Contains(output, "Finished migration") {
+			t.Fatalf("expected completed task in shorthand status=all output, got: %q", output)
+		}
 	})
 }
 
@@ -609,9 +929,9 @@ func TestRunTaskComplete_ShowsListBeforePromptWhenSelectionMissing(t *testing.T)
 
 ## Tasks
 
-- [ ] First pending task
-- [ ] Second pending task
-`
+		- [ ] First pending[ ]task
+		- [ ] Second pending task
+		`
 	if err := notes.WriteNote(context.Background(), cfg.TodoPath, todoContent); err != nil {
 		t.Fatalf("failed to create todo file: %v", err)
 	}
@@ -631,6 +951,10 @@ func TestRunTaskComplete_ShowsListBeforePromptWhenSelectionMissing(t *testing.T)
 	if listIdx > promptIdx {
 		t.Fatalf("expected task list to be shown before prompt; listIdx=%d promptIdx=%d output=%q", listIdx, promptIdx, output)
 	}
+	if !strings.Contains(output, "1. ") {
+		t.Fatalf("expected numbered task options in completion prompt output, got: %q", output)
+	}
+	assertNoCheckboxMarkersInNumberedTaskLines(t, output)
 }
 
 func TestRunTaskComplete_IncludesCompletedTodoTaskTextInOutput(t *testing.T) {
@@ -638,7 +962,8 @@ func TestRunTaskComplete_IncludesCompletedTodoTaskTextInOutput(t *testing.T) {
 	cfg := createTestTaskConfig(t, tmpDir)
 	cfg.StatePath = filepath.Join(tmpDir, "state.json")
 
-	const taskText = "Todo-origin completion text"
+	const taskText = "Todo-origin [ ] completion text"
+	const expectedRenderedText = "Todo-origin completion text"
 	todoContent := `# To-Do List
 
 ## Tasks
@@ -656,8 +981,11 @@ func TestRunTaskComplete_IncludesCompletedTodoTaskTextInOutput(t *testing.T) {
 		t.Fatalf("RunTaskComplete returned error: %v", err)
 	}
 
-	if !strings.Contains(output, taskText) {
-		t.Fatalf("expected completion output to include completed task text %q, got: %q", taskText, output)
+	if !strings.Contains(output, expectedRenderedText) {
+		t.Fatalf("expected completion output to include sanitized completed task text %q, got: %q", expectedRenderedText, output)
+	}
+	if strings.Contains(output, "[ ]") || strings.Contains(output, "[x]") || strings.Contains(output, "[X]") {
+		t.Fatalf("expected completion output without checkbox markers, got: %q", output)
 	}
 
 	updatedTodo, err := os.ReadFile(cfg.TodoPath)
@@ -741,8 +1069,8 @@ func TestRunTaskEdit_ShowsListBeforePromptWhenSelectionMissing(t *testing.T) {
 
 ## Tasks
 
-- [ ] Editable task
-`
+		- [ ] Editable[ ]task
+		`
 	if err := notes.WriteNote(context.Background(), cfg.TodoPath, todoContent); err != nil {
 		t.Fatalf("failed to create todo file: %v", err)
 	}
@@ -770,6 +1098,49 @@ func TestRunTaskEdit_ShowsListBeforePromptWhenSelectionMissing(t *testing.T) {
 	if listIdx > promptIdx {
 		t.Fatalf("expected task list to be shown before prompt; listIdx=%d promptIdx=%d output=%q", listIdx, promptIdx, output)
 	}
+	if !strings.Contains(output, "1. ") {
+		t.Fatalf("expected numbered task options in edit prompt output, got: %q", output)
+	}
+	assertNoCheckboxMarkersInNumberedTaskLines(t, output)
+}
+
+func assertNoCheckboxMarkersInNumberedTaskLines(t *testing.T, output string) {
+	t.Helper()
+
+	numberedLineCount := 0
+	for line := range strings.SplitSeq(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !isNumberedTaskLine(trimmed) {
+			continue
+		}
+		numberedLineCount++
+		if strings.Contains(trimmed, "[ ]") || strings.Contains(trimmed, "[x]") || strings.Contains(trimmed, "[X]") {
+			t.Fatalf("expected numbered task lines without checkbox markers, found %q in output: %q", trimmed, output)
+		}
+	}
+
+	if numberedLineCount == 0 {
+		t.Fatalf("expected at least one numbered task line in output, got: %q", output)
+	}
+}
+
+func isNumberedTaskLine(line string) bool {
+	dotIdx := strings.Index(line, ". ")
+	if dotIdx <= 0 {
+		return false
+	}
+	for _, r := range line[:dotIdx] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+var ansiEscapeCodePattern = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSIEscapeCodes(output string) string {
+	return ansiEscapeCodePattern.ReplaceAllString(output, "")
 }
 
 func TestTaskEditFreeTextSanitizationHelpersStripMetadata(t *testing.T) {
@@ -783,7 +1154,7 @@ func TestTaskEditFreeTextSanitizationHelpersStripMetadata(t *testing.T) {
 
 func TestDisplayTaskLine_KeepsPriorityAndTagsStructuredAfterTextSanitization(t *testing.T) {
 	task := tasks.Task{
-		Text:     "Plan release [P2] #ops #urgent",
+		Text:     "Plan release[ ]soon[x] [P2] #ops #urgent",
 		Priority: "P2",
 		Tags:     []string{"ops", "urgent"},
 	}
@@ -799,10 +1170,33 @@ func TestDisplayTaskLine_KeepsPriorityAndTagsStructuredAfterTextSanitization(t *
 	if strings.Contains(line, "Plan release [P2]") {
 		t.Fatalf("expected free-text portion to exclude inline priority marker, got %q", line)
 	}
+	if strings.Contains(line, "[ ]") || strings.Contains(line, "[x]") || strings.Contains(line, "[X]") {
+		t.Fatalf("expected free-text portion to exclude inline checkbox markers, got %q", line)
+	}
+	if !strings.Contains(line, "Plan release soon") {
+		t.Fatalf("expected sanitized free-text to preserve words around removed checkbox markers, got %q", line)
+	}
 	if strings.Contains(line, "tags:") {
 		t.Fatalf("expected display line to omit the literal tags label, got %q", line)
 	}
 	if strings.Count(line, "#ops") != 1 || strings.Count(line, "#urgent") != 1 {
 		t.Fatalf("expected tags to appear once via structured metadata, got %q", line)
+	}
+}
+
+func TestDisplayTaskLine_CompletedDateRendersWithoutDoneLabel(t *testing.T) {
+	task := tasks.Task{
+		Text:          "Ship release",
+		Completed:     true,
+		CompletedDate: "2026-03-01",
+	}
+
+	line := displayTaskLine(task)
+
+	if strings.Contains(line, "done:") {
+		t.Fatalf("expected completed task line to omit done label, got %q", line)
+	}
+	if !strings.Contains(line, taskDoneDateStyle.Render("2026-03-01")) {
+		t.Fatalf("expected completed date to be rendered with done-date style, got %q", line)
 	}
 }

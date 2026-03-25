@@ -24,10 +24,13 @@ import (
 
 var (
 	taskBulletRegex   = regexp.MustCompile(`^(\s*[-*+]\s*)\[([ xX])\]\s*(.*)$`)
+	taskInlineCheckRe = regexp.MustCompile(`(^|\s)\[(?: |x|X)\](\s|$)`)
+	taskAnyCheckRe    = regexp.MustCompile(`\[(?: |x|X)\]`)
 	taskTagRegex      = regexp.MustCompile(`#([a-zA-Z0-9_-]+)`)
 	taskPriorityStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "62", Dark: "63"}).Bold(true)
 	taskTagStyle      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "36", Dark: "80"})
 	taskTextStyle     = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "252", Dark: "250"})
+	taskDoneDateStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "71", Dark: "108"})
 )
 
 var TaskCmd = &cobra.Command{
@@ -143,6 +146,7 @@ func init() {
 	TaskCmd.AddCommand(TaskAddCmd)
 	TaskCmd.AddCommand(TaskCompleteCmd)
 	TaskCmd.AddCommand(TaskEditCmd)
+	TaskCmd.AddCommand(TaskSearchCmd)
 	TaskCmd.AddCommand(TaskArchiveCmd)
 	TaskCmd.AddCommand(TaskPruneCmd)
 	TaskCmd.AddCommand(TaskStatsCmd)
@@ -263,10 +267,31 @@ func taskDate(task tasks.Task) (time.Time, bool) {
 	return time.Time{}, false
 }
 
+type taskLineOptions struct {
+	stripInlineCheckboxes bool
+}
+
 func displayTaskLine(task tasks.Task) string {
-	text := stripTaskTags(strings.TrimSpace(tasks.StripCompletedTag(tasks.StripTaskID(task.Text))))
+	return displayTaskLineWithOptions(task, taskLineOptions{stripInlineCheckboxes: true})
+}
+
+func displaySearchTaskLine(task tasks.Task) string {
+	return displayTaskLine(task)
+}
+
+func displayTaskLineWithOptions(task tasks.Task, opts taskLineOptions) string {
+	text := renderedTaskText(task.Text)
+	text = stripTaskTags(text)
 	text = stripPriorityMarker(text)
-	parts := make([]string, 0, 3)
+	if opts.stripInlineCheckboxes {
+		text = stripInlineCheckboxes(text)
+	}
+	parts := make([]string, 0, 4)
+	if task.Completed {
+		parts = append(parts, "✓")
+	} else {
+		parts = append(parts, "○")
+	}
 	if task.Priority != "" {
 		parts = append(parts, taskPriorityStyle.Render(fmt.Sprintf("[%s]", task.Priority)))
 	}
@@ -281,10 +306,29 @@ func displayTaskLine(task tasks.Task) string {
 		parts = append(parts, taskTagStyle.Render(strings.Join(tags, " ")))
 	}
 	if task.CompletedDate != "" {
-		parts = append(parts, fmt.Sprintf("done: %s", task.CompletedDate))
+		parts = append(parts, taskDoneDateStyle.Render(task.CompletedDate))
 	}
 
 	return strings.Join(parts, "  ")
+}
+
+func stripInlineCheckboxes(text string) string {
+	if text == "" {
+		return ""
+	}
+	if matches := taskBulletRegex.FindStringSubmatch(text); len(matches) == 4 {
+		text = matches[3]
+	}
+	for taskInlineCheckRe.MatchString(text) {
+		text = taskInlineCheckRe.ReplaceAllString(text, "$1$2")
+	}
+	text = taskAnyCheckRe.ReplaceAllString(text, " ")
+	return strings.Join(strings.Fields(text), " ")
+}
+
+func renderedTaskText(text string) string {
+	text = strings.TrimSpace(tasks.StripCompletedTag(tasks.StripTaskID(text)))
+	return stripInlineCheckboxes(text)
 }
 
 func stripPriorityMarker(text string) string {
@@ -296,6 +340,15 @@ func stripPriorityMarker(text string) string {
 }
 
 func showTaskList(ctx context.Context, cfg *config.LoadedConfig, includeCompleted bool) error {
+	output, err := RenderTaskList(ctx, cfg, includeCompleted)
+	if err != nil {
+		return err
+	}
+	fmt.Print(output)
+	return nil
+}
+
+func RenderTaskList(ctx context.Context, cfg *config.LoadedConfig, includeCompleted bool) (string, error) {
 	var (
 		taskList []tasks.Task
 		err      error
@@ -306,14 +359,18 @@ func showTaskList(ctx context.Context, cfg *config.LoadedConfig, includeComplete
 		taskList, err = loadVisibleTaskList(ctx, cfg)
 	}
 	if err != nil {
-		return fmt.Errorf("failed to read tasks: %w", err)
+		return "", fmt.Errorf("failed to read tasks: %w", err)
 	}
 
 	if len(taskList) == 0 {
-		fmt.Println("No tasks to show")
-		return nil
+		return "No tasks to show\n", nil
 	}
 
+	return formatTaskListOutput(taskList), nil
+}
+
+func formatTaskListOutput(taskList []tasks.Task) string {
+	var b strings.Builder
 	currentSection := ""
 	for i, task := range taskList {
 		section := task.Section
@@ -322,14 +379,14 @@ func showTaskList(ctx context.Context, cfg *config.LoadedConfig, includeComplete
 		}
 		if section != currentSection {
 			if i > 0 {
-				fmt.Println()
+				b.WriteString("\n")
 			}
 			currentSection = section
 		}
-		fmt.Printf("%d. %s\n", i+1, displayTaskLine(task))
+		b.WriteString(fmt.Sprintf("%d. %s\n", i+1, displayTaskLine(task)))
 	}
 
-	return nil
+	return b.String()
 }
 
 func RunTaskList(ctx context.Context, cfg *config.LoadedConfig, includeCompleted bool) error {
@@ -362,7 +419,7 @@ func addTask(ctx context.Context, cfg *config.LoadedConfig, args []string) error
 	}
 	var tags []string
 	if tagsRaw != "" {
-		for _, part := range strings.Split(tagsRaw, ",") {
+		for part := range strings.SplitSeq(tagsRaw, ",") {
 			part = strings.TrimSpace(part)
 			if part != "" {
 				tags = append(tags, part)
@@ -549,7 +606,7 @@ func RunTaskComplete(ctx context.Context, cfg *config.LoadedConfig, args []strin
 				return err
 			}
 			noteOriginTaskCount++
-			completedMessages = append(completedMessages, fmt.Sprintf("Completed: task %d — %s", i+1, picked.Text))
+			completedMessages = append(completedMessages, fmt.Sprintf("Completed: task %d — %s", i+1, renderedTaskText(picked.Text)))
 			continue
 		}
 
@@ -559,7 +616,7 @@ func RunTaskComplete(ctx context.Context, cfg *config.LoadedConfig, args []strin
 		}
 		lines[lineIdx] = markTaskLineComplete(lines[lineIdx], picked, completedDate)
 		todoOriginTasks[i+1] = picked
-		completedMessages = append(completedMessages, fmt.Sprintf("Completed: task %d — %s", i+1, picked.Text))
+		completedMessages = append(completedMessages, fmt.Sprintf("Completed: task %d — %s", i+1, renderedTaskText(picked.Text)))
 	}
 
 	if len(todoOriginTasks) > 0 {

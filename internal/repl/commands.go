@@ -183,7 +183,17 @@ var commandRegistry = []CommandDef{
 	// ── Task ────────────────────────────────────────────────────────────────
 	{
 		Name:        "task",
-		Subcommands: []string{"add", "list", "complete", "edit", "archive", "prune", "stats", "sync"},
+		Subcommands: []string{"add", "list", "search", "complete", "edit", "archive", "prune", "stats", "sync"},
+	},
+	{
+		Name: "task search",
+		Params: []ParamDef{
+			{Name: "query", Kind: ParamString},
+			{Name: "status", Kind: ParamEnum, Values: []string{"pending", "completed", "all"}},
+			{Name: "priority", Kind: ParamEnum, Values: []string{"P0", "P1", "P2", "P3"}},
+			{Name: "tag", Kind: ParamString},
+			{Name: "section", Kind: ParamString},
+		},
 	},
 
 	// ── Alias ────────────────────────────────────────────────────────────────
