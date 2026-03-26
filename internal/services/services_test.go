@@ -846,6 +846,114 @@ func TestTaskService_WriteTodoFileFromState_CompletedDateSection(t *testing.T) {
 	}
 }
 
+func TestTaskService_WriteTodoFileFromState_DailyTaskUsesCreatedDateSection(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	todoState := state.NewTodoState()
+	todoState.Tasks["task123"] = state.TaskState{
+		ID:          "task123",
+		Text:        "Draft release notes",
+		Section:     "Tasks",
+		Completed:   false,
+		CreatedDate: "2026-02-01",
+		Source:      "diary/2026-02-01.md",
+	}
+
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+
+	service := NewTaskService()
+	if err := service.writeTodoFileFromState(todoPath, todoState, false); err != nil {
+		t.Fatalf("writeTodoFileFromState() error = %v", err)
+	}
+
+	content, err := os.ReadFile(todoPath)
+	if err != nil {
+		t.Fatalf("Failed to read generated todo file: %v", err)
+	}
+
+	contentStr := string(content)
+	if !strings.Contains(contentStr, "## 2026-02-01") {
+		t.Fatalf("expected daily task to be written under its created-date section, got:\n%s", contentStr)
+	}
+	if strings.Contains(contentStr, "## Tasks") {
+		t.Fatalf("expected task not to be written under generic Tasks section, got:\n%s", contentStr)
+	}
+}
+
+func TestTaskService_WriteTodoFileFromState_ActiveTaskMovesToCreatedDateSection(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	todoState := state.NewTodoState()
+	todoState.Tasks["task123"] = state.TaskState{
+		ID:          "task123",
+		Text:        "Move me to my date section",
+		Section:     "Tasks",
+		Completed:   false,
+		CreatedDate: "2026-02-07",
+		Source:      "diary/2026-02-07.md",
+	}
+
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+
+	service := NewTaskService()
+	if err := service.writeTodoFileFromState(todoPath, todoState, false); err != nil {
+		t.Fatalf("writeTodoFileFromState() error = %v", err)
+	}
+
+	content, err := os.ReadFile(todoPath)
+	if err != nil {
+		t.Fatalf("Failed to read generated todo file: %v", err)
+	}
+
+	contentStr := string(content)
+	if !strings.Contains(contentStr, "## 2026-02-07") {
+		t.Fatalf("expected active task to be written under created-date section, got:\n%s", contentStr)
+	}
+	if strings.Contains(contentStr, "## Tasks") {
+		t.Fatalf("expected active task not to remain under generic Tasks section, got:\n%s", contentStr)
+	}
+}
+
+func TestTaskService_WriteTodoFileFromState_ActiveTaskRehomesFromMismatchedSection(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	todoState := state.NewTodoState()
+	todoState.Tasks["task123"] = state.TaskState{
+		ID:          "task123",
+		Text:        "Rehome me",
+		Section:     "2026-01-01",
+		Completed:   false,
+		CreatedDate: "2026-02-07",
+		Source:      "diary/2026-02-07.md",
+	}
+
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+
+	service := NewTaskService()
+	if err := service.writeTodoFileFromState(todoPath, todoState, false); err != nil {
+		t.Fatalf("writeTodoFileFromState() error = %v", err)
+	}
+
+	content, err := os.ReadFile(todoPath)
+	if err != nil {
+		t.Fatalf("Failed to read generated todo file: %v", err)
+	}
+
+	contentStr := string(content)
+	if !strings.Contains(contentStr, "## 2026-02-07") {
+		t.Fatalf("expected task to be written under created-date section, got:\n%s", contentStr)
+	}
+	if strings.Contains(contentStr, "## 2026-01-01") {
+		t.Fatalf("expected task to be moved out of mismatched section, got:\n%s", contentStr)
+	}
+	if !strings.Contains(contentStr, "- [ ] Rehome me") {
+		t.Fatalf("expected task checkbox in output, got:\n%s", contentStr)
+	}
+}
+
 func TestTaskService_FormatTaskLine_CompletedWithDate(t *testing.T) {
 	service := NewTaskService()
 

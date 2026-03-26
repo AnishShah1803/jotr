@@ -268,12 +268,17 @@ func (s *TaskService) syncTasksWithLocks(ctx context.Context, opts SyncOptions, 
 		if syncResult.DailyChanged {
 			sourceFiles := make(map[string]bool)
 			for _, taskID := range syncResult.ChangedTaskIDs {
-				if taskState, exists := todoState.Tasks[taskID]; exists && taskState.Source != "" {
-					if taskState.Source != "merged" && taskState.Source != "deletion-detected" {
+				if taskState, exists := todoState.Tasks[taskID]; exists {
+					switch taskState.Source {
+					case "", "todo-list", "merged":
+						if notePath != "" {
+							sourceFiles[notePath] = true
+						}
+					case "deletion-detected":
+						continue
+					default:
 						sourceFiles[taskState.Source] = true
 					}
-				} else if exists && taskState.Source == "" {
-					utils.VerboseLogWithContext(ctx, "task %s has no source file, skipping daily note update", taskID)
 				}
 			}
 
@@ -472,7 +477,7 @@ func (s *TaskService) writeTodoFileFromState(todoPath string, todoState *state.T
 		if task.Completed && task.CompletedDate != "" {
 			section = task.CompletedDate
 		} else {
-			section = task.Section
+			section = strings.TrimSpace(task.CreatedDate)
 			if section == "" {
 				section = "Tasks"
 			}
@@ -510,6 +515,10 @@ func (s *TaskService) writeTodoFileFromState(todoPath string, todoState *state.T
 	}
 
 	return nil
+}
+
+func (s *TaskService) WriteTodoFileFromState(todoPath string, todoState *state.TodoState, includeCompleted bool) error {
+	return s.writeTodoFileFromState(todoPath, todoState, includeCompleted)
 }
 
 // ArchiveOptions contains options for archiving tasks.

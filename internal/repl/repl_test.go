@@ -367,6 +367,18 @@ func TestExecuteCommand_DispatchesTaskSyncSubcommand(t *testing.T) {
 	}
 }
 
+func TestTaskSyncIsRegisteredInTaskCommandTree(t *testing.T) {
+	root := &cobra.Command{Use: "jotr"}
+	root.AddCommand(taskcmd.TaskCmd)
+	found, _, err := root.Find([]string{"task", "sync"})
+	if err != nil {
+		t.Fatalf("expected task sync to be found, got error: %v", err)
+	}
+	if found == nil || found.Name() != "sync" {
+		t.Fatalf("expected to find sync subcommand, got %#v", found)
+	}
+}
+
 func TestIsCommand(t *testing.T) {
 	a := &Autocomplete{
 		commands: map[string]bool{

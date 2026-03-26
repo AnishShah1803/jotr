@@ -106,7 +106,7 @@ func init() {
 
 	// Task Management
 	rootCmd.AddCommand(taskcmd.TaskCmd)
-	rootCmd.AddCommand(taskcmd.SyncCmd)
+	rootCmd.AddCommand(taskcmd.NewSyncCmd())
 	rootCmd.AddCommand(taskcmd.SummaryCmd)
 	rootCmd.AddCommand(taskcmd.StatsCmd)
 	rootCmd.AddCommand(taskcmd.ArchiveCmd)

@@ -147,6 +147,7 @@ func init() {
 	TaskCmd.AddCommand(TaskCompleteCmd)
 	TaskCmd.AddCommand(TaskEditCmd)
 	TaskCmd.AddCommand(TaskSearchCmd)
+	TaskCmd.AddCommand(NewSyncCmd())
 	TaskCmd.AddCommand(TaskArchiveCmd)
 	TaskCmd.AddCommand(TaskPruneCmd)
 	TaskCmd.AddCommand(TaskStatsCmd)
@@ -645,6 +646,20 @@ func RunTaskComplete(ctx context.Context, cfg *config.LoadedConfig, args []strin
 		}
 	}
 
+	if len(todoOriginTasks) > 0 {
+		todayNotePath := notes.BuildDailyNotePath(cfg.DiaryPath, time.Now())
+		if utils.FileExists(todayNotePath) {
+			for _, picked := range todoOriginTasks {
+				if err := completeTaskInSourceFileIfPresent(ctx, todayNotePath, picked, completedDate); err != nil {
+					return err
+				}
+			}
+			if err := notes.WriteNote(ctx, cfg.TodoPath, strings.Join(lines, "\n")+"\n"); err != nil {
+				return fmt.Errorf("failed to rewrite todo file after daily completion: %w", err)
+			}
+		}
+	}
+
 	for _, message := range completedMessages {
 		fmt.Println(message)
 	}
@@ -682,6 +697,19 @@ func completeTaskInSourceFile(ctx context.Context, sourcePath string, task tasks
 	}
 
 	return nil
+}
+
+func completeTaskInSourceFileIfPresent(ctx context.Context, sourcePath string, task tasks.Task, completedDate string) error {
+	content, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return fmt.Errorf("failed to read task source file: %w", err)
+	}
+
+	if task.ID != "" && !strings.Contains(string(content), task.ID) {
+		return nil
+	}
+
+	return completeTaskInSourceFile(ctx, sourcePath, task, completedDate)
 }
 
 func markTaskLineComplete(line string, task tasks.Task, completedDate string) string {

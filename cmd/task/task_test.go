@@ -12,6 +12,7 @@ import (
 
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/notes"
+	"github.com/AnishShah1803/jotr/internal/state"
 	"github.com/AnishShah1803/jotr/internal/tasks"
 	"github.com/AnishShah1803/jotr/internal/utils"
 )
@@ -1018,6 +1019,12 @@ func TestRunTaskComplete_DailyTaskCompletionUpdatesSourceNoteAndTodo(t *testing.
 		t.Fatalf("failed to create daily note: %v", err)
 	}
 
+	stateData := state.NewTodoState()
+	stateData.AddTask(tasks.Task{ID: tasks.GenerateTaskID(taskText), Text: taskText, Section: time.Now().Format("2006-01-02")}, todayNotePath)
+	if err := stateData.Write(cfg.StatePath); err != nil {
+		t.Fatalf("failed to seed state: %v", err)
+	}
+
 	origDryRun, origQuiet, origJSON, origVerbose, origNoColor := syncDryRun, syncQuiet, syncJSON, syncVerbose, syncNoColor
 	t.Cleanup(func() {
 		syncDryRun, syncQuiet, syncJSON, syncVerbose, syncNoColor = origDryRun, origQuiet, origJSON, origVerbose, origNoColor
@@ -1050,13 +1057,101 @@ func TestRunTaskComplete_DailyTaskCompletionUpdatesSourceNoteAndTodo(t *testing.
 	if !strings.Contains(string(updatedDaily), "- [x] "+taskText) {
 		t.Fatalf("expected completed marker in daily note for task %q, got:\n%s", taskText, string(updatedDaily))
 	}
+	if !strings.Contains(string(updatedDaily), "@completed(") {
+		t.Fatalf("expected completed tag in daily note for task %q, got:\n%s", taskText, string(updatedDaily))
+	}
+
+	updatedTodo, err := os.ReadFile(cfg.TodoPath)
+	if err != nil {
+		t.Fatalf("failed to read updated todo file: %v", err)
+	}
+	if !strings.Contains(string(updatedTodo), "## "+time.Now().Format("2006-01-02")) {
+		t.Fatalf("expected todo list to be rewritten under today's date section for completed task %q, got:\n%s", taskText, string(updatedTodo))
+	}
+	if !strings.Contains(string(updatedTodo), "- [x] "+taskText) {
+		t.Fatalf("expected todo list to contain completed task %q, got:\n%s", taskText, string(updatedTodo))
+	}
+}
+
+func TestRunTaskComplete_TodoOriginTaskUpdatesDailyNote(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := createTestTaskConfig(t, tmpDir)
+	cfg.StatePath = filepath.Join(tmpDir, "state.json")
+
+	todayNotePath := notes.BuildDailyNotePath(cfg.DiaryPath, time.Now())
+	if err := os.MkdirAll(filepath.Dir(todayNotePath), 0750); err != nil {
+		t.Fatalf("failed to create diary directory: %v", err)
+	}
+
+	const taskText = "Todo-origin daily sync text"
+	dailyContent := `# Today
+
+## Tasks
+
+- [ ] ` + taskText + `
+`
+	if err := notes.WriteNote(context.Background(), todayNotePath, dailyContent); err != nil {
+		t.Fatalf("failed to create daily note: %v", err)
+	}
+
+	todoContent := `# To-Do List
+
+## Tasks
+
+- [ ] ` + taskText + `
+`
+	if err := notes.WriteNote(context.Background(), cfg.TodoPath, todoContent); err != nil {
+		t.Fatalf("failed to create todo file: %v", err)
+	}
+
+	taskID := tasks.GenerateTaskID(taskText)
+	dailyContent = strings.Replace(dailyContent, "- [ ] "+taskText, "- [ ] "+taskText+" <!-- id: "+taskID+" -->", 1)
+	todoContent = strings.Replace(todoContent, "- [ ] "+taskText, "- [ ] "+taskText+" <!-- id: "+taskID+" -->", 1)
+
+	if err := notes.WriteNote(context.Background(), todayNotePath, dailyContent); err != nil {
+		t.Fatalf("failed to rewrite daily note with task id: %v", err)
+	}
+	if err := notes.WriteNote(context.Background(), cfg.TodoPath, todoContent); err != nil {
+		t.Fatalf("failed to rewrite todo file with task id: %v", err)
+	}
+
+	stateData := state.NewTodoState()
+	stateData.AddTask(tasks.Task{ID: taskID, Text: taskText, Section: "Tasks"}, "todo-list")
+	if err := stateData.Write(cfg.StatePath); err != nil {
+		t.Fatalf("failed to seed state: %v", err)
+	}
+
+	output, err := withPatchedCLIIO(t, "", func() error {
+		return RunTaskComplete(context.Background(), cfg, []string{"1"})
+	})
+	if err != nil {
+		t.Fatalf("RunTaskComplete returned error: %v", err)
+	}
+
+	if !strings.Contains(output, taskText) {
+		t.Fatalf("expected completion output to include task text %q, got: %q", taskText, output)
+	}
+
+	updatedDaily, err := os.ReadFile(todayNotePath)
+	if err != nil {
+		t.Fatalf("failed to read updated daily note: %v", err)
+	}
+	if !strings.Contains(string(updatedDaily), "- [x] "+taskText) {
+		t.Fatalf("expected completed marker in daily note for task %q, got:\n%s", taskText, string(updatedDaily))
+	}
+	if !strings.Contains(string(updatedDaily), "@completed(") {
+		t.Fatalf("expected completed tag in daily note for task %q, got:\n%s", taskText, string(updatedDaily))
+	}
 
 	updatedTodo, err := os.ReadFile(cfg.TodoPath)
 	if err != nil {
 		t.Fatalf("failed to read updated todo file: %v", err)
 	}
 	if !strings.Contains(string(updatedTodo), "- [x] "+taskText) {
-		t.Fatalf("expected todo list to stay in sync with completed task %q, got:\n%s", taskText, string(updatedTodo))
+		t.Fatalf("expected completed marker in todo for task %q, got:\n%s", taskText, string(updatedTodo))
+	}
+	if !strings.Contains(string(updatedTodo), "@completed(") {
+		t.Fatalf("expected completed tag in todo for task %q, got:\n%s", taskText, string(updatedTodo))
 	}
 }
 
