@@ -183,7 +183,27 @@ var commandRegistry = []CommandDef{
 	// ── Task ────────────────────────────────────────────────────────────────
 	{
 		Name:        "task",
-		Subcommands: []string{"add", "list", "search", "complete", "edit", "archive", "prune", "stats", "sync"},
+		Subcommands: []string{"add", "list", "search", "complete", "edit", "archive", "prune", "stats", "sync", "total"},
+	},
+	{
+		Name:        "task list",
+		Subcommands: []string{"today", "file", "all", "completed"},
+	},
+	{
+		Name:        "task list today",
+		Subcommands: []string{"completed", "all"},
+	},
+	{
+		Name:   "task list file",
+		Params: []ParamDef{{Name: "note", Kind: ParamString}},
+	},
+	{
+		Name:   "task complete",
+		Params: []ParamDef{{Name: "line", Kind: ParamString}},
+	},
+	{
+		Name:        "task total",
+		Subcommands: []string{"todo", "completed"},
 	},
 	{
 		Name: "task search",

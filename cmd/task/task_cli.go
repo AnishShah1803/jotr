@@ -67,6 +67,83 @@ var TaskListCmd = &cobra.Command{
 	},
 }
 
+var TaskListTodayCmd = &cobra.Command{
+	Use:   "today",
+	Short: "Show tasks from today",
+	Long: `Show tasks from today's section in the todo list.
+
+Examples:
+	  jotr task list today           # Show incomplete tasks from today
+	  jotr task list today all      # Show all tasks from today
+	  jotr task list today completed # Show completed tasks from today`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		mode := "pending"
+		if len(args) > 0 {
+			mode = args[0]
+		}
+		return showTasksForToday(cmd.Context(), cfg, mode)
+	},
+}
+
+var TaskListFileCmd = &cobra.Command{
+	Use:   "file",
+	Short: "Show tasks from a specific note",
+	Long: `Show tasks from a specific note file.
+
+Examples:
+  jotr task list file MyNote           # Show tasks from MyNote
+  jotr task list file MyNote completed # Show completed tasks only`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 1 {
+			return fmt.Errorf("note name is required")
+		}
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		noteName := args[0]
+		if !strings.HasSuffix(noteName, ".md") {
+			noteName += ".md"
+		}
+		notePath := filepath.Join(cfg.Paths.BaseDir, noteName)
+		mode := "all"
+		if len(args) > 1 {
+			mode = args[1]
+		}
+		return showTasksForFile(cmd.Context(), notePath, mode)
+	},
+}
+
+var TaskListAllCmd = &cobra.Command{
+	Use:   "all",
+	Short: "Show all pending tasks",
+	Long:  `Show all incomplete tasks in the todo list.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return showTaskList(cmd.Context(), cfg, true)
+	},
+}
+
+var TaskListCompletedCmd = &cobra.Command{
+	Use:   "completed",
+	Short: "Show completed tasks",
+	Long:  `Show completed tasks in the todo list.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		return showCompletedTaskList(cmd.Context(), cfg)
+	},
+}
+
 var TaskCompleteCmd = &cobra.Command{
 	Use:   "complete [task numbers]",
 	Short: "Complete one or more tasks",
@@ -141,6 +218,28 @@ var TaskStatsCmd = &cobra.Command{
 	},
 }
 
+var TaskTotalCmd = &cobra.Command{
+	Use:   "total",
+	Short: "Show task count",
+	Long: `Show the total count of tasks.
+
+Examples:
+  jotr task total           # Total task count
+  jotr task total todo     # Incomplete task count
+  jotr task total completed # Completed task count`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.LoadWithContext(cmd.Context(), "")
+		if err != nil {
+			return err
+		}
+		mode := "all"
+		if len(args) > 0 {
+			mode = args[0]
+		}
+		return showTaskTotal(cmd.Context(), cfg, mode)
+	},
+}
+
 func init() {
 	TaskCmd.AddCommand(TaskListCmd)
 	TaskCmd.AddCommand(TaskAddCmd)
@@ -151,6 +250,13 @@ func init() {
 	TaskCmd.AddCommand(TaskArchiveCmd)
 	TaskCmd.AddCommand(TaskPruneCmd)
 	TaskCmd.AddCommand(TaskStatsCmd)
+	TaskCmd.AddCommand(TaskTotalCmd)
+
+	TaskListCmd.AddCommand(TaskListAllCmd)
+	TaskListCmd.AddCommand(TaskListCompletedCmd)
+	TaskListCmd.AddCommand(TaskListTodayCmd)
+	TaskListCmd.AddCommand(TaskListFileCmd)
+
 	TaskPruneCmd.Flags().BoolVar(&taskPruneDryRun, "dry-run", false, "Show what would be removed without making changes")
 }
 
@@ -349,6 +455,126 @@ func showTaskList(ctx context.Context, cfg *config.LoadedConfig, includeComplete
 	return nil
 }
 
+func showTasksForToday(ctx context.Context, cfg *config.LoadedConfig, mode string) error {
+	allTasks, err := tasks.ReadTasks(ctx, cfg.TodoPath)
+	if err != nil {
+		return fmt.Errorf("failed to read tasks: %w", err)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	var filtered []tasks.Task
+	for _, t := range allTasks {
+		if t.Section == today {
+			if mode == "all" {
+				filtered = append(filtered, t)
+			} else if mode == "completed" && t.Completed {
+				filtered = append(filtered, t)
+			} else if mode == "pending" && !t.Completed {
+				filtered = append(filtered, t)
+			}
+		}
+	}
+
+	if len(filtered) == 0 {
+		fmt.Println("No tasks from today")
+		return nil
+	}
+
+	return printTaskListSimple(filtered)
+}
+
+func showTaskTotal(ctx context.Context, cfg *config.LoadedConfig, mode string) error {
+	allTasks, err := tasks.ReadTasks(ctx, cfg.TodoPath)
+	if err != nil {
+		return fmt.Errorf("failed to read tasks: %w", err)
+	}
+
+	total := len(allTasks)
+	var incomplete, completed int
+	for _, t := range allTasks {
+		if t.Completed {
+			completed++
+		} else {
+			incomplete++
+		}
+	}
+
+	switch mode {
+	case "todo", "pending":
+		fmt.Printf("Incomplete: %d\n", incomplete)
+	case "completed":
+		fmt.Printf("Completed: %d\n", completed)
+	default:
+		fmt.Printf("Total: %d (Incomplete: %d, Completed: %d)\n", total, incomplete, completed)
+	}
+	return nil
+}
+
+func showTasksForFile(_ context.Context, notePath string, mode string) error {
+	if !utils.FileExists(notePath) {
+		return fmt.Errorf("note not found: %s", notePath)
+	}
+
+	noteTasks, err := tasks.ReadTasks(context.Background(), notePath)
+	if err != nil {
+		return fmt.Errorf("failed to read note: %w", err)
+	}
+
+	var filtered []tasks.Task
+	switch mode {
+	case "completed":
+		for _, t := range noteTasks {
+			if t.Completed {
+				filtered = append(filtered, t)
+			}
+		}
+	case "pending", "all":
+		filtered = noteTasks
+	default:
+		filtered = noteTasks
+	}
+
+	if len(filtered) == 0 {
+		fmt.Println("No tasks in note")
+		return nil
+	}
+
+	return printTaskListSimple(filtered)
+}
+
+func showCompletedTaskList(ctx context.Context, cfg *config.LoadedConfig) error {
+	output, err := RenderTaskList(ctx, cfg, true)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	var filtered []string
+	for _, line := range lines {
+		if strings.Contains(line, "[x]") {
+			filtered = append(filtered, line)
+		}
+	}
+	if len(filtered) == 0 {
+		fmt.Println("No completed tasks")
+		return nil
+	}
+	fmt.Println(strings.Join(filtered, "\n"))
+	return nil
+}
+
+func printTaskListSimple(taskList []tasks.Task) error {
+	var b strings.Builder
+	for i, task := range taskList {
+		checkbox := "[ ]"
+		if task.Completed {
+			checkbox = "[x]"
+		}
+		b.WriteString(fmt.Sprintf("%d. %s %s\n", i+1, checkbox, task.Text))
+	}
+	fmt.Print(b.String())
+	return nil
+}
+
 func RenderTaskList(ctx context.Context, cfg *config.LoadedConfig, includeCompleted bool) (string, error) {
 	var (
 		taskList []tasks.Task
@@ -498,6 +724,9 @@ func parseSelection(input string) ([]int, error) {
 	for _, field := range fields {
 		if field == "" {
 			continue
+		}
+		if strings.HasPrefix(field, "line=") {
+			field = strings.TrimPrefix(field, "line=")
 		}
 		number, err := strconv.Atoi(field)
 		if err != nil || number <= 0 {
