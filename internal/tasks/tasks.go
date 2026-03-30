@@ -32,7 +32,7 @@ var (
 	tagRegex        = regexp.MustCompile(`#([a-zA-Z0-9_-]+)`)
 	dueRegex        = regexp.MustCompile(`due:\s*(\d{4}-\d{2}-\d{2})`)
 	taskIDRegex     = regexp.MustCompile(`<!-- id: ([a-f0-9]{8}) -->`)
-	stripIDRegex    = regexp.MustCompile(`\s*<!-- id: [a-f0-9]{8} -->`)
+	stripIDRegex    = regexp.MustCompile(`\s*<!-- id: [a-f0-9]* ?-->`)
 	completedTagRe  = regexp.MustCompile(`\s*@completed\(\d{4}-\d{2}-\d{2}\)`)
 	completedDateRe = regexp.MustCompile(`@completed\((\d{4}-\d{2}-\d{2})\)`)
 	inlineCheckRe   = regexp.MustCompile(`\[(?: |x|X)\]`)

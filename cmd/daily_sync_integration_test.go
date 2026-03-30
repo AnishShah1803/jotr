@@ -217,8 +217,8 @@ func TestSyncCommand_Integration(t *testing.T) {
 			t.Fatalf("SyncTasks failed: %v", err)
 		}
 
-		if result.TasksFromDaily != 1 {
-			t.Errorf("TasksSynced = %d; want 1 (rehome to date section)", result.TasksFromDaily)
+		if result.TasksFromDaily != 0 {
+			t.Errorf("TasksSynced = %d; want 0 (exact match with same ID should be deduplicated)", result.TasksFromDaily)
 		}
 	})
 

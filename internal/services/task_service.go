@@ -206,6 +206,10 @@ func (s *TaskService) syncTasksWithLocks(ctx context.Context, opts SyncOptions, 
 	var todoTasks []tasks.Task
 	if utils.FileExists(opts.TodoPath) {
 		todoTasks, _ = tasks.ReadTasks(ctx, opts.TodoPath)
+		for i := range todoTasks {
+			tasks.EnsureTaskID(&todoTasks[i])
+			todoTasks[i].Text = strings.TrimSpace(tasks.StripTaskID(todoTasks[i].Text))
+		}
 	}
 
 	if notePath != "" {
@@ -270,7 +274,7 @@ func (s *TaskService) syncTasksWithLocks(ctx context.Context, opts SyncOptions, 
 			for _, taskID := range syncResult.ChangedTaskIDs {
 				if taskState, exists := todoState.Tasks[taskID]; exists {
 					switch taskState.Source {
-					case "", "todo-list", "merged":
+					case "", "todo-list", "merged", "migration":
 						if notePath != "" {
 							sourceFiles[notePath] = true
 						}
