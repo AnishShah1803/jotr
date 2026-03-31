@@ -33,3 +33,17 @@ func TestCommandExecution(t *testing.T) {
 		t.Errorf("Command execution failed: %v", err)
 	}
 }
+
+func TestRootCommandIncludesTask(t *testing.T) {
+	found := false
+	for _, cmd := range rootCmd.Commands() {
+		if cmd.Name() == "task" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Fatal("expected root command tree to include task")
+	}
+}

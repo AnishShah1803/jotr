@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -12,6 +13,9 @@ import (
 )
 
 var (
+	taskInlineCheckRe = regexp.MustCompile(`(^|\s)\[(?: |x|X)\](\s|$)`)
+	taskAnyCheckRe    = regexp.MustCompile(`\[(?: |x|X)\]`)
+
 	primaryColor   = output.PrimaryColor
 	secondaryColor = output.SecondaryColor
 	accentColor    = output.AccentColor
@@ -94,6 +98,17 @@ var (
 				Align(lipgloss.Center).
 				Foreground(secondaryColor)
 )
+
+func stripTaskCheckboxMarkers(text string) string {
+	if text == "" {
+		return ""
+	}
+	for taskInlineCheckRe.MatchString(text) {
+		text = taskInlineCheckRe.ReplaceAllString(text, "$1$2")
+	}
+	text = taskAnyCheckRe.ReplaceAllString(text, " ")
+	return strings.Join(strings.Fields(text), " ")
+}
 
 func (m Model) errorStyle() lipgloss.Style {
 	width := m.width - 8
@@ -380,7 +395,7 @@ func (m Model) renderTasksPanel(width, height int) string {
 			continue
 		}
 
-		taskText := task.Text
+		taskText := stripTaskCheckboxMarkers(task.Text)
 		if len(taskText) > contentWidth-3 {
 			taskText = taskText[:contentWidth-6] + "..."
 		}

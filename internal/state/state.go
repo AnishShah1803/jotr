@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/tasks"
+	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
 // TodoState represents the complete state of a todo list
@@ -74,7 +76,7 @@ func (s *TodoState) Write(statePath string) error {
 		return fmt.Errorf("failed to marshal state: %w", err)
 	}
 
-	if err := os.WriteFile(statePath, data, constants.FilePerm0644); err != nil {
+	if err := utils.AtomicWriteFile(statePath, data, constants.FilePerm0644); err != nil {
 		return fmt.Errorf("failed to write state file: %w", err)
 	}
 
@@ -88,6 +90,16 @@ func isDateSection(s string) bool {
 	}
 	_, err := time.Parse("2006-01-02", s)
 	return err == nil
+}
+
+var sourceDateRe = regexp.MustCompile(`(\d{4}-\d{2}-\d{2})`)
+
+func dateFromSourcePath(source string) string {
+	match := sourceDateRe.FindStringSubmatch(source)
+	if len(match) < 2 {
+		return ""
+	}
+	return match[1]
 }
 
 // AddTask adds or updates a task in the state
@@ -115,8 +127,13 @@ func (s *TodoState) AddTask(task tasks.Task, source string) {
 		ts.CreatedAt = now
 		if isDateSection(task.Section) {
 			ts.CreatedDate = task.Section
+		} else if derivedDate := dateFromSourcePath(source); derivedDate != "" {
+			ts.CreatedDate = derivedDate
 		} else {
 			ts.CreatedDate = today
+		}
+		if !task.Completed {
+			ts.Section = ts.CreatedDate
 		}
 	}
 
@@ -279,6 +296,10 @@ func (s *TodoState) CompareWithDailyNotes(dailyTasks []tasks.Task, source string
 	}
 
 	for _, task := range dailyTasks {
+		if task.Completed {
+			continue
+		}
+
 		if task.ID == "" || !s.HasTask(task.ID) {
 			changes = append(changes, TaskChange{
 				TaskID:     task.ID,
@@ -307,12 +328,14 @@ func (s *TodoState) CompareWithTodoList(todoTasks []tasks.Task) []TaskChange {
 	todoTaskMap := make(map[string]tasks.Task)
 
 	for _, task := range todoTasks {
-		if task.ID == "" {
-			continue
+		normalized := task
+		if normalized.ID == "" {
+			tasks.EnsureTaskID(&normalized)
 		}
-		todoTaskMap[task.ID] = task
+		todoTaskMap[normalized.ID] = normalized
 	}
 
+	// First: check state tasks against todo tasks (existing behavior)
 	for id, stateTask := range s.Tasks {
 		todoTask, exists := todoTaskMap[id]
 		if !exists {
@@ -334,6 +357,88 @@ func (s *TodoState) CompareWithTodoList(todoTasks []tasks.Task) []TaskChange {
 				},
 				Source: "todo-list",
 			})
+		}
+	}
+
+	for id, todoTask := range todoTaskMap {
+		if _, exists := s.Tasks[id]; exists {
+			continue
+		}
+		if todoTask.Completed {
+			continue
+		}
+		changes = append(changes, TaskChange{
+			TaskID:     id,
+			ChangeType: Added,
+			NewTask: &TaskState{
+				Text:      todoTask.Text,
+				Section:   todoTask.Section,
+				Priority:  todoTask.Priority,
+				Tags:      todoTask.Tags,
+				ID:        todoTask.ID,
+				Completed: todoTask.Completed,
+			},
+			Source: "todo-list",
+		})
+	}
+
+	// Second: check for section drift on active tasks in todo.md
+	// This catches tasks that are in the wrong section but may not be flagged
+	// by the ID-based comparison above
+	for _, todoTask := range todoTasks {
+		if todoTask.ID == "" {
+			continue
+		}
+		if todoTask.Completed {
+			continue // completed tasks use CompletedDate for section
+		}
+
+		// For active tasks, check if section needs to be corrected
+		// If the task has a CreatedDate in state, the section should match it
+		// If not, derive CreatedDate from the section if it's a date section
+		stateTask, exists := s.Tasks[todoTask.ID]
+		if !exists {
+			continue // task not in state, will be handled as added
+		}
+
+		// Determine what the section should be
+		var expectedSection string
+		if stateTask.CreatedDate != "" {
+			expectedSection = stateTask.CreatedDate
+		} else if derivedDate := dateFromSourcePath(stateTask.Source); derivedDate != "" {
+			expectedSection = derivedDate
+		} else if isDateSection(todoTask.Section) {
+			expectedSection = todoTask.Section
+		} else {
+			continue // no date to derive expected section from
+		}
+
+		// If the actual section differs from expected, flag as modified
+		if strings.TrimSpace(todoTask.Section) != strings.TrimSpace(expectedSection) {
+			// Check if we already have this change
+			alreadyAdded := false
+			for _, c := range changes {
+				if c.TaskID == todoTask.ID && c.ChangeType == Modified {
+					alreadyAdded = true
+					break
+				}
+			}
+			if !alreadyAdded {
+				changes = append(changes, TaskChange{
+					TaskID:     todoTask.ID,
+					ChangeType: Modified,
+					OldTask:    &stateTask,
+					NewTask: &TaskState{
+						Text:      todoTask.Text,
+						Section:   todoTask.Section,
+						Priority:  todoTask.Priority,
+						Tags:      todoTask.Tags,
+						ID:        todoTask.ID,
+						Completed: todoTask.Completed,
+					},
+					Source: "todo-list",
+				})
+			}
 		}
 	}
 
@@ -379,6 +484,9 @@ func (s *TodoState) DetectDeletions(dailyTasks, todoTasks []tasks.Task) []TaskCh
 
 func (s *TodoState) isTaskModified(stateTask TaskState, sourceTask tasks.Task) bool {
 	if stateTask.Text != sourceTask.Text {
+		return true
+	}
+	if strings.TrimSpace(stateTask.Section) != strings.TrimSpace(sourceTask.Section) {
 		return true
 	}
 	if stateTask.Priority != sourceTask.Priority {
@@ -428,6 +536,9 @@ func (s *TodoState) DetectConflicts(dailyChanges, todoChanges []TaskChange) map[
 		if todoChange, exists := todoChangeMap[id]; exists {
 			if dailyChange.ChangeType == Modified && todoChange.ChangeType == Modified {
 				if dailyChange.NewTask != nil && todoChange.NewTask != nil {
+					if isSectionOnlyChange(dailyChange) || isSectionOnlyChange(todoChange) {
+						continue
+					}
 					var conflictParts []string
 					if dailyChange.NewTask.Text != todoChange.NewTask.Text {
 						conflictParts = append(conflictParts, fmt.Sprintf("text differs (daily: '%s', todo: '%s')",
@@ -446,6 +557,37 @@ func (s *TodoState) DetectConflicts(dailyChanges, todoChanges []TaskChange) map[
 	}
 
 	return conflicts
+}
+
+func isSectionOnlyChange(change TaskChange) bool {
+	if change.ChangeType != Modified || change.OldTask == nil || change.NewTask == nil {
+		return false
+	}
+	if strings.TrimSpace(change.OldTask.Text) != strings.TrimSpace(change.NewTask.Text) {
+		return false
+	}
+	if strings.TrimSpace(change.OldTask.Priority) != strings.TrimSpace(change.NewTask.Priority) {
+		return false
+	}
+	if change.OldTask.Completed != change.NewTask.Completed {
+		return false
+	}
+	if !equalStringSlices(change.OldTask.Tags, change.NewTask.Tags) {
+		return false
+	}
+	return strings.TrimSpace(change.OldTask.Section) != strings.TrimSpace(change.NewTask.Section)
+}
+
+func equalStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // BidirectionalSync performs bidirectional sync between daily notes and todo list
@@ -501,6 +643,36 @@ func (s *TodoState) applyDailyToTodoChanges(dailyChangeMap, todoChangeMap map[st
 				result.UpdatedFromDaily = append(result.UpdatedFromDaily, detail)
 			}
 		} else if dailyChange.ChangeType == Modified && todoChange.ChangeType == Modified {
+			if dailyChange.NewTask != nil && dailyChange.OldTask != nil && dailyChange.NewTask.Completed && !dailyChange.OldTask.Completed && isSectionOnlyChange(todoChange) {
+				s.applyChange(dailyChange)
+				result.AppliedDaily++
+				result.StateUpdated = true
+				result.TodoChanged = true
+				result.ChangedTaskIDs = append(result.ChangedTaskIDs, taskID)
+				detail := buildTaskChangeDetail(dailyChange)
+				result.UpdatedFromDaily = append(result.UpdatedFromDaily, detail)
+				continue
+			}
+			if isSectionOnlyChange(todoChange) {
+				s.applyChange(todoChange)
+				result.AppliedTodo++
+				result.StateUpdated = true
+				result.TodoChanged = true
+				result.ChangedTaskIDs = append(result.ChangedTaskIDs, taskID)
+				detail := buildTaskChangeDetail(todoChange)
+				result.UpdatedFromTodo = append(result.UpdatedFromTodo, detail)
+				continue
+			}
+			if isSectionOnlyChange(dailyChange) {
+				s.applyChange(todoChange)
+				result.AppliedTodo++
+				result.StateUpdated = true
+				result.DailyChanged = true
+				result.ChangedTaskIDs = append(result.ChangedTaskIDs, taskID)
+				detail := buildTaskChangeDetail(todoChange)
+				result.UpdatedFromTodo = append(result.UpdatedFromTodo, detail)
+				continue
+			}
 			merged := s.smartMerge(dailyChange, todoChange)
 			if merged != nil {
 				s.applyChange(TaskChange{
@@ -588,6 +760,20 @@ func (s *TodoState) applyChange(change TaskChange) {
 				task.Source = existing.Source
 			}
 		}
+	}
+
+	if task.CreatedDate == "" {
+		if isDateSection(task.Section) {
+			task.CreatedDate = task.Section
+		}
+	}
+	if task.CreatedDate == "" {
+		if derivedDate := dateFromSourcePath(task.Source); derivedDate != "" {
+			task.CreatedDate = derivedDate
+		}
+	}
+	if !task.Completed && task.CreatedDate != "" {
+		task.Section = task.CreatedDate
 	}
 
 	// Set CompletedDate if task transitioned to complete

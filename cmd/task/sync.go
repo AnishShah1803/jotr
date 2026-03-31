@@ -82,6 +82,11 @@ Examples:
 	},
 }
 
+func NewSyncCmd() *cobra.Command {
+	cmd := *SyncCmd
+	return &cmd
+}
+
 func init() {
 	SyncCmd.Flags().BoolVar(&syncDryRun, "dry-run", false, "Show what would be done without making changes")
 	SyncCmd.Flags().BoolVar(&syncQuiet, "quiet", false, "Suppress normal output, show only summary")

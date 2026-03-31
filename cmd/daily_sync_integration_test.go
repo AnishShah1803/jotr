@@ -218,7 +218,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 		}
 
 		if result.TasksFromDaily != 0 {
-			t.Errorf("TasksSynced = %d; want 0 (deduplication)", result.TasksFromDaily)
+			t.Errorf("TasksSynced = %d; want 0 (exact match with same ID should be deduplicated)", result.TasksFromDaily)
 		}
 	})
 
@@ -399,6 +399,64 @@ func TestSyncCommand_Integration(t *testing.T) {
 
 		if !fs.FileExists("nonexistent-todo.md") {
 			t.Errorf("Expected todo file to be created")
+		}
+	})
+
+	t.Run("sync_rehome_tasks_from_generic_section", func(t *testing.T) {
+		cleanupStateAndTodo()
+		diaryPath := filepath.Join(fs.BaseDir, "diary")
+		todoPath := filepath.Join(fs.BaseDir, "todo.md")
+		statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
+
+		noteContent := "# Today\n\n## Tasks\n- [ ] Task from daily\n"
+		createTodayNote(fs, t, noteContent)
+
+		ctx := context.Background()
+		service := services.NewTaskService()
+
+		_, err := service.SyncTasks(ctx, services.SyncOptions{
+			DiaryPath: diaryPath,
+			TodoPath:  todoPath,
+			StatePath: statePath,
+		})
+		if err != nil {
+			t.Fatalf("Initial sync failed: %v", err)
+		}
+
+		fs.WriteFile(t, "todo.md", `# To-Do List
+
+## Tasks
+
+- [ ] Task from daily <!-- id: -->
+`)
+
+		result, err := service.SyncTasks(ctx, services.SyncOptions{
+			DiaryPath: diaryPath,
+			TodoPath:  todoPath,
+			StatePath: statePath,
+		})
+
+		if err != nil {
+			t.Fatalf("SyncTasks failed: %v", err)
+		}
+
+		if result.TasksFromTodo == 0 && !result.TodoChanged {
+			t.Logf("Sync result: TasksFromTodo=%d, TodoChanged=%v", result.TasksFromTodo, result.TodoChanged)
+		}
+
+		todoContent := fs.ReadFile(t, "todo.md")
+
+		if strings.Contains(todoContent, "## Tasks") {
+			hasDateSection := false
+			for _, dateSection := range []string{"## 2026-03-26", "## 2026-03-25", "## 2026-03-24"} {
+				if strings.Contains(todoContent, dateSection) {
+					hasDateSection = true
+					break
+				}
+			}
+			if !hasDateSection {
+				t.Errorf("Expected tasks to be moved from ## Tasks to date section, got:\n%s", todoContent)
+			}
 		}
 	})
 }

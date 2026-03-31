@@ -59,21 +59,42 @@ More task content here`
 }
 
 func TestFormatTask(t *testing.T) {
-	task := &Task{
-		Text:      "Test task",
-		Completed: false,
-		Priority:  "",
-		Tags:      []string{"work", "feature"},
-		Line:      1,
-		Section:   "Backlog",
-		ID:        "test123",
+	tests := []struct {
+		name string
+		task Task
+		want string
+	}{
+		{
+			name: "plain text",
+			task: Task{
+				Text:      "Test task",
+				Completed: false,
+				Priority:  "",
+				Tags:      []string{"work", "feature"},
+				Line:      1,
+				Section:   "Backlog",
+				ID:        "test123",
+			},
+			want: "○  Test task",
+		},
+		{
+			name: "strips checkbox markers from text",
+			task: Task{
+				Text:      "- [x] Implement formatter [ ] cleanup",
+				Completed: true,
+				Priority:  "P1",
+			},
+			want: "✓  P1 Implement formatter cleanup",
+		},
 	}
 
-	formatted := FormatTask(*task)
-	expected := "○  Test task"
-
-	if formatted != expected {
-		t.Errorf("FormatTask() = %q, want %q", formatted, expected)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatted := FormatTask(tt.task)
+			if formatted != tt.want {
+				t.Errorf("FormatTask() = %q, want %q", formatted, tt.want)
+			}
+		})
 	}
 }
 

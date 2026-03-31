@@ -3,13 +3,16 @@ package repl
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
+	taskcmd "github.com/AnishShah1803/jotr/cmd/task"
 	"github.com/AnishShah1803/jotr/internal/config"
 	"github.com/AnishShah1803/jotr/internal/output"
 	"github.com/AnishShah1803/jotr/internal/services"
@@ -17,29 +20,52 @@ import (
 )
 
 type Model struct {
-	ctx                 context.Context
-	config              *config.LoadedConfig
-	rootCmd             *cobra.Command
-	textInput           textinput.Model
-	history             *History
-	autocomplete        *Autocomplete
-	width               int
-	height              int
-	ready               bool
-	quitting            bool
-	completions         []string
-	selectedIdx         int
-	completionsOffset   int
-	browsingCompletions bool
-	inHistoryNav        bool
-	streakResult        services.StreakResult
-	transcript          []transcriptEntry
+	ctx                  context.Context
+	config               *config.LoadedConfig
+	rootCmd              *cobra.Command
+	textInput            textinput.Model
+	history              *History
+	autocomplete         *Autocomplete
+	width                int
+	height               int
+	ready                bool
+	quitting             bool
+	completions          []string
+	selectedIdx          int
+	completionsOffset    int
+	browsingCompletions  bool
+	inHistoryNav         bool
+	taskAddPromptActive  bool
+	taskAddPromptStep    int
+	taskAddPromptValues  []string
+	taskAddPromptError   string
+	taskPromptMode       string
+	taskPromptActive     bool
+	taskPromptStep       int
+	taskPromptValues     []string
+	taskPromptError      string
+	taskEditActive       bool
+	taskEditStep         int
+	taskEditValues       []string
+	taskEditError        string
+	taskEditTaskNumber   int
+	taskEditTaskID       string
+	taskEditExistingText string
+	taskEditPriority     string
+	taskEditTags         string
+	streakResult         services.StreakResult
+	transcript           []transcriptEntry
 }
 
 type transcriptEntry struct {
 	command string
 	output  string
 }
+
+const (
+	transcriptTaskListPending   = "task list"
+	transcriptTaskListForEditor = "task list (for edit)"
+)
 
 const replAsciiArt = `      ░░
       ░░▒░
@@ -92,6 +118,8 @@ var (
 	selectedCompletionStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("51")).
 				Bold(true)
+	defaultREPLPrompt      = ""
+	defaultREPLPlaceholder = "type a command..."
 )
 
 const completionsMaxLines = 10
@@ -101,6 +129,8 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Comm
 	ti := textinput.New()
 	ti.Placeholder = "type a command..."
 	ti.Prompt = ""
+	ti.PromptStyle = promptStyle
+	ti.Cursor.Style = lipgloss.NewStyle().Foreground(accentColor)
 	ti.Focus()
 	ti.CharLimit = 500
 	ti.Width = 60
@@ -108,19 +138,20 @@ func NewModel(ctx context.Context, cfg *config.LoadedConfig, rootCmd *cobra.Comm
 	ti.PlaceholderStyle = completionStyle
 
 	m := Model{
-		ctx:          ctx,
-		config:       cfg,
-		rootCmd:      rootCmd,
-		textInput:    ti,
-		history:      NewHistory(),
-		autocomplete: NewAutocomplete(rootCmd),
-		width:        80,
-		height:       24,
-		ready:        false,
-		quitting:     false,
-		completions:  []string{},
-		selectedIdx:  0,
-		streakResult: services.CalculateStreak(cfg),
+		ctx:                 ctx,
+		config:              cfg,
+		rootCmd:             rootCmd,
+		textInput:           ti,
+		history:             NewHistory(),
+		autocomplete:        NewAutocomplete(rootCmd),
+		width:               80,
+		height:              24,
+		ready:               false,
+		quitting:            false,
+		completions:         []string{},
+		selectedIdx:         0,
+		streakResult:        services.CalculateStreak(cfg),
+		taskAddPromptValues: make([]string, 0, 3),
 	}
 
 	return m
@@ -152,6 +183,141 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.taskAddPromptActive {
+			switch msg.Type {
+			case tea.KeyEsc, tea.KeyCtrlC:
+				m.clearTaskAddPrompt()
+				m.textInput.SetValue("")
+				m.clearCompletionState()
+				return m, nil
+
+			case tea.KeyEnter:
+				value := strings.TrimSpace(m.textInput.Value())
+				if m.taskAddPromptStep == 0 && value == "" {
+					m.taskAddPromptError = "Task text is required"
+					return m, nil
+				}
+
+				m.taskAddPromptError = ""
+				m.taskAddPromptValues = append(m.taskAddPromptValues, value)
+				m.textInput.SetValue("")
+				m.textInput.CursorStart()
+
+				if m.taskAddPromptStep >= 2 {
+					m.history.Add("task add")
+					out, err := m.runTaskAddFromPrompt()
+					m.appendTranscript("task add", out)
+					m.clearTaskAddPrompt()
+					m.clearCompletionState()
+					if err != nil {
+						m.appendTranscript("task add", fmt.Sprintf("Error: %v", err))
+					}
+					return m, nil
+				}
+
+				m.taskAddPromptStep++
+				m.textInput.Prompt = m.taskAddPromptLabel()
+				return m, nil
+			}
+
+			prevValue := m.textInput.Value()
+			m.textInput, cmd = m.textInput.Update(msg)
+			if m.browsingCompletions && m.textInput.Value() != prevValue {
+				m.browsingCompletions = false
+			}
+			return m, cmd
+		}
+		if m.taskPromptActive {
+			switch msg.Type {
+			case tea.KeyEsc, tea.KeyCtrlC:
+				m.clearTaskPrompt()
+				m.textInput.SetValue("")
+				m.clearCompletionState()
+				return m, nil
+
+			case tea.KeyEnter:
+				value := strings.TrimSpace(m.textInput.Value())
+				if value == "" {
+					m.taskPromptError = "Task number(s) are required"
+					return m, nil
+				}
+
+				m.taskPromptValues = append(m.taskPromptValues, value)
+				m.textInput.SetValue("")
+				m.textInput.CursorStart()
+
+				out, err := m.runTaskPrompt()
+				m.appendTranscript("task "+m.taskPromptMode, out)
+				m.clearTaskPrompt()
+				m.clearCompletionState()
+				if err != nil {
+					m.appendTranscript("task "+m.taskPromptMode, fmt.Sprintf("Error: %v", err))
+				}
+				return m, nil
+			}
+
+			prevValue := m.textInput.Value()
+			m.textInput, cmd = m.textInput.Update(msg)
+			if m.browsingCompletions && m.textInput.Value() != prevValue {
+				m.browsingCompletions = false
+			}
+			return m, cmd
+		}
+		if m.taskEditActive {
+			switch msg.Type {
+			case tea.KeyEsc, tea.KeyCtrlC:
+				m.clearTaskEdit()
+				m.textInput.SetValue("")
+				m.clearCompletionState()
+				return m, nil
+
+			case tea.KeyEnter:
+				value := strings.TrimSpace(m.textInput.Value())
+				if m.taskEditStep == 0 && value == "" {
+					m.taskEditError = "Task number is required"
+					return m, nil
+				}
+				if m.taskEditStep == 1 && value == "" {
+					m.taskEditError = "Task text is required"
+					return m, nil
+				}
+
+				m.taskEditValues = append(m.taskEditValues, value)
+				m.taskEditError = ""
+				if m.taskEditStep == 0 {
+					if err := m.beginTaskEditTextPrompt(); err != nil {
+						m.taskEditError = err.Error()
+					}
+					return m, nil
+				}
+
+				if m.taskEditStep >= 3 {
+					out, err := m.runTaskEditFromPrompt()
+					m.appendTranscript("task edit", out)
+					m.clearTaskEdit()
+					m.textInput.SetValue("")
+					m.clearCompletionState()
+					if err != nil {
+						m.appendTranscript("task edit", fmt.Sprintf("Error: %v", err))
+					}
+					return m, nil
+				}
+
+				m.taskEditStep++
+				m.textInput.Prompt = m.taskEditPromptLabel()
+				m.textInput.SetValue(m.taskEditPromptDefaultValue())
+				m.textInput.CursorEnd()
+				return m, nil
+			}
+
+			prevValue := m.textInput.Value()
+			m.textInput, cmd = m.textInput.Update(msg)
+			if m.browsingCompletions && m.textInput.Value() != prevValue {
+				m.browsingCompletions = false
+			}
+			return m, cmd
+		}
+
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
 			if m.textInput.Value() == "" {
@@ -181,6 +347,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			m.history.Add(input)
+			if m.startTaskAddPrompt(input) {
+				return m, nil
+			}
+			if m.startTaskEditPrompt(input) {
+				return m, nil
+			}
+			if m.startTaskPrompt(input) {
+				return m, nil
+			}
 			cmdOutput := m.executeCommand(input)
 			m.appendTranscript(input, cmdOutput)
 
@@ -308,6 +483,351 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m *Model) startTaskAddPrompt(input string) bool {
+	parts := strings.Fields(input)
+	if len(parts) != 2 || parts[0] != "task" || parts[1] != "add" {
+		return false
+	}
+
+	m.taskAddPromptActive = true
+	m.taskAddPromptStep = 0
+	m.taskAddPromptValues = m.taskAddPromptValues[:0]
+	m.taskAddPromptError = ""
+	m.textInput.SetValue("")
+	m.textInput.Prompt = m.taskAddPromptLabel()
+	m.textInput.Placeholder = ""
+	m.textInput.CursorStart()
+	m.clearCompletionState()
+	return true
+}
+
+func (m *Model) startTaskPrompt(input string) bool {
+	parts := strings.Fields(input)
+	if len(parts) != 2 || parts[0] != "task" {
+		return false
+	}
+
+	switch parts[1] {
+	case "complete":
+		if err := m.ensureTaskListContext(false); err != nil {
+			m.appendTranscript("task complete", fmt.Sprintf("Error: %v", err))
+			return true
+		}
+		m.taskPromptMode = "complete"
+		m.taskPromptActive = true
+		m.taskPromptStep = 0
+		m.taskPromptValues = m.taskPromptValues[:0]
+		m.taskPromptError = ""
+		m.appendTaskListBeforePrompt("complete")
+		m.textInput.SetValue("")
+		m.textInput.Prompt = "Task numbers to complete: "
+		m.clearCompletionState()
+		return true
+	default:
+		return false
+	}
+}
+
+func (m *Model) clearTaskPrompt() {
+	m.taskPromptMode = ""
+	m.taskPromptActive = false
+	m.taskPromptStep = 0
+	m.taskPromptValues = m.taskPromptValues[:0]
+	m.taskPromptError = ""
+	if !m.taskAddPromptActive {
+		m.textInput.Prompt = defaultREPLPrompt
+		m.textInput.Placeholder = defaultREPLPlaceholder
+	}
+}
+
+func (m *Model) runTaskPrompt() (string, error) {
+	switch m.taskPromptMode {
+	case "complete":
+		err := taskcmd.RunTaskComplete(m.ctx, m.config, []string{strings.Join(m.taskPromptValues, " ")})
+		return "", err
+	default:
+		return "", fmt.Errorf("unknown task prompt mode")
+	}
+}
+
+func (m *Model) startTaskEditPrompt(input string) bool {
+	parts := strings.Fields(input)
+	if len(parts) != 2 || parts[0] != "task" || parts[1] != "edit" {
+		return false
+	}
+
+	if err := m.ensureTaskListContext(true); err != nil {
+		m.appendTranscript("task edit", fmt.Sprintf("Error: %v", err))
+		return true
+	}
+
+	m.taskEditActive = true
+	m.taskEditStep = 0
+	m.taskEditValues = m.taskEditValues[:0]
+	m.taskEditError = ""
+	m.appendTaskListBeforePrompt("edit")
+	m.textInput.SetValue("")
+	m.textInput.Prompt = "Task number to edit: "
+	m.clearCompletionState()
+	return true
+}
+
+func (m *Model) appendTaskListBeforePrompt(mode string) {
+	if m.lastTranscriptIsTaskList() {
+		return
+	}
+
+	listOutput, err := m.renderTaskListForPrompt(mode)
+	if strings.TrimSpace(listOutput) != "" {
+		m.appendTranscript("task "+mode, listOutput)
+		return
+	}
+	if err != nil {
+		m.appendTranscript("task "+mode, fmt.Sprintf("Error: %v", err))
+	}
+}
+
+func (m *Model) renderTaskListForPrompt(mode string) (string, error) {
+	switch mode {
+	case "complete":
+		listOutput, err := captureProcessOutput(func() error {
+			return taskcmd.RunTaskComplete(m.ctx, m.config, []string{})
+		})
+		if strings.TrimSpace(listOutput) != "" {
+			return listOutput, nil
+		}
+		return "", err
+	case "edit":
+		listOutput, err := captureProcessOutput(func() error {
+			return taskcmd.RunTaskEdit(m.ctx, m.config, []string{})
+		})
+		if strings.TrimSpace(listOutput) != "" {
+			return listOutput, nil
+		}
+		return "", err
+	default:
+		return "", fmt.Errorf("unknown task prompt mode")
+	}
+}
+
+func (m *Model) lastTranscriptIsTaskList() bool {
+	if len(m.transcript) == 0 {
+		return false
+	}
+
+	last := m.transcript[len(m.transcript)-1]
+	if last.command == "task list" || last.command == "task ls" {
+		return true
+	}
+
+	return looksLikeTaskListOutput(last.output)
+}
+
+func looksLikeTaskListOutput(output string) bool {
+	trimmed := strings.TrimSpace(output)
+	if trimmed == "" {
+		return false
+	}
+
+	lines := strings.Split(trimmed, "\n")
+	hasHeader := false
+	hasItem := false
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "## ") {
+			hasHeader = true
+			continue
+		}
+
+		i := 0
+		for i < len(line) && line[i] >= '0' && line[i] <= '9' {
+			i++
+		}
+		if i > 0 && i+1 < len(line) && line[i] == '.' && line[i+1] == ' ' {
+			hasItem = true
+		}
+	}
+
+	return hasHeader && hasItem
+}
+
+func (m *Model) beginTaskEditTextPrompt() error {
+	if len(m.taskEditValues) == 0 {
+		return fmt.Errorf("task number is required")
+	}
+
+	if len(m.taskEditValues) > 0 {
+		if _, err := strconv.Atoi(strings.TrimSpace(m.taskEditValues[0])); err != nil {
+			return fmt.Errorf("invalid task number: %w", err)
+		}
+	}
+
+	ordered, err := taskcmd.LoadTasksForEdit(m.ctx, m.config)
+	if err != nil {
+		return err
+	}
+	if len(ordered) == 0 {
+		return fmt.Errorf("no tasks to edit")
+	}
+
+	n, err := strconv.Atoi(strings.TrimSpace(m.taskEditValues[0]))
+	if err != nil {
+		return fmt.Errorf("invalid task number: %w", err)
+	}
+	if n < 1 || n > len(ordered) {
+		return fmt.Errorf("task number %d is out of range", n)
+	}
+
+	selected := ordered[n-1]
+	editableText := selected.Text
+	if selected.Priority != "" {
+		editableText = strings.ReplaceAll(editableText, "["+selected.Priority+"]", "")
+	}
+	if len(selected.Tags) > 0 {
+		for _, tag := range selected.Tags {
+			editableText = strings.ReplaceAll(editableText, "#"+tag, "")
+		}
+	}
+	editableText = strings.Join(strings.Fields(strings.TrimSpace(editableText)), " ")
+
+	m.taskEditTaskNumber = n
+	m.taskEditTaskID = selected.ID
+	m.taskEditExistingText = editableText
+	m.taskEditPriority = selected.Priority
+	m.taskEditTags = strings.Join(selected.Tags, ",")
+	m.taskEditStep = 1
+	m.taskEditValues = m.taskEditValues[:0]
+	m.textInput.SetValue(editableText)
+	m.textInput.CursorEnd()
+	m.textInput.Prompt = m.taskEditPromptLabel()
+	return nil
+}
+
+func (m *Model) taskEditPromptLabel() string {
+	switch m.taskEditStep {
+	case 1:
+		return "Task text: "
+	case 2:
+		return "Priority (P0-P3, press enter to skip): "
+	case 3:
+		return "Tags (comma-separated, press enter to skip): "
+	default:
+		return "Task number to edit: "
+	}
+}
+
+func (m *Model) taskEditPromptDefaultValue() string {
+	switch m.taskEditStep {
+	case 2:
+		return strings.TrimPrefix(strings.TrimSpace(strings.ToUpper(m.taskEditPriority)), "P")
+	case 3:
+		return m.taskEditTags
+	default:
+		return ""
+	}
+}
+
+func (m *Model) clearTaskEdit() {
+	m.taskEditActive = false
+	m.taskEditStep = 0
+	m.taskEditValues = m.taskEditValues[:0]
+	m.taskEditError = ""
+	m.taskEditTaskNumber = 0
+	m.taskEditTaskID = ""
+	m.taskEditExistingText = ""
+	m.taskEditPriority = ""
+	m.taskEditTags = ""
+	if !m.taskAddPromptActive && !m.taskPromptActive {
+		m.textInput.Prompt = defaultREPLPrompt
+		m.textInput.Placeholder = defaultREPLPlaceholder
+	}
+}
+
+func (m *Model) runTaskEditFromPrompt() (string, error) {
+	if len(m.taskEditValues) == 0 {
+		return "", fmt.Errorf("task edit prompt is incomplete")
+	}
+
+	newText := strings.TrimSpace(m.taskEditValues[0])
+	priority := ""
+	if len(m.taskEditValues) > 1 {
+		priority = strings.TrimSpace(m.taskEditValues[1])
+	}
+	var tags []string
+	if len(m.taskEditValues) > 2 && strings.TrimSpace(m.taskEditValues[2]) != "" {
+		for _, part := range strings.Split(m.taskEditValues[2], ",") {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				tags = append(tags, part)
+			}
+		}
+	}
+
+	taskService := services.NewTaskService()
+	_, err := taskService.UpdateTask(m.ctx, services.UpdateTaskOptions{
+		DiaryPath:   m.config.DiaryPath,
+		TodoPath:    m.config.TodoPath,
+		StatePath:   m.config.StatePath,
+		TaskID:      m.taskEditTaskID,
+		Text:        newText,
+		Priority:    priority,
+		Tags:        tags,
+		LockTimeout: 5 * time.Second,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("Updated task %d\n", m.taskEditTaskNumber), nil
+}
+
+func (m *Model) clearTaskAddPrompt() {
+	m.taskAddPromptActive = false
+	m.taskAddPromptStep = 0
+	m.taskAddPromptValues = m.taskAddPromptValues[:0]
+	m.taskAddPromptError = ""
+	if !m.taskPromptActive {
+		m.textInput.Prompt = defaultREPLPrompt
+		m.textInput.Placeholder = defaultREPLPlaceholder
+	}
+}
+
+func (m *Model) taskAddPromptLabel() string {
+	switch m.taskAddPromptStep {
+	case 0:
+		return "Task text: "
+	case 1:
+		return "Priority (P0-P3, press enter to skip): "
+	case 2:
+		return "Tags (comma-separated, press enter to skip): "
+	default:
+		return "Task text: "
+	}
+}
+
+func (m *Model) runTaskAddFromPrompt() (string, error) {
+	if len(m.taskAddPromptValues) < 3 {
+		return "", fmt.Errorf("task add prompt is incomplete")
+	}
+
+	text := m.taskAddPromptValues[0]
+	priority := m.taskAddPromptValues[1]
+	tagsRaw := m.taskAddPromptValues[2]
+
+	var tags []string
+	if tagsRaw != "" {
+		for _, part := range strings.Split(tagsRaw, ",") {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				tags = append(tags, part)
+			}
+		}
+	}
+
+	return taskcmd.RunTaskAdd(m.ctx, m.config, text, priority, tags)
+}
+
 func (m *Model) clearCompletionState() {
 	m.completions = nil
 	m.selectedIdx = 0
@@ -326,6 +846,35 @@ func (m *Model) appendTranscript(command, output string) {
 	}
 }
 
+func (m *Model) hasTaskListContext(includeCompleted bool) bool {
+	if len(m.transcript) == 0 {
+		return false
+	}
+	last := m.transcript[len(m.transcript)-1]
+	if includeCompleted {
+		return last.command == transcriptTaskListForEditor || last.command == transcriptTaskListPending
+	}
+	return last.command == transcriptTaskListPending
+}
+
+func (m *Model) ensureTaskListContext(includeCompleted bool) error {
+	if m.hasTaskListContext(includeCompleted) {
+		return nil
+	}
+	out, err := captureProcessOutput(func() error {
+		return taskcmd.RunTaskList(m.ctx, m.config, includeCompleted)
+	})
+	if err != nil {
+		return err
+	}
+	cmd := transcriptTaskListPending
+	if includeCompleted {
+		cmd = transcriptTaskListForEditor
+	}
+	m.appendTranscript(cmd, out)
+	return nil
+}
+
 func (m *Model) updateCompletions() {
 	value := m.textInput.Value()
 	fields := strings.Fields(value)
@@ -339,7 +888,7 @@ func (m *Model) updateCompletions() {
 		if m.autocomplete.IsCommand(cmdName) && len(prefixMatches) == 1 {
 			// Exact unambiguous match — show subcommands or params.
 			subCommands := m.autocomplete.GetSubCommands(cmdName)
-			if subCommands != nil && len(subCommands) > 0 {
+			if len(subCommands) > 0 {
 				newCompletions = subCommands
 			} else if m.autocomplete.IsParamCommand(cmdName) {
 				newCompletions = m.autocomplete.GetParamCompletions(cmdName)
@@ -569,8 +1118,19 @@ func (m Model) View() string {
 	b.WriteString(strings.Repeat(" ", inset))
 	b.WriteString(promptStyle.Render("❯ "))
 	b.WriteString(m.textInput.View())
+	if (m.taskAddPromptActive && m.taskAddPromptError != "") || (m.taskPromptActive && m.taskPromptError != "") || (m.taskEditActive && m.taskEditError != "") {
+		b.WriteString("\n")
+		b.WriteString(strings.Repeat(" ", inset))
+		if m.taskAddPromptActive {
+			b.WriteString(helpStyle.Render(m.taskAddPromptError))
+		} else if m.taskEditActive {
+			b.WriteString(helpStyle.Render(m.taskEditError))
+		} else {
+			b.WriteString(helpStyle.Render(m.taskPromptError))
+		}
+	}
 
-	if len(m.completions) > 0 {
+	if !m.taskAddPromptActive && !m.taskPromptActive && !m.taskEditActive && len(m.completions) > 0 {
 		b.WriteString("\n")
 		b.WriteString(m.renderCompletions(inset))
 	}

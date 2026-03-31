@@ -1,10 +1,12 @@
 package tui
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/AnishShah1803/jotr/internal/config"
+	"github.com/AnishShah1803/jotr/internal/tasks"
 )
 
 // TestRenderHeader_StatusDisplay tests that status messages display under ASCII logo when active.
@@ -60,7 +62,7 @@ func TestRenderHeader_StatusDisplay(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			model := NewModel(nil, cfg)
+			model := NewModel(context.TODO(), cfg)
 			model.statusMsg = tt.statusMsg
 			model.statusLevel = tt.statusLevel
 			model.width = tt.width
@@ -87,7 +89,7 @@ func TestRenderHeader_VersionDisplay(t *testing.T) {
 	cfg.DiaryPath = "/tmp/test/diary"
 	cfg.TodoPath = "/tmp/test/todo.md"
 
-	model := NewModel(nil, cfg)
+	model := NewModel(context.TODO(), cfg)
 	model.statusMsg = ""
 	model.updateAvailable = false
 	model.width = 80
@@ -110,7 +112,7 @@ func TestRenderHeader_StatusPriority(t *testing.T) {
 	cfg.DiaryPath = "/tmp/test/diary"
 	cfg.TodoPath = "/tmp/test/todo.md"
 
-	model := NewModel(nil, cfg)
+	model := NewModel(context.TODO(), cfg)
 	model.statusMsg = "Status message"
 	model.statusLevel = "info"
 	model.updateAvailable = true
@@ -173,7 +175,7 @@ func TestRenderHeader_LargeTerminalAsciiLogo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			model := NewModel(nil, cfg)
+			model := NewModel(context.TODO(), cfg)
 			model.width = tt.width
 			model.height = tt.height
 			model.ready = true
@@ -233,7 +235,7 @@ func TestRenderHeader_StatusColorStyling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			model := NewModel(nil, cfg)
+			model := NewModel(context.TODO(), cfg)
 			model.statusMsg = tt.statusMsg
 			model.statusLevel = tt.statusLevel
 			model.width = 80
@@ -258,7 +260,7 @@ func TestModel_StatusFlow(t *testing.T) {
 	cfg.DiaryPath = "/tmp/test/diary"
 	cfg.TodoPath = "/tmp/test/todo.md"
 
-	model := NewModel(nil, cfg)
+	model := NewModel(context.TODO(), cfg)
 	model.width = 80
 	model.height = 50
 	model.ready = true
@@ -282,5 +284,41 @@ func TestModel_StatusFlow(t *testing.T) {
 	view3 := model.View()
 	if !strings.Contains(view3, "v") {
 		t.Errorf("View should revert to version after clear, got:\n%s", view3)
+	}
+}
+
+func TestRenderTasksPanel_StripsCheckboxMarkersPreservesMetadata(t *testing.T) {
+	cfg := &config.LoadedConfig{Config: config.Config{}}
+	cfg.Paths.BaseDir = "/tmp/test"
+	cfg.DiaryPath = "/tmp/test/diary"
+	cfg.TodoPath = "/tmp/test/todo.md"
+
+	model := NewModel(context.TODO(), cfg)
+	model.width = 80
+	model.height = 50
+	model.ready = true
+	model.focusedPanel = panelTasks
+	model.tasksViewport.Width = 36
+	model.tasksViewport.Height = 9
+	model.tasks = []tasks.Task{
+		{Text: "[ ] Plan release [P1] #ops"},
+		{Text: "[x] Verify rollout [P2] #ship"},
+	}
+
+	originalText0 := model.tasks[0].Text
+	originalText1 := model.tasks[1].Text
+
+	rendered := model.renderTasksPanel(40, 12)
+
+	if strings.Contains(rendered, "[ ]") || strings.Contains(rendered, "[x]") || strings.Contains(rendered, "[X]") {
+		t.Fatalf("expected rendered tasks panel to hide checkbox markers, got: %q", rendered)
+	}
+
+	if !strings.Contains(rendered, "[P1]") || !strings.Contains(rendered, "#ops") {
+		t.Fatalf("expected rendered tasks panel to preserve priority and tags, got: %q", rendered)
+	}
+
+	if model.tasks[0].Text != originalText0 || model.tasks[1].Text != originalText1 {
+		t.Fatalf("expected task data to remain unchanged, got tasks: %#v", model.tasks)
 	}
 }

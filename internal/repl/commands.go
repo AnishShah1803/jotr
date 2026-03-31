@@ -180,6 +180,42 @@ var commandRegistry = []CommandDef{
 		Subcommands: []string{"rebuild", "sync", "status"},
 	},
 
+	// ── Task ────────────────────────────────────────────────────────────────
+	{
+		Name:        "task",
+		Subcommands: []string{"add", "list", "search", "complete", "edit", "archive", "prune", "stats", "sync", "total"},
+	},
+	{
+		Name:        "task list",
+		Subcommands: []string{"today", "file", "all", "completed"},
+	},
+	{
+		Name:        "task list today",
+		Subcommands: []string{"completed", "all"},
+	},
+	{
+		Name:   "task list file",
+		Params: []ParamDef{{Name: "note", Kind: ParamString}},
+	},
+	{
+		Name:   "task complete",
+		Params: []ParamDef{{Name: "line", Kind: ParamString}},
+	},
+	{
+		Name:        "task total",
+		Subcommands: []string{"todo", "completed"},
+	},
+	{
+		Name: "task search",
+		Params: []ParamDef{
+			{Name: "query", Kind: ParamString},
+			{Name: "status", Kind: ParamEnum, Values: []string{"pending", "completed", "all"}},
+			{Name: "priority", Kind: ParamEnum, Values: []string{"P0", "P1", "P2", "P3"}},
+			{Name: "tag", Kind: ParamString},
+			{Name: "section", Kind: ParamString},
+		},
+	},
+
 	// ── Alias ────────────────────────────────────────────────────────────────
 	{
 		Name:        "alias",

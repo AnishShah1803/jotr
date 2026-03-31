@@ -24,9 +24,10 @@ func TestCompareWithDailyNotes(t *testing.T) {
 			state: &TodoState{
 				Tasks: map[string]TaskState{
 					"abc123": {
-						ID:     "abc123",
-						Text:   "Test task",
-						Source: "test.md",
+						ID:      "abc123",
+						Text:    "Test task",
+						Section: "Tasks",
+						Source:  "test.md",
 					},
 				},
 			},
@@ -81,18 +82,95 @@ func TestCompareWithDailyNotes(t *testing.T) {
 			changeTypes: []ChangeType{Modified},
 		},
 		{
+			name: "task moved to different section is modified",
+			state: &TodoState{
+				Tasks: map[string]TaskState{
+					"abc123": {
+						ID:          "abc123",
+						Text:        "Section-sensitive task",
+						Section:     "2026-03-25",
+						CreatedDate: "2026-03-25",
+						Source:      "test.md",
+					},
+				},
+			},
+			dailyTasks: []tasks.Task{
+				{ID: "abc123", Text: "Section-sensitive task", Section: "2026-03-26"},
+			},
+			expected:    1,
+			changeTypes: []ChangeType{Modified},
+		},
+		{
+			name: "section-only change is still a modification",
+			state: &TodoState{
+				Tasks: map[string]TaskState{
+					"abc123": {
+						ID:      "abc123",
+						Text:    "Section-only task",
+						Section: "2026-03-25",
+						Source:  "test.md",
+					},
+				},
+			},
+			dailyTasks: []tasks.Task{
+				{ID: "abc123", Text: "Section-only task", Section: "2026-03-26"},
+			},
+			expected:    1,
+			changeTypes: []ChangeType{Modified},
+		},
+		{
+			name: "todo task wrong section rehomes by created date",
+			state: &TodoState{
+				Tasks: map[string]TaskState{
+					"abc123": {
+						ID:          "abc123",
+						Text:        "Wrong section task",
+						Section:     "2026-03-25",
+						CreatedDate: "2026-03-25",
+						Source:      "todo.md",
+					},
+				},
+			},
+			dailyTasks: []tasks.Task{
+				{ID: "abc123", Text: "Wrong section task", Section: "2026-03-26"},
+			},
+			expected:    1,
+			changeTypes: []ChangeType{Modified},
+		},
+		{
+			name: "todo task in generic Tasks section triggers todo change",
+			state: &TodoState{
+				Tasks: map[string]TaskState{
+					"abc123": {
+						ID:          "abc123",
+						Text:        "Move me from Tasks",
+						Section:     "2026-03-25",
+						CreatedDate: "2026-03-25",
+						Source:      "dev-data/Diary/2026/03-Mar/2026-03-25-Thu.md",
+					},
+				},
+			},
+			dailyTasks: []tasks.Task{
+				{ID: "abc123", Text: "Move me from Tasks", Section: "Tasks"},
+			},
+			expected:    1,
+			changeTypes: []ChangeType{Modified},
+		},
+		{
 			name: "multiple changes",
 			state: &TodoState{
 				Tasks: map[string]TaskState{
 					"abc123": {
-						ID:     "abc123",
-						Text:   "Unchanged task",
-						Source: "test.md",
+						ID:      "abc123",
+						Text:    "Unchanged task",
+						Section: "Tasks",
+						Source:  "test.md",
 					},
 					"def456": {
-						ID:     "def456",
-						Text:   "Old text",
-						Source: "test.md",
+						ID:      "def456",
+						Text:    "Old text",
+						Section: "Tasks",
+						Source:  "test.md",
 					},
 				},
 			},
@@ -767,6 +845,29 @@ func TestTaskCompletionViaDailyNoteSetsCompletedDate(t *testing.T) {
 
 	if !task.Completed {
 		t.Error("Expected task to be marked complete")
+	}
+}
+
+func TestDailyNoteTaskAddedUsesDailyDateAsCreatedDate(t *testing.T) {
+	state := NewTodoState()
+
+	dailyTasks := []tasks.Task{
+		{ID: "new-1", Text: "Daily-origin task", Section: "Tasks"},
+	}
+
+	todoTasks := []tasks.Task{}
+
+	result := state.BidirectionalSync(dailyTasks, todoTasks, "Diary/2026-02-03.md")
+	if !result.StateUpdated {
+		t.Fatal("Expected StateUpdated=true")
+	}
+
+	task, exists := state.Tasks["new-1"]
+	if !exists {
+		t.Fatal("Expected task to be added to state")
+	}
+	if task.CreatedDate != "2026-02-03" {
+		t.Fatalf("Expected CreatedDate=2026-02-03, got %q", task.CreatedDate)
 	}
 }
 

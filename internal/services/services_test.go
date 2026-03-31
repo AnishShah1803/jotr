@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -469,6 +470,106 @@ func TestTaskService_SyncTasks_Deduplication_MultipleSimilar(t *testing.T) {
 	}
 }
 
+func TestTaskService_SyncTasks_PromotesManualTodoOnlyTaskToDailyAndSurvivesPrune(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	configHelper := testhelpers.NewConfigHelper(fs)
+	configHelper.CreateBasicConfig(t)
+
+	configPath := filepath.Join(fs.BaseDir, ".config", "jotr", "config.json")
+	os.Setenv("JOTR_CONFIG", configPath)
+
+	now := time.Now()
+	year := now.Format("2006")
+	monthDir := now.Format("01-Jan")
+	dayFile := now.Format("2006-01-02-Mon.md")
+	dailyRelPath := filepath.Join("diary", year, monthDir, dayFile)
+	dailyPath := filepath.Join(fs.BaseDir, dailyRelPath)
+
+	const manualTaskText = "Manual todo-only task should sync into daily"
+
+	fs.WriteFile(t, dailyRelPath, "# Daily Note\n\n## Tasks\n\n")
+	fs.WriteFile(t, "todo.md", "# To-Do List\n\n## Tasks\n\n- [ ] "+manualTaskText+"\n")
+
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+	statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
+
+	service := NewTaskService()
+	ctx := context.Background()
+
+	if _, err := service.SyncTasks(ctx, SyncOptions{
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: statePath,
+	}); err != nil {
+		t.Fatalf("SyncTasks() error = %v", err)
+	}
+
+	dailyContent, err := os.ReadFile(dailyPath)
+	if err != nil {
+		t.Fatalf("failed to read daily note after sync: %v", err)
+	}
+	if !strings.Contains(string(dailyContent), "- [ ] "+manualTaskText) {
+		t.Fatalf("expected manual todo-only task in daily note after sync, got:\n%s", dailyContent)
+	}
+
+	todoTasks, err := tasks.ReadTasks(ctx, todoPath)
+	if err != nil {
+		t.Fatalf("failed to read todo tasks after sync: %v", err)
+	}
+
+	foundInTodo := false
+	for _, task := range todoTasks {
+		if strings.TrimSpace(tasks.StripTaskID(task.Text)) == manualTaskText {
+			foundInTodo = true
+			break
+		}
+	}
+	if !foundInTodo {
+		t.Fatalf("expected manual task to remain in todo/state after sync")
+	}
+
+	todoState, err := state.Read(statePath)
+	if err != nil {
+		t.Fatalf("failed to read state after sync: %v", err)
+	}
+
+	var syncedTaskID string
+	for id, taskState := range todoState.Tasks {
+		if strings.TrimSpace(tasks.StripTaskID(taskState.Text)) == manualTaskText {
+			syncedTaskID = id
+			break
+		}
+	}
+	if syncedTaskID == "" {
+		t.Fatalf("expected manual task to be present in todo state after sync")
+	}
+
+	pruneResult, err := service.PruneTasks(ctx, PruneOptions{
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: statePath,
+	})
+	if err != nil {
+		t.Fatalf("PruneTasks() error = %v", err)
+	}
+	if pruneResult.RemovedCount != 0 {
+		t.Fatalf("PruneTasks().RemovedCount = %d; want 0 for synced manual todo-only task", pruneResult.RemovedCount)
+	}
+	if pruneResult.OrphanCount != 0 {
+		t.Fatalf("PruneTasks().OrphanCount = %d; want 0 for synced manual todo-only task", pruneResult.OrphanCount)
+	}
+
+	prunedState, err := state.Read(statePath)
+	if err != nil {
+		t.Fatalf("failed to read state after prune: %v", err)
+	}
+	if _, exists := prunedState.Tasks[syncedTaskID]; !exists {
+		t.Fatalf("expected synced manual task %q to remain in state after prune", syncedTaskID)
+	}
+}
+
 func TestTaskService_LoadConfig(t *testing.T) {
 	fs := testhelpers.NewTestFS(t)
 	defer fs.Cleanup()
@@ -742,6 +843,114 @@ func TestTaskService_WriteTodoFileFromState_CompletedDateSection(t *testing.T) {
 	// Verify incomplete task has [ ] checkbox
 	if !strings.Contains(contentStr, "- [ ] Ongoing task") {
 		t.Error("Incomplete task should have [ ] checkbox")
+	}
+}
+
+func TestTaskService_WriteTodoFileFromState_DailyTaskUsesCreatedDateSection(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	todoState := state.NewTodoState()
+	todoState.Tasks["task123"] = state.TaskState{
+		ID:          "task123",
+		Text:        "Draft release notes",
+		Section:     "Tasks",
+		Completed:   false,
+		CreatedDate: "2026-02-01",
+		Source:      "diary/2026-02-01.md",
+	}
+
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+
+	service := NewTaskService()
+	if err := service.writeTodoFileFromState(todoPath, todoState, false); err != nil {
+		t.Fatalf("writeTodoFileFromState() error = %v", err)
+	}
+
+	content, err := os.ReadFile(todoPath)
+	if err != nil {
+		t.Fatalf("Failed to read generated todo file: %v", err)
+	}
+
+	contentStr := string(content)
+	if !strings.Contains(contentStr, "## 2026-02-01") {
+		t.Fatalf("expected daily task to be written under its created-date section, got:\n%s", contentStr)
+	}
+	if strings.Contains(contentStr, "## Tasks") {
+		t.Fatalf("expected task not to be written under generic Tasks section, got:\n%s", contentStr)
+	}
+}
+
+func TestTaskService_WriteTodoFileFromState_ActiveTaskMovesToCreatedDateSection(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	todoState := state.NewTodoState()
+	todoState.Tasks["task123"] = state.TaskState{
+		ID:          "task123",
+		Text:        "Move me to my date section",
+		Section:     "Tasks",
+		Completed:   false,
+		CreatedDate: "2026-02-07",
+		Source:      "diary/2026-02-07.md",
+	}
+
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+
+	service := NewTaskService()
+	if err := service.writeTodoFileFromState(todoPath, todoState, false); err != nil {
+		t.Fatalf("writeTodoFileFromState() error = %v", err)
+	}
+
+	content, err := os.ReadFile(todoPath)
+	if err != nil {
+		t.Fatalf("Failed to read generated todo file: %v", err)
+	}
+
+	contentStr := string(content)
+	if !strings.Contains(contentStr, "## 2026-02-07") {
+		t.Fatalf("expected active task to be written under created-date section, got:\n%s", contentStr)
+	}
+	if strings.Contains(contentStr, "## Tasks") {
+		t.Fatalf("expected active task not to remain under generic Tasks section, got:\n%s", contentStr)
+	}
+}
+
+func TestTaskService_WriteTodoFileFromState_ActiveTaskRehomesFromMismatchedSection(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	todoState := state.NewTodoState()
+	todoState.Tasks["task123"] = state.TaskState{
+		ID:          "task123",
+		Text:        "Rehome me",
+		Section:     "2026-01-01",
+		Completed:   false,
+		CreatedDate: "2026-02-07",
+		Source:      "diary/2026-02-07.md",
+	}
+
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+
+	service := NewTaskService()
+	if err := service.writeTodoFileFromState(todoPath, todoState, false); err != nil {
+		t.Fatalf("writeTodoFileFromState() error = %v", err)
+	}
+
+	content, err := os.ReadFile(todoPath)
+	if err != nil {
+		t.Fatalf("Failed to read generated todo file: %v", err)
+	}
+
+	contentStr := string(content)
+	if !strings.Contains(contentStr, "## 2026-02-07") {
+		t.Fatalf("expected task to be written under created-date section, got:\n%s", contentStr)
+	}
+	if strings.Contains(contentStr, "## 2026-01-01") {
+		t.Fatalf("expected task to be moved out of mismatched section, got:\n%s", contentStr)
+	}
+	if !strings.Contains(contentStr, "- [ ] Rehome me") {
+		t.Fatalf("expected task checkbox in output, got:\n%s", contentStr)
 	}
 }
 
@@ -1099,5 +1308,301 @@ func TestTaskService_SyncTasks_WriteBackIDAndPropagate(t *testing.T) {
 	}
 	if !strings.Contains(string(dailyContent), "- [x]") {
 		t.Errorf("expected daily note to contain '- [x]' after second sync, got:\n%s", dailyContent)
+	}
+}
+
+func TestTaskService_UpdateTask_UsesTaskSourceNote(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	configHelper := testhelpers.NewConfigHelper(fs)
+	configHelper.CreateBasicConfig(t)
+
+	configPath := filepath.Join(fs.BaseDir, ".config", "jotr", "config.json")
+	os.Setenv("JOTR_CONFIG", configPath)
+
+	now := time.Now()
+	year := now.AddDate(0, 0, -2).Format("2006")
+	monthDir := now.AddDate(0, 0, -2).Format("01-Jan")
+	dayFile := now.AddDate(0, 0, -2).Format("2006-01-02-Mon.md")
+	dailyRelPath := filepath.Join("diary", year, monthDir, dayFile)
+	dailyPath := filepath.Join(fs.BaseDir, dailyRelPath)
+
+	fs.WriteFile(t, dailyRelPath, "# Daily Note\n\n## Tasks\n\n- [ ] Old note task <!-- id: abc12345 -->\n")
+
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+	statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
+	fs.WriteFile(t, "todo.md", "# To-Do List\n\n## Tasks\n\n- [ ] Old note task <!-- id: abc12345 -->\n")
+
+	service := NewTaskService()
+	ctx := context.Background()
+
+	_, err := service.SyncTasks(ctx, SyncOptions{
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: statePath,
+		DailyPath: dailyPath,
+	})
+	if err != nil {
+		t.Fatalf("initial SyncTasks() error = %v", err)
+	}
+
+	_, err = service.UpdateTask(ctx, UpdateTaskOptions{
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: statePath,
+		TaskID:    "abc12345",
+		Text:      "Edited old note task",
+		DailyPath: dailyPath,
+	})
+	if err != nil {
+		t.Fatalf("UpdateTask() error = %v", err)
+	}
+
+	dailyContent, err := os.ReadFile(dailyPath)
+	if err != nil {
+		t.Fatalf("failed to read daily note: %v", err)
+	}
+	if !strings.Contains(string(dailyContent), "Edited old note task") {
+		t.Fatalf("expected old daily note to be updated, got:\n%s", dailyContent)
+	}
+	if strings.Contains(string(dailyContent), "Old note task <!-- id: abc12345 -->") {
+		t.Fatalf("expected old task text to be replaced, got:\n%s", dailyContent)
+	}
+}
+
+func TestTaskService_UpdateTask_PersistsPriorityAndTagsOnTodoFile(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	configHelper := testhelpers.NewConfigHelper(fs)
+	configHelper.CreateBasicConfig(t)
+
+	configPath := filepath.Join(fs.BaseDir, ".config", "jotr", "config.json")
+	os.Setenv("JOTR_CONFIG", configPath)
+
+	now := time.Now()
+	year := now.Format("2006")
+	monthDir := now.Format("01-Jan")
+	dayFile := now.Format("2006-01-02-Mon.md")
+	if err := os.MkdirAll(filepath.Join(fs.BaseDir, "diary", year, monthDir), 0o750); err != nil {
+		t.Fatalf("failed to create diary dir: %v", err)
+	}
+
+	fs.WriteFile(t, filepath.Join("diary", year, monthDir, dayFile), "# Daily Note\n\n## Tasks\n")
+
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+	statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
+
+	fs.WriteFile(t, "todo.md", `# To-Do List
+
+## Tasks
+
+- [ ] Existing tagged task [P2] #alpha #beta <!-- id: abc12345 -->
+- [ ] Initially tagless task <!-- id: def67890 -->
+`)
+
+	service := NewTaskService()
+	ctx := context.Background()
+
+	_, err := service.SyncTasks(ctx, SyncOptions{
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: statePath,
+	})
+	if err != nil {
+		t.Fatalf("initial SyncTasks() error = %v", err)
+	}
+
+	_, err = service.UpdateTask(ctx, UpdateTaskOptions{
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: statePath,
+		TaskID:    "abc12345",
+		Text:      "Existing tagged task updated",
+		Priority:  "P1",
+		Tags:      []string{"beta", "alpha"},
+	})
+	if err != nil {
+		t.Fatalf("UpdateTask() for existing tagged task error = %v", err)
+	}
+
+	_, err = service.UpdateTask(ctx, UpdateTaskOptions{
+		DiaryPath: filepath.Join(fs.BaseDir, "diary"),
+		TodoPath:  todoPath,
+		StatePath: statePath,
+		TaskID:    "def67890",
+		Text:      "Initially tagless task updated",
+		Priority:  "P3",
+		Tags:      []string{"newtag"},
+	})
+	if err != nil {
+		t.Fatalf("UpdateTask() for initially tagless task error = %v", err)
+	}
+
+	tasksOnTodo, err := tasks.ReadTasks(ctx, todoPath)
+	if err != nil {
+		t.Fatalf("failed to read todo tasks after updates: %v", err)
+	}
+
+	findTask := func(id string) tasks.Task {
+		t.Helper()
+		for _, task := range tasksOnTodo {
+			if task.ID == id {
+				return task
+			}
+		}
+		t.Fatalf("task with id %q not found in todo file", id)
+		return tasks.Task{}
+	}
+
+	existingTagged := findTask("abc12345")
+	if existingTagged.Priority != "P1" {
+		t.Fatalf("expected updated priority P1 for existing tagged task, got %q", existingTagged.Priority)
+	}
+	tags := append([]string(nil), existingTagged.Tags...)
+	sort.Strings(tags)
+	if strings.Join(tags, ",") != "alpha,beta" {
+		t.Fatalf("expected unchanged tags alpha,beta for existing tagged task, got %v", existingTagged.Tags)
+	}
+
+	initiallyTagless := findTask("def67890")
+	if initiallyTagless.Priority != "P3" {
+		t.Fatalf("expected updated priority P3 for initially tagless task, got %q", initiallyTagless.Priority)
+	}
+	if got := strings.Join(initiallyTagless.Tags, ","); got != "newtag" {
+		t.Fatalf("expected newly added tag newtag for initially tagless task, got %v", initiallyTagless.Tags)
+	}
+}
+
+// TestTaskService_CreateTask_NoDeadlock verifies that CreateTask -> SyncTasks
+// doesn't deadlock by reacquiring the same locks.
+func TestTaskService_CreateTask_NoDeadlock(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	configHelper := testhelpers.NewConfigHelper(fs)
+	configHelper.CreateBasicConfig(t)
+
+	configPath := filepath.Join(fs.BaseDir, ".config", "jotr", "config.json")
+	os.Setenv("JOTR_CONFIG", configPath)
+
+	now := time.Now()
+	year := now.Format("2006")
+	monthDir := now.Format("01-Jan")
+	dayFile := now.Format("2006-01-02-Mon.md")
+	dailyRelPath := filepath.Join("diary", year, monthDir, dayFile)
+
+	diaryPath := filepath.Join(fs.BaseDir, "diary")
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+	statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
+
+	fs.WriteFile(t, dailyRelPath, "# Daily Note\n")
+	fs.WriteFile(t, "todo.md", "# To-Do List\n\n## Tasks\n")
+
+	service := NewTaskService()
+	ctx := context.Background()
+
+	done := make(chan bool, 1)
+	var result *CreateTaskResult
+	var err error
+
+	go func() {
+		result, err = service.CreateTask(ctx, CreateTaskOptions{
+			DiaryPath:   diaryPath,
+			TodoPath:    todoPath,
+			StatePath:   statePath,
+			Text:        "Test task",
+			LockTimeout: 5 * time.Second,
+		})
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		if err != nil {
+			t.Fatalf("CreateTask() error = %v", err)
+		}
+		if result == nil || result.TaskID == "" {
+			t.Fatal("expected CreateTask to return a task with an ID")
+		}
+
+		dailyNotePath := filepath.Join(fs.BaseDir, dailyRelPath)
+		dailyContent, err := os.ReadFile(dailyNotePath)
+		if err != nil {
+			t.Fatalf("failed to read daily note: %v", err)
+		}
+
+		if !strings.Contains(string(dailyContent), result.TaskID) {
+			t.Errorf("expected daily note to contain task ID %s, got:\n%s", result.TaskID, dailyContent)
+		}
+
+	case <-time.After(10 * time.Second):
+		t.Fatal("CreateTask() deadlocked or timed out")
+	}
+}
+
+// TestTaskService_UpdateTask_NoDeadlock verifies that UpdateTask -> SyncTasks
+// doesn't deadlock by reacquiring the same locks.
+func TestTaskService_UpdateTask_NoDeadlock(t *testing.T) {
+	fs := testhelpers.NewTestFS(t)
+	defer fs.Cleanup()
+
+	configHelper := testhelpers.NewConfigHelper(fs)
+	configHelper.CreateBasicConfig(t)
+
+	configPath := filepath.Join(fs.BaseDir, ".config", "jotr", "config.json")
+	os.Setenv("JOTR_CONFIG", configPath)
+
+	now := time.Now()
+	year := now.Format("2006")
+	monthDir := now.Format("01-Jan")
+	dayFile := now.Format("2006-01-02-Mon.md")
+	dailyRelPath := filepath.Join("diary", year, monthDir, dayFile)
+
+	diaryPath := filepath.Join(fs.BaseDir, "diary")
+	todoPath := filepath.Join(fs.BaseDir, "todo.md")
+	statePath := filepath.Join(fs.BaseDir, ".todo_state.json")
+
+	fs.WriteFile(t, dailyRelPath, "# Daily Note\n")
+	fs.WriteFile(t, "todo.md", "# To-Do List\n\n## Tasks\n")
+
+	service := NewTaskService()
+	ctx := context.Background()
+
+	createResult, err := service.CreateTask(ctx, CreateTaskOptions{
+		DiaryPath:   diaryPath,
+		TodoPath:    todoPath,
+		StatePath:   statePath,
+		Text:        "Original task",
+		LockTimeout: 5 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask() error = %v", err)
+	}
+
+	done := make(chan bool, 1)
+	var updateErr error
+
+	go func() {
+		_, updateErr = service.UpdateTask(ctx, UpdateTaskOptions{
+			DiaryPath:   diaryPath,
+			TodoPath:    todoPath,
+			StatePath:   statePath,
+			TaskID:      createResult.TaskID,
+			Text:        "Updated task text",
+			LockTimeout: 5 * time.Second,
+		})
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		if updateErr != nil {
+			t.Fatalf("UpdateTask() error = %v", updateErr)
+		}
+
+	case <-time.After(10 * time.Second):
+		t.Fatal("UpdateTask() deadlocked or timed out")
 	}
 }

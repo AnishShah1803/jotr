@@ -196,13 +196,7 @@ func (a *Autocomplete) GetCompletions(partial string) []string {
 
 func (a *Autocomplete) GetSubCommands(parent string) []string {
 	parent = a.resolvePath(parent)
-	var subs []string
-
-	if subList, ok := a.subCommands[parent]; ok {
-		subs = subList
-	} else if subList, ok := a.actionCommands[parent]; ok {
-		subs = subList
-	}
+	subs := a.getMergedSubcommandNames(parent)
 
 	if subs == nil {
 		return nil
@@ -217,13 +211,7 @@ func (a *Autocomplete) GetSubCommands(parent string) []string {
 
 func (a *Autocomplete) GetSubCommandCompletions(parent, partial string) []string {
 	parent = a.resolvePath(parent)
-	var subNames []string
-
-	if subList, ok := a.subCommands[parent]; ok {
-		subNames = subList
-	} else if subList, ok := a.actionCommands[parent]; ok {
-		subNames = subList
-	}
+	subNames := a.getMergedSubcommandNames(parent)
 
 	var matches []string
 	for _, sub := range subNames {
@@ -244,6 +232,37 @@ func (a *Autocomplete) GetSubCommandCompletions(parent, partial string) []string
 		return nil
 	}
 	return matches
+}
+
+func (a *Autocomplete) getMergedSubcommandNames(parent string) []string {
+	seen := make(map[string]struct{})
+	merged := make([]string, 0)
+
+	if subList, ok := a.subCommands[parent]; ok {
+		for _, sub := range subList {
+			if _, exists := seen[sub]; exists {
+				continue
+			}
+			seen[sub] = struct{}{}
+			merged = append(merged, sub)
+		}
+	}
+
+	if subList, ok := a.actionCommands[parent]; ok {
+		for _, sub := range subList {
+			if _, exists := seen[sub]; exists {
+				continue
+			}
+			seen[sub] = struct{}{}
+			merged = append(merged, sub)
+		}
+	}
+
+	if len(merged) == 0 {
+		return nil
+	}
+
+	return merged
 }
 
 func (a *Autocomplete) IsParamCommand(cmdName string) bool {
