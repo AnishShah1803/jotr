@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -765,13 +766,14 @@ func (m *Model) runTaskEditFromPrompt() (string, error) {
 
 	taskService := services.NewTaskService()
 	_, err := taskService.UpdateTask(m.ctx, services.UpdateTaskOptions{
-		DiaryPath: m.config.DiaryPath,
-		TodoPath:  m.config.TodoPath,
-		StatePath: m.config.StatePath,
-		TaskID:    m.taskEditTaskID,
-		Text:      newText,
-		Priority:  priority,
-		Tags:      tags,
+		DiaryPath:   m.config.DiaryPath,
+		TodoPath:    m.config.TodoPath,
+		StatePath:   m.config.StatePath,
+		TaskID:      m.taskEditTaskID,
+		Text:        newText,
+		Priority:    priority,
+		Tags:        tags,
+		LockTimeout: 5 * time.Second,
 	})
 	if err != nil {
 		return "", err
