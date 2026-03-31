@@ -1353,6 +1353,7 @@ func TestTaskService_UpdateTask_UsesTaskSourceNote(t *testing.T) {
 		StatePath: statePath,
 		TaskID:    "abc12345",
 		Text:      "Edited old note task",
+		DailyPath: dailyPath,
 	})
 	if err != nil {
 		t.Fatalf("UpdateTask() error = %v", err)
@@ -1380,9 +1381,15 @@ func TestTaskService_UpdateTask_PersistsPriorityAndTagsOnTodoFile(t *testing.T) 
 	configPath := filepath.Join(fs.BaseDir, ".config", "jotr", "config.json")
 	os.Setenv("JOTR_CONFIG", configPath)
 
-	if err := os.MkdirAll(filepath.Join(fs.BaseDir, "diary"), 0o750); err != nil {
+	now := time.Now()
+	year := now.Format("2006")
+	monthDir := now.Format("01-Jan")
+	dayFile := now.Format("2006-01-02-Mon.md")
+	if err := os.MkdirAll(filepath.Join(fs.BaseDir, "diary", year, monthDir), 0o750); err != nil {
 		t.Fatalf("failed to create diary dir: %v", err)
 	}
+
+	fs.WriteFile(t, filepath.Join("diary", year, monthDir, dayFile), "# Daily Note\n\n## Tasks\n")
 
 	todoPath := filepath.Join(fs.BaseDir, "todo.md")
 	statePath := filepath.Join(fs.BaseDir, ".todo_state.json")

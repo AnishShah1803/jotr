@@ -213,12 +213,18 @@ func (s *TaskService) syncTasksWithLocks(ctx context.Context, opts SyncOptions, 
 	}
 
 	if notePath != "" {
-		for _, todoTask := range todoTasks {
-			if todoTask.ID != "" {
-				continue
+		dailyTaskIDs := make(map[string]bool)
+		for _, dailyTask := range dailyTasks {
+			if dailyTask.ID != "" {
+				dailyTaskIDs[dailyTask.ID] = true
 			}
+		}
+		for _, todoTask := range todoTasks {
 			cleanTodoText := strings.TrimSpace(tasks.StripTaskID(todoTask.Text))
 			if cleanTodoText == "" {
+				continue
+			}
+			if todoTask.ID != "" && dailyTaskIDs[todoTask.ID] {
 				continue
 			}
 			alreadyInDaily := false
@@ -566,6 +572,7 @@ type UpdateTaskOptions struct {
 	Priority    string
 	Tags        []string
 	LockTimeout time.Duration
+	DailyPath   string
 }
 
 type UpdateTaskResult struct {
@@ -776,7 +783,7 @@ func (s *TaskService) UpdateTask(ctx context.Context, opts UpdateTaskOptions) (*
 
 	if statePath, err := state.Read(opts.StatePath); err == nil {
 		if existing, ok := statePath.Tasks[opts.TaskID]; ok {
-			if existing.Source != "" && existing.Source != "todo-list" && existing.Source != "merged" {
+			if existing.Source != "" && existing.Source != "todo-list" && existing.Source != "merged" && existing.Source != "migration" {
 				editSourcePath = existing.Source
 				syncDailyPath = editSourcePath
 			}
@@ -848,11 +855,15 @@ func (s *TaskService) UpdateTask(ctx context.Context, opts UpdateTaskOptions) (*
 		return nil, err
 	}
 
+	dailyPath := syncDailyPath
+	if dailyPath == "" && opts.DailyPath != "" {
+		dailyPath = opts.DailyPath
+	}
 	if _, err := s.syncTasksWithLocks(ctx, SyncOptions{
 		DiaryPath: opts.DiaryPath,
 		TodoPath:  opts.TodoPath,
 		StatePath: opts.StatePath,
-		DailyPath: syncDailyPath,
+		DailyPath: dailyPath,
 	}, locks); err != nil {
 		return nil, err
 	}
