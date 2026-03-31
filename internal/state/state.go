@@ -642,6 +642,16 @@ func (s *TodoState) applyDailyToTodoChanges(dailyChangeMap, todoChangeMap map[st
 				result.UpdatedFromDaily = append(result.UpdatedFromDaily, detail)
 			}
 		} else if dailyChange.ChangeType == Modified && todoChange.ChangeType == Modified {
+			if dailyChange.NewTask != nil && dailyChange.OldTask != nil && dailyChange.NewTask.Completed && !dailyChange.OldTask.Completed && isSectionOnlyChange(todoChange) {
+				s.applyChange(dailyChange)
+				result.AppliedDaily++
+				result.StateUpdated = true
+				result.TodoChanged = true
+				result.ChangedTaskIDs = append(result.ChangedTaskIDs, taskID)
+				detail := buildTaskChangeDetail(dailyChange)
+				result.UpdatedFromDaily = append(result.UpdatedFromDaily, detail)
+				continue
+			}
 			if isSectionOnlyChange(todoChange) {
 				s.applyChange(todoChange)
 				result.AppliedTodo++
@@ -700,7 +710,7 @@ func (s *TodoState) applyTodoToDailyChanges(todoChangeMap, dailyChangeMap map[st
 			s.applyChange(todoChange)
 			result.AppliedTodo++
 			result.StateUpdated = true
-			result.TodoChanged = true
+			result.DailyChanged = true
 			result.ChangedTaskIDs = append(result.ChangedTaskIDs, taskID)
 
 			detail := buildTaskChangeDetail(todoChange)

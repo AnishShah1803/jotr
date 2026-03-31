@@ -24,9 +24,10 @@ func TestCompareWithDailyNotes(t *testing.T) {
 			state: &TodoState{
 				Tasks: map[string]TaskState{
 					"abc123": {
-						ID:     "abc123",
-						Text:   "Test task",
-						Source: "test.md",
+						ID:      "abc123",
+						Text:    "Test task",
+						Section: "Tasks",
+						Source:  "test.md",
 					},
 				},
 			},
@@ -160,14 +161,16 @@ func TestCompareWithDailyNotes(t *testing.T) {
 			state: &TodoState{
 				Tasks: map[string]TaskState{
 					"abc123": {
-						ID:     "abc123",
-						Text:   "Unchanged task",
-						Source: "test.md",
+						ID:      "abc123",
+						Text:    "Unchanged task",
+						Section: "Tasks",
+						Source:  "test.md",
 					},
 					"def456": {
-						ID:     "def456",
-						Text:   "Old text",
-						Source: "test.md",
+						ID:      "def456",
+						Text:    "Old text",
+						Section: "Tasks",
+						Source:  "test.md",
 					},
 				},
 			},
