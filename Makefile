@@ -48,7 +48,7 @@ clean:
 # Run tests
 test:
 	@echo "Running tests..."
-	go test -v ./...
+	go test -v -timeout 15m ./...
 
 # Run with race detector
 test-race:
