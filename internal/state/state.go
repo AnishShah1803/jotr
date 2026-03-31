@@ -11,6 +11,7 @@ import (
 
 	"github.com/AnishShah1803/jotr/internal/constants"
 	"github.com/AnishShah1803/jotr/internal/tasks"
+	"github.com/AnishShah1803/jotr/internal/utils"
 )
 
 // TodoState represents the complete state of a todo list
@@ -75,7 +76,7 @@ func (s *TodoState) Write(statePath string) error {
 		return fmt.Errorf("failed to marshal state: %w", err)
 	}
 
-	if err := os.WriteFile(statePath, data, constants.FilePerm0644); err != nil {
+	if err := utils.AtomicWriteFile(statePath, data, constants.FilePerm0644); err != nil {
 		return fmt.Errorf("failed to write state file: %w", err)
 	}
 
